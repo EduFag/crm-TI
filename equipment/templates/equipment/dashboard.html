@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Equipamentos{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full w-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Equipamentos</h2>
+            <p class="text-sm text-slate-500 mt-1">Controle de ciclo de vida de ativos e hardware corporativo.</p>
+        </div>
+        <a href="{% url 'equipment:equipment_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Ativo de TI</a>
+    </div>
+
+    <!-- RF01: Métricas 3x3 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 w-full">
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Cadastrado</p>
+            <h3 class="text-4xl font-bold text-slate-900">{{ total_equipments }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Ativos em Uso</p>
+            <h3 class="text-4xl font-bold text-blue-600">{{ in_use_equipments }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Estoque (Disponíveis)</p>
+            <h3 class="text-4xl font-bold text-emerald-600">{{ available_equipments }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Em Manutenção</p>
+            <h3 class="text-4xl font-bold text-orange-600">{{ maintenance_equipments }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Garantia Expirada</p>
+            <h3 class="text-4xl font-bold text-red-600">{{ expired_warranty }}</h3>
+        </div>
+    </div>
+
+    <!-- Layout Dividido para Tabela Principal e Log -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 h-full pb-8 w-full">
+        
+        <!-- Tabela Geral de Ativos -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px] w-full">
+            <div class="p-4 border-b border-slate-100 flex flex-col gap-3 bg-slate-50 rounded-t-xl w-full">
+                <h4 class="font-bold text-slate-800">Inventário Geral</h4>
+                <!-- RF03: Filtros Esticados (Ocupando todo o container) -->
+                <div class="flex flex-wrap md:flex-nowrap gap-3 w-full">
+                    <input type="text" id="filter-eq-text" onkeyup="filterEquipments()" placeholder="Buscar Tag, Série ou Funcionário..." class="text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-[2] outline-none font-medium">
+                    <select id="filter-eq-type" onchange="filterEquipments()" class="text-sm p-2.5 border border-slate-300 rounded-lg flex-1 outline-none">
+                        <option value="">Qualquer Tipo</option>
+                        <option value="NOTEBOOK">Notebook</option>
+                        <option value="DESKTOP">Desktop</option>
+                        <option value="MONITOR">Monitor</option>
+                        <option value="SMARTPHONE">Smartphone</option>
+                        <option value="PERIPHERAL">Periférico</option>
+                    </select>
+                    <select id="filter-eq-status" onchange="filterEquipments()" class="text-sm p-2.5 border border-slate-300 rounded-lg flex-1 outline-none">
+                        <option value="">Qualquer Status</option>
+                        <option value="AVAILABLE">Disponível</option>
+                        <option value="IN_USE">Em Uso</option>
+                        <option value="MAINTENANCE">Em Manutenção</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-y-auto p-0 flex-1 w-full">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Patrimônio</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Modelo</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Status</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipments-tbody" class="divide-y divide-slate-100">
+                        {% for eq in equipments %}
+                        <tr class="hover:bg-slate-50 transition-colors" data-type="{{ eq.type }}" data-status="{{ eq.status }}">
+                            <td class="px-5 py-4 font-bold text-slate-900 eq-tag">{{ eq.tag }} <br><span class="text-[10px] font-mono text-slate-400 eq-serial">SN: {{ eq.serial_number }}</span></td>
+                            <td class="px-5 py-4 text-slate-600 eq-brand">{{ eq.brand_model }} <br><span class="text-xs font-bold text-blue-600 eq-emp">{{ eq.current_employee|default:"Em Estoque" }}</span></td>
+                            <td class="px-5 py-4">
+                                {% if eq.status == 'AVAILABLE' %}
+                                <span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Disponível</span>
+                                {% elif eq.status == 'IN_USE' %}
+                                <span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Em Uso</span>
+                                {% elif eq.status == 'MAINTENANCE' %}
+                                <span class="bg-orange-100 text-orange-700 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Manutenção</span>
+                                {% else %}
+                                <span class="bg-red-100 text-red-700 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sucata</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-4 text-right">
+                                <a href="{% url 'equipment:equipment_update' eq.id %}" class="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase underline">Editar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="p-12 text-center text-slate-400 font-medium">Nenhum equipamento cadastrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- RF02: Histórico (Log) -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px] w-full">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl flex flex-col gap-3 w-full">
+                <h4 class="font-bold text-slate-800">Log de Movimentações</h4>
+                <!-- RF03: Filtros Esticados (Ocupando todo o container) -->
+                <div class="flex flex-wrap md:flex-nowrap gap-3 w-full">
+                    <input type="text" id="filter-log-text" onkeyup="filterLogs()" placeholder="Busca por funcionário ou tag..." class="text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 outline-none font-medium">
+                    <select id="filter-log-action" onchange="filterLogs()" class="text-sm p-2.5 border border-slate-300 rounded-lg flex-1 outline-none">
+                        <option value="">Qualquer Ação</option>
+                        <option value="ASSIGNED">Atribuição</option>
+                        <option value="RETURNED">Devolução</option>
+                        <option value="MAINTENANCE">Envio Manutenção</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-y-auto p-0 flex-1 w-full">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Data</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Ação</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Ativo (Tag)</th>
+                            <th class="px-5 py-4 font-semibold text-slate-600">Funcionário Envolvido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-tbody" class="divide-y divide-slate-100">
+                        {% for log in history_logs %}
+                        <tr class="hover:bg-slate-50 transition-colors" data-action="{{ log.action }}">
+                            <td class="px-5 py-4 text-xs font-mono text-slate-500">{{ log.timestamp|date:"d/m/y H:i" }}</td>
+                            <td class="px-5 py-4">
+                                {% if log.action == 'ASSIGNED' %}
+                                <span class="text-blue-600 font-bold text-xs uppercase tracking-wide">Entregue</span>
+                                {% elif log.action == 'RETURNED' %}
+                                <span class="text-emerald-600 font-bold text-xs uppercase tracking-wide">Devolvido</span>
+                                {% elif log.action == 'MAINTENANCE' %}
+                                <span class="text-orange-600 font-bold text-xs uppercase tracking-wide">Manutenção</span>
+                                {% else %}
+                                <span class="text-slate-500 font-bold text-xs uppercase tracking-wide">{{ log.get_action_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-4 font-bold text-slate-800 log-tag">{{ log.equipment.tag }}</td>
+                            <td class="px-5 py-4 text-slate-600 font-medium log-emp">{{ log.employee_name|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="p-12 text-center text-slate-400 font-medium">Nenhum log registrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // RF03: Lógica JS Pura para Filtro Avançado em Tempo Real
+    function filterEquipments() {
+        let textInput = document.getElementById('filter-eq-text').value.toLowerCase();
+        let typeInput = document.getElementById('filter-eq-type').value;
+        let statusInput = document.getElementById('filter-eq-status').value;
+        
+        let rows = document.querySelectorAll('#equipments-tbody tr');
+        rows.forEach(row => {
+            if(row.children.length === 1) return;
+            
+            let tag = row.querySelector('.eq-tag').innerText.toLowerCase();
+            let serial = row.querySelector('.eq-serial').innerText.toLowerCase();
+            let brand = row.querySelector('.eq-brand').innerText.toLowerCase();
+            let emp = row.querySelector('.eq-emp').innerText.toLowerCase();
+            
+            let matchText = tag.includes(textInput) || serial.includes(textInput) || brand.includes(textInput) || emp.includes(textInput);
+            let matchType = typeInput === "" || row.getAttribute('data-type') === typeInput;
+            let matchStatus = statusInput === "" || row.getAttribute('data-status') === statusInput;
+            
+            row.style.display = (matchText && matchType && matchStatus) ? '' : 'none';
+        });
+    }
+
+    function filterLogs() {
+        let textInput = document.getElementById('filter-log-text').value.toLowerCase();
+        let actionInput = document.getElementById('filter-log-action').value;
+        
+        let rows = document.querySelectorAll('#logs-tbody tr');
+        rows.forEach(row => {
+            if(row.children.length === 1) return;
+            
+            let tag = row.querySelector('.log-tag').innerText.toLowerCase();
+            let emp = row.querySelector('.log-emp').innerText.toLowerCase();
+            
+            let matchText = tag.includes(textInput) || emp.includes(textInput);
+            let matchAction = actionInput === "" || row.getAttribute('data-action') === actionInput;
+            
+            row.style.display = (matchText && matchAction) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

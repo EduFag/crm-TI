@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Domínios Corporativos{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full mt-6 w-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Catálogo de Domínios</h2>
+            <p class="text-sm text-slate-500 mt-1">Domínios autorizados e registrados para a criação de caixas.</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'emails:dashboard' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">Voltar</a>
+            <a href="{% url 'emails:domain_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Adicionar Domínio</a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Identificador</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Nome do Domínio Corporativo</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Data de Registro</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for domain in domains %}
+                <tr class="hover:bg-slate-50 transition-colors group">
+                    <td class="px-6 py-5 font-mono text-slate-400">#{{ domain.id }}</td>
+                    <td class="px-6 py-5 font-black text-slate-800 text-xl">@{{ domain.name }}</td>
+                    <td class="px-6 py-5 text-slate-500 font-medium text-right">{{ domain.created_at|date:"d/m/Y H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="p-16 text-center text-slate-400 bg-slate-50 font-medium">Você ainda não cadastrou nenhum domínio. (ex: suaempresa.com.br)</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

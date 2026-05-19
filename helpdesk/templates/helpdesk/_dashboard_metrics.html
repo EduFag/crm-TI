@@ -1,0 +1,56 @@
+<!-- KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <p class="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wide">Total Geral Registrado</p>
+        <h3 class="text-4xl font-bold text-slate-900">{{ total_tickets }}</h3>
+    </div>
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+        <p class="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wide">Ativos no Kanban</p>
+        <h3 class="text-4xl font-bold text-blue-600">{{ total_kanban_active }}</h3>
+    </div>
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+        <p class="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wide">Arquivados Automaticamente</p>
+        <h3 class="text-4xl font-bold text-slate-600">{{ total_archived }}</h3>
+    </div>
+</div>
+
+<!-- Tabelas de Distribuição -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Distribuição por Status -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h4 class="font-bold text-slate-800">Tickets por Status</h4>
+        </div>
+        <div class="p-6">
+            {% for item in status_distribution %}
+            <div class="flex justify-between items-center mb-3 last:mb-0">
+                <span class="text-sm font-medium text-slate-600">
+                    {% for k,v in status_labels.items %}{% if k == item.status %}{{ v }}{% endif %}{% endfor %}
+                </span>
+                <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">{{ item.total }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-400 text-center">Sem dados suficientes.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Distribuição por Prioridade -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h4 class="font-bold text-slate-800">Tickets por Prioridade</h4>
+        </div>
+        <div class="p-6">
+            {% for item in priority_distribution %}
+            <div class="flex justify-between items-center mb-3 last:mb-0">
+                <span class="text-sm font-medium text-slate-600">
+                    {% for k,v in priority_labels.items %}{% if k == item.priority %}{{ v }}{% endif %}{% endfor %}
+                </span>
+                <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">{{ item.total }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-400 text-center">Sem dados suficientes.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>

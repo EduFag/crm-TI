@@ -1,0 +1,49 @@
+from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from helpdesk.models import Ticket
+
+class HistoryListView(LoginRequiredMixin, ListView):
+    template_name = 'helpdesk/history.html'
+    model = Ticket
+    context_object_name = 'tickets'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = super().get_queryset().filter(is_active=True).select_related('assigned_to').order_by('-created_at')
+        
+        # Recupera os filtros da QueryString
+        status = self.request.GET.get('status')
+        priority = self.request.GET.get('priority')
+        category = self.request.GET.get('category')
+        archived = self.request.GET.get('archived')
+        search = self.request.GET.get('search')
+        date_from = self.request.GET.get('date_from')
+        date_to = self.request.GET.get('date_to')
+        
+        if status:
+            qs = qs.filter(status=status)
+        if priority:
+            qs = qs.filter(priority=priority)
+        if category:
+            qs = qs.filter(category=category)
+        if archived == 'yes':
+            qs = qs.filter(is_archived=True)
+        elif archived == 'no':
+            qs = qs.filter(is_archived=False)
+            
+        if search:
+            qs = qs.filter(title__icontains=search)
+            
+        if date_from:
+            qs = qs.filter(created_at__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__lte=f"{date_to} 23:59:59")
+            
+        return qs
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['status_choices'] = Ticket.StatusChoices
+        context['priority_choices'] = Ticket.PriorityChoices
+        context['category_choices'] = Ticket.CategoryChoices
+        return context

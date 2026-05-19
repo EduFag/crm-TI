@@ -1,0 +1,80 @@
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity" 
+     onclick="document.getElementById('drawer-container').innerHTML = ''"></div>
+
+<!-- Drawer Content -->
+<div class="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-slate-200">
+    
+    <!-- Cabeçalho -->
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <h3 class="text-lg font-bold text-slate-900 tracking-tight">Detalhes do Chamado</h3>
+        <button onclick="document.getElementById('drawer-container').innerHTML = ''" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+    </div>
+
+    <!-- Corpo (Scrollável) -->
+    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+        
+        <!-- Info Principal -->
+        <div>
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">#{{ ticket.id }}</span>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">{{ ticket.get_status_display }}</span>
+            </div>
+            <h2 class="text-xl font-bold text-slate-900 mb-2 leading-snug">{{ ticket.title }}</h2>
+            <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">{{ ticket.description|default:"Sem descrição adicional."|linebreaksbr }}</p>
+        </div>
+        
+        <!-- Metadados -->
+        <div class="grid grid-cols-2 gap-4 text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Solicitante</span>
+                <span class="font-medium text-slate-800">{{ ticket.requester_name }}</span>
+            </div>
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Técnico</span>
+                <span class="font-medium text-slate-800">
+                    {% if ticket.assigned_to %}
+                        {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}
+                    {% else %}
+                        <span class="text-slate-400 italic">Não atribuído</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Prioridade</span>
+                <span class="font-medium text-slate-800">{{ ticket.get_priority_display }}</span>
+            </div>
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Criado em</span>
+                <span class="font-medium text-slate-800">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+
+        <!-- Seção de Comentários -->
+        <div class="flex-1 flex flex-col">
+            <h4 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                Histórico
+            </h4>
+            
+            <!-- Lista de Comentários (Alvo do HTMX) -->
+            <div id="comments-list" class="flex flex-col gap-4 mb-6">
+                {% include "helpdesk/_comments_list.html" %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Input de Comentário (Fixo no Rodapé) -->
+    <div class="p-4 border-t border-slate-200 bg-slate-50">
+        <form hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset()" class="flex flex-col gap-3">
+            <textarea name="text" rows="2" placeholder="Adicione uma nota ou atualização..." required class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    Enviar Comentário
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

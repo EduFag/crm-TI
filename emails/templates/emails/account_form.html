@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastrar E-mail{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full max-w-2xl mx-auto mt-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Novo E-mail</h2>
+            <p class="text-sm text-slate-500 mt-1">Crie a identidade e o acesso da caixa corporativa.</p>
+        </div>
+    </div>
+    
+    <div class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Endereço de E-mail Corporativo</label>
+                <div class="flex items-stretch shadow-sm">
+                    <!-- Prefixo -->
+                    <input type="text" name="username" required placeholder="ex: joao.silva" 
+                        class="w-full text-base p-3 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-right font-medium text-slate-800 transition-all">
+                    
+                    <!-- Adorno @ -->
+                    <span class="bg-slate-100 border-y border-slate-300 px-4 py-3 flex items-center text-slate-500 font-black text-lg">
+                        @
+                    </span>
+                    
+                    <!-- Domínio Dropdown -->
+                    <select name="domain" required 
+                        class="w-full text-base p-3 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer appearance-none">
+                        <option value="" disabled selected>Selecione o Domínio</option>
+                        {% for choice in form.domain.field.queryset %}
+                            <option value="{{ choice.pk }}">{{ choice.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if form.username.errors or form.domain.errors %}
+                    <p class="text-xs text-red-500 font-bold mt-2">Verifique o prefixo e garanta que escolheu um domínio.</p>
+                {% endif %}
+                
+                {% if not form.domain.field.queryset.exists %}
+                    <p class="text-xs text-orange-600 font-bold mt-2">Nenhum domínio cadastrado. <a href="{% url 'emails:domain_create' %}" class="underline">Cadastre um domínio primeiro</a>.</p>
+                {% endif %}
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Funcionário Vinculado</label>
+                <input type="text" name="employee_name" required placeholder="Nome completo do colaborador" class="w-full text-base p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm transition-all">
+                {{ form.employee_name.errors }}
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Status Inicial</label>
+                <select name="status" class="w-full text-base p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm font-medium text-slate-700 bg-white">
+                    {% for val, label in form.status.field.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {{ form.status.errors }}
+            </div>
+            
+            <div class="mt-10 flex gap-4 pt-6 border-t border-slate-100">
+                <button type="submit" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-bold text-base hover:bg-blue-700 transition-colors shadow-md text-center">Criar Conta</button>
+                <a href="{% url 'emails:dashboard' %}" class="flex-1 bg-slate-100 text-slate-700 px-6 py-3 rounded-lg font-bold text-base hover:bg-slate-200 transition-colors shadow-sm text-center">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

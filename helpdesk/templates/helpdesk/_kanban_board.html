@@ -1,0 +1,65 @@
+<div class="flex gap-6 h-full min-w-max">
+    <!-- Coluna: Novos -->
+    <div class="flex flex-col w-80 max-h-full">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                <h3 class="font-semibold text-slate-700">Novos</h3>
+                <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_new.count }}</span>
+            </div>
+        </div>
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="NEW" ondragover="allowDrop(event)" ondrop="drop(event)">
+            {% for ticket in tickets_new %}
+                {% include "helpdesk/_ticket_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Coluna: Em Atendimento -->
+    <div class="flex flex-col w-80 max-h-full">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                <h3 class="font-semibold text-slate-700">Em Atendimento</h3>
+                <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_in_progress.count }}</span>
+            </div>
+        </div>
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="IN_PROGRESS" ondragover="allowDrop(event)" ondrop="drop(event)">
+            {% for ticket in tickets_in_progress %}
+                {% include "helpdesk/_ticket_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Coluna: Pendente -->
+    <div class="flex flex-col w-80 max-h-full">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+                <h3 class="font-semibold text-slate-700">Pendente</h3>
+                <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_pending.count }}</span>
+            </div>
+        </div>
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="PENDING" ondragover="allowDrop(event)" ondrop="drop(event)">
+            {% for ticket in tickets_pending %}
+                {% include "helpdesk/_ticket_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Coluna: Resolvido -->
+    <div class="flex flex-col w-80 max-h-full">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                <h3 class="font-semibold text-slate-700">Resolvido</h3>
+                <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_resolved.count }}</span>
+            </div>
+        </div>
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="RESOLVED" ondragover="allowDrop(event)" ondrop="drop(event)">
+            {% for ticket in tickets_resolved %}
+                {% include "helpdesk/_ticket_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+</div>

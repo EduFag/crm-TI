@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Atribuição - Gestão de Chips{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Entregar ou Transferir Chip</h2>
+            <p class="text-sm text-slate-500 mt-1">Vincule chips disponíveis do estoque diretamente a funcionários.</p>
+        </div>
+    </div>
+    
+    {% include "chips/_nav.html" %}
+    
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Formulário de Atribuição (Esquerda) -->
+        <div class="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
+            <h4 class="font-bold text-slate-800 mb-4">1. Confirmar Atribuição</h4>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">ID do Chip (Obrigatório)</label>
+                    <input type="text" id="chip_id" name="chip_id" required readonly placeholder="Clique em 'Selecionar' ao lado ->" class="w-full text-sm p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-500 font-mono transition-all duration-300">
+                    <p class="text-[10px] text-slate-400 mt-1">Este campo é autopreenchido via JavaScript.</p>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Nome do Funcionário</label>
+                    <input type="text" name="employee_name" required placeholder="Digite o nome do funcionário..." class="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold transition-colors shadow-sm">
+                    Salvar Movimentação
+                </button>
+            </form>
+        </div>
+
+        <!-- Tabela de Estoque Disponível (Direita - RF10) -->
+        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col max-h-[600px]">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+                <h4 class="font-bold text-slate-800">2. Escolher no Estoque Livre</h4>
+            </div>
+            <div class="overflow-y-auto p-0 flex-1">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-slate-600 uppercase text-xs">ID</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600 uppercase text-xs">Linha</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600 uppercase text-xs">Operadora</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600 uppercase text-xs">Plano</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600 uppercase text-xs text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for chip in available_chips %}
+                        <tr class="hover:bg-blue-50 transition-colors group">
+                            <td class="px-4 py-3 font-mono text-slate-500">#{{ chip.id }}</td>
+                            <td class="px-4 py-3 font-bold text-slate-900">{{ chip.line_number }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ chip.operator.name }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ chip.get_plan_type_display }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <!-- RF09: Autopreenchimento JS -->
+                                <button onclick="selectChip({{ chip.id }})" class="bg-slate-200 group-hover:bg-blue-600 group-hover:text-white text-slate-700 text-xs px-3 py-1.5 rounded-md font-bold transition-all shadow-sm">
+                                    Selecionar
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="p-6 text-center text-slate-400 bg-slate-50">Não há nenhum chip com status "Disponível" no momento.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function selectChip(id) {
+        let input = document.getElementById('chip_id');
+        input.value = id;
+        
+        // Efeito visual brilhante (Feedback instantâneo RF09)
+        input.classList.remove('bg-slate-100', 'text-slate-500', 'border-slate-300');
+        input.classList.add('bg-blue-50', 'border-blue-400', 'ring-4', 'ring-blue-100', 'text-blue-700', 'font-bold');
+        
+        // Foca automaticamente no campo do funcionário após selecionar o chip
+        document.querySelector('input[name="employee_name"]').focus();
+    }
+</script>
+{% endblock %}

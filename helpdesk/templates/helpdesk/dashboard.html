@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <!-- Cabeçalho Principal -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
+            <p class="text-sm text-slate-500 mt-1">Métricas e acompanhamento geral de chamados.</p>
+        </div>
+    </div>
+    
+    <!-- Menu Navegação -->
+    {% include "helpdesk/_nav.html" %}
+
+    <!-- Conexão SSE HTMX (Real-Time) -->
+    <div hx-ext="sse" sse-connect="{% url 'helpdesk:sse_stream' %}">
+        <div id="dashboard-metrics-container" hx-trigger="sse:ticket_updated" hx-get="{% url 'helpdesk:dashboard_metrics' %}" hx-swap="innerHTML">
+            {% include "helpdesk/_dashboard_metrics.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

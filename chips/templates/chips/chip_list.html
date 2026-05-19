@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Inventário - Gestão de Chips{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Inventário de Chips</h2>
+            <p class="text-sm text-slate-500 mt-1">Gestão de todas as linhas cadastradas.</p>
+        </div>
+        <a href="{% url 'chips:chip_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Chip</a>
+    </div>
+    
+    {% include "chips/_nav.html" %}
+    
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs">ID</th>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs">Linha</th>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs">Operadora / Plano</th>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs">Custo Fixo</th>
+                    <th class="px-4 py-4 font-semibold text-slate-500 uppercase text-xs text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for chip in chips %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-mono text-slate-500">#{{ chip.id }}</td>
+                    <td class="px-4 py-3 font-bold text-slate-900 text-base">{{ chip.line_number }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2.5 py-1 rounded-md text-[11px] uppercase font-bold tracking-wider 
+                            {% if chip.status == 'AVAILABLE' %}bg-emerald-100 text-emerald-700
+                            {% elif chip.status == 'IN_USE' %}bg-blue-100 text-blue-700
+                            {% elif chip.status == 'LOST' or chip.status == 'BLOCKED' %}bg-red-100 text-red-700
+                            {% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ chip.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600">
+                        <span class="font-semibold">{{ chip.operator.name }}</span> <br>
+                        <span class="text-xs text-slate-400">{{ chip.get_plan_type_display }} ({{ chip.get_technology_display }})</span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 font-medium">R$ {{ chip.fixed_cost }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'chips:chip_edit' chip.id %}" class="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase px-2 transition-colors">Editar</a>
+                        
+                        {% if chip.status == 'IN_USE' %}
+                        <!-- Botão de Devolução (RF12) -->
+                        <form method="POST" action="{% url 'chips:return_chip' chip.id %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-orange-500 hover:text-orange-700 font-bold text-xs uppercase px-2 border-l border-slate-300 ml-1 transition-colors" onclick="return confirm('Confirmar a devolução deste chip para o estoque (Ficará Disponível)?')">Devolver</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="p-8 text-center text-slate-400 bg-slate-50">Nenhum chip cadastrado no sistema.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

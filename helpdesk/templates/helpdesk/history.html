@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <!-- Cabeçalho -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
+            <p class="text-sm text-slate-500 mt-1">Busque e filtre o histórico completo de chamados.</p>
+        </div>
+    </div>
+    
+    {% include "helpdesk/_nav.html" %}
+
+    <!-- Filtros -->
+    <form method="get" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap gap-5 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Pesquisar Título</label>
+            <input type="text" name="search" value="{{ request.GET.search }}" placeholder="Termo de busca..." class="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="w-40">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Status</label>
+            <select name="status" class="w-full text-sm p-2 border border-slate-300 rounded-lg">
+                <option value="">Todos</option>
+                {% for k, v in status_choices.choices %}
+                <option value="{{ k }}" {% if request.GET.status == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="w-40">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Prioridade</label>
+            <select name="priority" class="w-full text-sm p-2 border border-slate-300 rounded-lg">
+                <option value="">Todas</option>
+                {% for k, v in priority_choices.choices %}
+                <option value="{{ k }}" {% if request.GET.priority == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="w-40">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Arquivado?</label>
+            <select name="archived" class="w-full text-sm p-2 border border-slate-300 rounded-lg">
+                <option value="">Ambos</option>
+                <option value="yes" {% if request.GET.archived == 'yes' %}selected{% endif %}>Sim</option>
+                <option value="no" {% if request.GET.archived == 'no' %}selected{% endif %}>Não</option>
+            </select>
+        </div>
+        
+        <div class="w-36">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Criado de</label>
+            <input type="date" name="date_from" value="{{ request.GET.date_from }}" class="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="w-36">
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Criado até</label>
+            <input type="date" name="date_to" value="{{ request.GET.date_to }}" class="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="flex gap-2">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Filtrar
+            </button>
+            <a href="{% url 'helpdesk:history' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                Limpar
+            </a>
+        </div>
+    </form>
+
+    <!-- Tabela de Histórico -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto flex-1">
+        <table class="w-full text-left text-sm whitespace-nowrap">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">ID</th>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">Título & Solicitante</th>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">Status</th>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">Técnico</th>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">Atualizado Em</th>
+                    <th class="px-6 py-4 font-semibold text-slate-600 uppercase text-xs">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for ticket in tickets %}
+                <tr class="hover:bg-slate-50 transition-colors {% if ticket.is_archived %}opacity-60 bg-slate-50/50{% endif %}">
+                    <td class="px-6 py-4 font-mono text-slate-500">#{{ ticket.id }}</td>
+                    <td class="px-6 py-4">
+                        <p class="font-medium text-slate-900 truncate max-w-xs">{{ ticket.title }}</p>
+                        <p class="text-xs text-slate-500">{{ ticket.requester_name }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">{{ ticket.get_status_display }}</span>
+                        {% if ticket.is_archived %}
+                        <span class="ml-1 px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded text-[10px] uppercase font-bold">Arq</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-slate-600">
+                        {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username|default:"—" }}
+                    </td>
+                    <td class="px-6 py-4 text-slate-500">
+                        {{ ticket.updated_at|date:"d/m/Y H:i" }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <!-- Botão que abre o HTMX Drawer igual ao Kanban -->
+                        <button hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-target="#drawer-container" hx-swap="innerHTML" class="text-blue-600 hover:text-blue-800 text-xs font-semibold uppercase tracking-wider">
+                            Visualizar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-12 text-center text-slate-400">Nenhum chamado encontrado com esses filtros.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Drawer container para a tabela também -->
+    <div id="drawer-container"></div>
+</div>
+{% endblock %}

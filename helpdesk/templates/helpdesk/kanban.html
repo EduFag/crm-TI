@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Helpdesk - Sistema TI{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <!-- Cabeçalho do Kanban -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
+            <p class="text-sm text-slate-500 mt-1">Gerencie os chamados e suporte interno.</p>
+        </div>
+        <a href="{% url 'helpdesk:ticket_create' %}" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Novo Chamado
+        </a>
+    </div>
+
+    <!-- Navegação interna do módulo -->
+    {% include "helpdesk/_nav.html" %}
+
+    <!-- Container Kanban -->
+    <div class="flex-1 overflow-x-auto overflow-y-hidden pb-4">
+        <!-- Conexão SSE HTMX (Real-Time) -->
+        <div hx-ext="sse" sse-connect="{% url 'helpdesk:sse_stream' %}" class="h-full">
+            <div id="kanban-board-container" hx-trigger="sse:ticket_updated" hx-get="{% url 'helpdesk:kanban_board' %}" hx-swap="innerHTML" class="h-full">
+                {% include "helpdesk/_kanban_board.html" %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Drawer Container (será preenchido pelo HTMX) -->
+<div id="drawer-container"></div>
+
+<!-- JavaScript para o Drag and Drop do Kanban -->
+<script>
+    function drag(event) {
+        // Envia o id do ticket
+        event.dataTransfer.setData("ticket_id", event.target.id);
+        event.target.classList.add('opacity-50');
+    }
+
+    function dragEnd(event) {
+        event.target.classList.remove('opacity-50');
+    }
+
+    function allowDrop(event) {
+        event.preventDefault();
+        if (event.target.classList.contains('kanban-column')) {
+            event.target.classList.add('bg-slate-200/50');
+        }
+    }
+
+    function drop(event) {
+        event.preventDefault();
+        
+        let targetColumn = event.target.closest('.kanban-column');
+        if (!targetColumn) return;
+        
+        targetColumn.classList.remove('bg-slate-200/50');
+
+        let ticketIdRaw = event.dataTransfer.getData("ticket_id");
+        if (!ticketIdRaw) return;
+        
+        let ticketId = ticketIdRaw.split('-')[1];
+        let newStatus = targetColumn.getAttribute('data-status');
+        
+        let card = document.getElementById(ticketIdRaw);
+        if (card) {
+            // Dropa localmente para percepção imediata do usuário
+            targetColumn.appendChild(card);
+            
+            // Avisa o backend
+            fetch(`/helpdesk/ticket/${ticketId}/update-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({'status': newStatus})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(!data.success) {
+                    console.error("Falha ao atualizar status");
+                }
+                // Como o SSE mandará o 'ticket_updated', 
+                // o painel de todo mundo (inclusive o de quem moveu) fará hx-get para sincronizar.
+            })
+            .catch(error => console.error('Erro:', error));
+        }
+    }
+    
+    document.addEventListener("dragleave", function(event) {
+        if (event.target.classList && event.target.classList.contains('kanban-column')) {
+            event.target.classList.remove('bg-slate-200/50');
+        }
+    });
+</script>
+{% endblock %}

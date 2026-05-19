@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Gestão de Chips{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Chips</h2>
+            <p class="text-sm text-slate-500 mt-1">Métricas, estoque e movimentações em tempo real.</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{% url 'chips:assignment' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Entrega Rápida</a>
+            <a href="{% url 'chips:recharge_create' %}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</a>
+        </div>
+    </div>
+    
+    {% include "chips/_nav.html" %}
+
+    <!-- RF01: Métricas Gerais -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Total de Chips</p>
+            <h3 class="text-2xl font-bold text-slate-900">{{ total_chips }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Disponíveis</p>
+            <h3 class="text-2xl font-bold text-emerald-600">{{ available_chips }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Em Uso</p>
+            <h3 class="text-2xl font-bold text-blue-600">{{ in_use_chips }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Bloqueados/Canc</p>
+            <h3 class="text-2xl font-bold text-red-600">{{ blocked_chips|add:canceled_chips }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Perdidos</p>
+            <h3 class="text-2xl font-bold text-orange-600">{{ lost_chips }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Recargas Acumuladas</p>
+            <h3 class="text-2xl font-bold text-slate-900">R$ {{ total_recharge_value|floatformat:2 }}</h3>
+        </div>
+    </div>
+
+    <!-- Layout Dividido -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 h-full pb-8">
+        
+        <!-- RF02 & RF04: Chips em Uso -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px]">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl gap-4">
+                <h4 class="font-bold text-slate-800 min-w-max">Chips na Rua (Em Uso)</h4>
+                <input type="text" id="filter-usage" onkeyup="filterUsage()" placeholder="Buscar linha ou funcionário..." class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 outline-none">
+            </div>
+            <div class="overflow-y-auto p-0 flex-1">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Funcionário</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Última Recarga</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usage-tbody" class="divide-y divide-slate-100">
+                        {% for chip in chips_in_use %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ chip.employee|default:"—" }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ chip.line_number }} <span class="text-xs text-slate-400">({{ chip.operator.name }})</span></td>
+                            <td class="px-4 py-3 text-xs">
+                                {% if chip.last_recharge_date %}
+                                    <span class="text-emerald-600 font-bold">R$ {{ chip.last_recharge_amount }}</span> em {{ chip.last_recharge_date|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-slate-400">Sem recargas</span>
+                                {% endif %}
+                                <!-- Botão Atalho RF15 -->
+                                <a href="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}" class="ml-2 text-blue-500 hover:text-blue-700 font-semibold text-[10px] uppercase">Recarregar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="p-4 text-center text-slate-400">Nenhum chip em uso no momento.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- RF03 & RF04: Histórico Log -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px]">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl flex flex-col gap-3">
+                <h4 class="font-bold text-slate-800">50 Últimas Movimentações</h4>
+                <div class="flex flex-wrap md:flex-nowrap gap-3 w-full">
+                    <input type="text" id="filter-hist-text" onkeyup="filterHistory()" placeholder="Busca..." class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 outline-none">
+                    <select id="filter-hist-action" onchange="filterHistory()" class="text-sm p-2 border border-slate-300 rounded-lg flex-1 outline-none">
+                        <option value="">Todas Ações</option>
+                        <option value="DELIVERY">Entregas</option>
+                        <option value="RETURN">Devoluções</option>
+                    </select>
+                    <input type="date" id="filter-hist-date" onchange="filterHistory()" class="text-sm p-2 border border-slate-300 rounded-lg flex-1 outline-none">
+                </div>
+            </div>
+            <div class="overflow-y-auto p-0 flex-1">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Data</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Ação</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Funcionário</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody" class="divide-y divide-slate-100">
+                        {% for mov in history_logs %}
+                        <tr class="hover:bg-slate-50" data-action="{{ mov.action }}" data-date="{{ mov.timestamp|date:'Y-m-d' }}">
+                            <td class="px-4 py-3 text-xs text-slate-500">{{ mov.timestamp|date:"d/m/y H:i" }}</td>
+                            <td class="px-4 py-3">
+                                {% if mov.action == 'DELIVERY' %}
+                                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Entrega</span>
+                                {% else %}
+                                <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Devolução</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ mov.employee_name }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ mov.chip.line_number }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="p-4 text-center text-slate-400">Nenhuma movimentação registrada.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JS p/ Filtragem Instantânea (RF04) -->
+<script>
+    function filterUsage() {
+        let input = document.getElementById('filter-usage').value.toLowerCase();
+        let rows = document.querySelectorAll('#usage-tbody tr');
+        rows.forEach(row => {
+            let text = row.innerText.toLowerCase();
+            row.style.display = text.includes(input) ? '' : 'none';
+        });
+    }
+
+    function filterHistory() {
+        let textInput = document.getElementById('filter-hist-text').value.toLowerCase();
+        let actionInput = document.getElementById('filter-hist-action').value;
+        let dateInput = document.getElementById('filter-hist-date').value;
+        
+        let rows = document.querySelectorAll('#history-tbody tr');
+        rows.forEach(row => {
+            let rowText = row.innerText.toLowerCase();
+            let rowAction = row.getAttribute('data-action');
+            let rowDate = row.getAttribute('data-date');
+            
+            let matchText = rowText.includes(textInput);
+            let matchAction = actionInput === "" || rowAction === actionInput;
+            let matchDate = dateInput === "" || rowDate === dateInput;
+            
+            row.style.display = (matchText && matchAction && matchDate) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

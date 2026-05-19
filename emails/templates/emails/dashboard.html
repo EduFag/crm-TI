@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Inventário de E-mails{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de E-mails</h2>
+            <p class="text-sm text-slate-500 mt-1">Métricas, Inventário e Identidades Corporativas.</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'emails:domain_list' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-800 px-5 py-2.5 rounded-lg font-bold shadow-sm border border-slate-200 transition-colors text-sm">Gerenciar Domínios</a>
+            <a href="{% url 'emails:account_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Cadastrar E-mail</a>
+        </div>
+    </div>
+
+    <!-- RF01: Métricas de Contas e Alertas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 w-full">
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total de Contas Ativas</p>
+            <h3 class="text-4xl font-bold text-slate-900">{{ active_accounts }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Contas Bloqueadas</p>
+            <h3 class="text-4xl font-bold text-red-600">{{ blocked_accounts }}</h3>
+        </div>
+    </div>
+
+    <!-- Filtros Inteligentes (Vanilla JS) -->
+    <div class="bg-white p-4 rounded-xl w-full mb-6 shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="md:col-span-2 relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <input type="text" id="search-text" onkeyup="filterAccounts()" placeholder="Busque por Nome do Funcionário ou Caixa (Prefixo)..." 
+                class="w-full text-sm py-2.5 pl-10 pr-4 bg-white border border-slate-300 text-slate-800 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="w-full">
+            <select id="search-domain" onchange="filterAccounts()" class="w-full text-sm p-2.5 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold">
+                <option value="">Qualquer Domínio</option>
+                {% for dom in domains %}
+                    <option value="{{ dom.name }}">@{{ dom.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="w-full">
+            <select id="search-status" onchange="filterAccounts()" class="w-full text-sm p-2.5 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold">
+                <option value="">Todos Status</option>
+                <option value="ACTIVE">Caixas Ativas</option>
+                <option value="BLOCKED">Caixas Bloqueadas</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- RF05 e RF06: Inventário Unificado -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Endereço de E-mail</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Funcionário Vinculado</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Criado Em</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Último Reset Senha</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações Rápidas</th>
+                </tr>
+            </thead>
+            <tbody id="accounts-tbody" class="divide-y divide-slate-100">
+                {% for account in accounts %}
+                <!-- Data-attributes usados pelo filtro JS -->
+                <tr class="hover:bg-blue-50 transition-colors group" data-status="{{ account.status }}" data-domain="{{ account.domain.name|default:'' }}">
+                    <td class="px-6 py-5 address-cell">
+                        <span class="font-bold text-slate-900 text-base">{{ account.username }}</span><span class="font-medium text-slate-500">@{{ account.domain.name|default:'[Sem Domínio]' }}</span>
+                    </td>
+                    <td class="px-6 py-5 text-slate-600 font-bold employee-cell">{{ account.employee_name }}</td>
+                    <td class="px-6 py-5 text-slate-500 text-xs font-medium">
+                        {{ account.created_at|date:"d/m/Y" }}
+                    </td>
+                    <td class="px-6 py-5 text-slate-400 text-xs font-mono">
+                        {{ account.last_password_reset|date:"d/m/Y H:i"|default:"Nunca Resetada" }}
+                    </td>
+                    <td class="px-6 py-5">
+                        {% if account.status == 'ACTIVE' %}
+                            <span class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest shadow-sm">Ativa</span>
+                        {% else %}
+                            <span class="bg-red-100 text-red-700 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest shadow-sm">Bloqueada</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-5 flex items-center justify-end gap-3">
+                        <form method="POST" action="{% url 'emails:account_reset_password' account.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 text-xs font-bold uppercase px-4 py-2 rounded-lg transition-all border border-blue-100 hover:border-blue-600 shadow-sm" onclick="return confirm('Deseja gerar um link de reset de senha para a caixa {{ account.address }}?')">
+                                Resetar Senha
+                            </button>
+                        </form>
+                        
+                        <form method="POST" action="{% url 'emails:account_toggle_status' account.id %}">
+                            {% csrf_token %}
+                            {% if account.status == 'ACTIVE' %}
+                            <button type="submit" class="bg-slate-50 hover:bg-red-600 hover:text-white text-slate-700 text-xs font-bold uppercase px-4 py-2 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm" onclick="return confirm('ATENÇÃO: Bloquear a conta invalidará as sessões ativas do funcionário. Deseja prosseguir?')">
+                                Bloquear
+                            </button>
+                            {% else %}
+                            <button type="submit" class="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 text-xs font-bold uppercase px-4 py-2 rounded-lg transition-all border border-emerald-100 hover:border-emerald-600 shadow-sm">
+                                Desbloquear
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="p-12 text-center text-slate-400 bg-slate-50 font-medium">Nenhuma conta de e-mail corporativa registrada no inventário.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function filterAccounts() {
+        let textInput = document.getElementById('search-text').value.toLowerCase();
+        let domainInput = document.getElementById('search-domain').value;
+        let statusInput = document.getElementById('search-status').value;
+        
+        let rows = document.querySelectorAll('#accounts-tbody tr');
+        
+        rows.forEach(row => {
+            // Placeholder empty state bypass
+            if(row.children.length === 1) return; 
+            
+            // Text matching (both address prefix and employee name)
+            let address = row.querySelector('.address-cell').innerText.toLowerCase();
+            let employee = row.querySelector('.employee-cell').innerText.toLowerCase();
+            let textMatch = address.includes(textInput) || employee.includes(textInput);
+            
+            // Domain matching
+            let rowDomain = row.getAttribute('data-domain');
+            let domainMatch = (domainInput === "") || (rowDomain === domainInput);
+            
+            // Status matching
+            let rowStatus = row.getAttribute('data-status');
+            let statusMatch = (statusInput === "") || (rowStatus === statusInput);
+            
+            // Toggle visibility instantly
+            if(textMatch && domainMatch && statusMatch) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}
