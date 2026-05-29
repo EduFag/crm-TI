@@ -24,4 +24,11 @@ urlpatterns = [
     path('chips/', include('chips.urls')),
     path('emails/', include('emails.urls')),
     path('equipment/', include('equipment.urls')),
+    path('discador/', include('discador.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

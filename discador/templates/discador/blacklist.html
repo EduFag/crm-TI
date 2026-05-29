@@ -1,0 +1,45 @@
+{% extends "discador/base_discador.html" %}
+
+{% block discador_content %}
+<div class="w-full">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Blacklist Ativa</h1>
+        <a href="{% url 'discador:consulta_telefone' %}" class="bg-gray-600 text-white px-4 py-2 rounded shadow hover:bg-gray-700 text-sm">Consultar Telefone</a>
+    </div>
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full text-left text-sm whitespace-nowrap">
+            <thead class="uppercase tracking-wider border-b-2 border-gray-200 bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4">Telefone</th>
+                    <th class="px-6 py-4">Origem / Qualificação</th>
+                    <th class="px-6 py-4">Campanha</th>
+                    <th class="px-6 py-4">Bloqueado em</th>
+                    <th class="px-6 py-4">Validade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bloqueios %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">{{ b.telefone_normalizado }}</td>
+                    <td class="px-6 py-4">{{ b.origem|title }} - {{ b.qualificacao_origem }}</td>
+                    <td class="px-6 py-4">{{ b.campanha_nome|default:"-" }}</td>
+                    <td class="px-6 py-4">{{ b.bloqueado_em|date:"d/m/Y H:i" }}</td>
+                    <td class="px-6 py-4">
+                        {% if b.tipo_bloqueio == 'permanente' %}
+                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Permanente</span>
+                        {% else %}
+                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Até {{ b.bloqueado_ate|date:"d/m/Y" }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhum bloqueio encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

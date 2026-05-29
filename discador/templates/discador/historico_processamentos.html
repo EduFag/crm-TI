@@ -1,0 +1,55 @@
+{% extends "discador/base_discador.html" %}
+
+{% block discador_content %}
+<div class="w-full">
+    <h1 class="text-2xl font-bold mb-6">Histórico de Processamentos de Bases CSV</h1>
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full text-left text-sm whitespace-nowrap">
+            <thead class="uppercase tracking-wider border-b-2 border-gray-200 bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4">Data</th>
+                    <th class="px-6 py-4">Nome</th>
+                    <th class="px-6 py-4">Total Linhas</th>
+                    <th class="px-6 py-4">Liberadas</th>
+                    <th class="px-6 py-4">Bloqueadas</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4">Download</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proc in processamentos %}
+                <tr class="border-b">
+                    <td class="px-6 py-4">{{ proc.created_at|date:"d/m/Y H:i" }}</td>
+                    <td class="px-6 py-4">{{ proc.nome }}</td>
+                    <td class="px-6 py-4">{{ proc.total_linhas }}</td>
+                    <td class="px-6 py-4 text-green-600 font-bold">{{ proc.total_liberadas }}</td>
+                    <td class="px-6 py-4 text-red-600 font-bold">{{ proc.total_bloqueadas }}</td>
+                    <td class="px-6 py-4">
+                        {% if proc.status == 'Concluído' %}
+                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">{{ proc.status }}</span>
+                        {% elif proc.status == 'Erro' %}
+                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{{ proc.status }}</span>
+                        {% else %}
+                            <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">{{ proc.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 flex space-x-2">
+                        {% if proc.arquivo_reciclado %}
+                            <a href="{{ proc.arquivo_reciclado.url }}" class="text-blue-600 hover:underline text-xs" download>Reciclado</a>
+                        {% endif %}
+                        {% if proc.arquivo_bloqueados %}
+                            <a href="{{ proc.arquivo_bloqueados.url }}" class="text-red-600 hover:underline text-xs" download>Bloqueados</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhum processamento encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
