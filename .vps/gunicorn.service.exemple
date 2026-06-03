@@ -1,0 +1,28 @@
+# Systemd — Gunicorn CRM TI
+# Arquivo: /etc/systemd/system/crm-ti.service
+#
+# sudo systemctl daemon-reload
+# sudo systemctl enable crm-ti
+# sudo systemctl start crm-ti
+# sudo systemctl status crm-ti
+
+[Unit]
+Description=CRM TI — ti.moneypromotora.com.br
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=edufa
+Group=edufa
+WorkingDirectory=/home/edufa/crm-TI
+EnvironmentFile=/home/edufa/crm-TI/.env
+ExecStart=/home/edufa/crm-TI/venv/bin/gunicorn setup.wsgi:application \
+    --bind 127.0.0.1:8001 \
+    --workers 3 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

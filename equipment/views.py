@@ -67,8 +67,8 @@ class EquipmentUpdateView(LoginRequiredMixin, UpdateView):
         
         # RF02: Histórico de Atribuições Inteligente
         if old_status != form.instance.status or old_employee != form.instance.current_employee:
-            action = EquipmentLog.ActionChoices.STATUS_CHANGE
-            
+            action = EquipmentLog.ActionChoices.ASSIGNED
+
             if form.instance.status == Equipment.StatusChoices.IN_USE:
                 action = EquipmentLog.ActionChoices.ASSIGNED
             elif old_status == Equipment.StatusChoices.IN_USE and form.instance.status == Equipment.StatusChoices.AVAILABLE:

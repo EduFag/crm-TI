@@ -10,7 +10,7 @@ Define apps instalados, banco, templates, `AUTH_USER_MODEL`, URLs raiz e pontos 
 
 | Arquivo | Função |
 |---------|--------|
-| `settings.py` | Configurações: `INSTALLED_APPS` (core, helpdesk, chips, emails, equipment, discador), SQLite, `CustomUser`, mídia estática, etc. `BASE_DIR` aponta para a raiz do repositório. |
+| `settings.py` | Lê `.env` na raiz (fallback `.env.exemple`). Bancos: `sqlite3`, `postgresql` (psycopg), `mysql`. Postgres: `DB_*`, `DB_CONN_MAX_AGE`, `DB_SSLMODE`. Também: `DJANGO_CSRF_TRUSTED_ORIGINS`, `STATIC_ROOT`. |
 | `urls.py` | Roteamento global: admin, `core`, e `include()` de cada app. Em `DEBUG`, serve arquivos de mídia. |
 | `wsgi.py` | Entrada WSGI para servidores de produção. |
 | `asgi.py` | Entrada ASGI (async/WebSockets, se usado no futuro). |

@@ -57,9 +57,12 @@ cover/
 
 # Django stuff:
 *.log
+debug-a083ac.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+media/
+staticfiles/
 
 # Flask stuff:
 instance/

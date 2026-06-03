@@ -1,0 +1,11 @@
+# CRM TI — dependências Python
+Django>=6.0.5,<7
+
+# PostgreSQL (obrigatório quando DB_ENGINE=postgresql)
+psycopg[binary]>=3.1,<4
+
+# Deploy em VPS (gunicorn + proxy reverso)
+gunicorn>=22.0,<24
+
+# MySQL/MariaDB — só se DB_ENGINE=mysql
+# mysqlclient>=2.2,<3

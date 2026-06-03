@@ -1,8 +1,10 @@
 import time
 from django.http import StreamingHttpResponse
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 from helpdesk.models import Ticket
 
+@login_required
 def sse_stream(request):
     """
     Mantém uma conexão SSE aberta (WSGI) e faz polling no banco de dados.

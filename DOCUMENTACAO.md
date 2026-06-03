@@ -14,6 +14,9 @@ CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashb
 | `README.md` | Descrição breve do repositório. |
 | `LICENSE` | Licença do projeto. |
 | `.gitignore` | Arquivos ignorados pelo Git. |
+| `.env.exemple` | Modelo `.env`: perfil SQLite (dev) ou PostgreSQL (VPS). |
+| `.vps/` | Deploy produção: Postgres, Gunicorn, Nginx. Ver `.vps/DOCUMENTACAO.md`. |
+| `requirements.txt` | Django, `psycopg[binary]`, gunicorn. |
 | `setup/` | Projeto Django (settings, URLs raiz, WSGI/ASGI). Ver `setup/DOCUMENTACAO.md`. |
 | `core/` | Usuários customizados, login e dashboard principal. Ver `core/DOCUMENTACAO.md`. |
 | `helpdesk/` | Chamados em Kanban, histórico e SSE. Ver `helpdesk/DOCUMENTACAO.md`. |
