@@ -2,8 +2,7 @@
 
 from datetime import timedelta
 
-from django.db.models import DateField, F, OuterRef, Subquery
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from chips.models import Chip, ChipMovement, Recharge
@@ -31,12 +30,16 @@ def chips_com_anotacoes_operacionais(queryset=None):
         employee_user_id=Subquery(ultima_entrega.values('employee_user_id')[:1]),
         last_delivery_at=Subquery(ultima_entrega.values('timestamp')[:1]),
         last_recharge_at=Subquery(ultima_recarga.values('timestamp')[:1]),
-        cycle_start=Coalesce(
-            TruncDate('last_recharge_at'),
-            F('activated_at'),
-            output_field=DateField(),
-        ),
     )
+
+
+def _para_data(valor):
+    """Converte datetime/date anotado para date com segurança."""
+    if not valor:
+        return None
+    if hasattr(valor, 'hour'):
+        return timezone.localtime(valor).date()
+    return valor
 
 
 def chips_operacionais():
@@ -53,7 +56,7 @@ def _calcular_ciclo(chip):
     """Calcula vencimento e dias restantes do ciclo de 90 dias."""
     cycle_start = None
     if chip.last_recharge_at:
-        cycle_start = timezone.localtime(chip.last_recharge_at).date()
+        cycle_start = _para_data(chip.last_recharge_at)
     elif chip.activated_at:
         cycle_start = chip.activated_at
 
@@ -85,15 +88,15 @@ def chip_para_grid_dict(chip):
         'employee_user_id': chip.employee_user_id,
         'activated_at': chip.activated_at.isoformat() if chip.activated_at else '',
         'last_delivery_at': (
-            timezone.localtime(chip.last_delivery_at).date().isoformat()
+            _para_data(chip.last_delivery_at).isoformat()
             if chip.last_delivery_at else ''
         ),
         'last_recharge_at': (
-            timezone.localtime(chip.last_recharge_at).date().isoformat()
+            _para_data(chip.last_recharge_at).isoformat()
             if chip.last_recharge_at else ''
         ),
         'last_blocked_at': (
-            timezone.localtime(chip.last_blocked_at).date().isoformat()
+            _para_data(chip.last_blocked_at).isoformat()
             if chip.last_blocked_at else ''
         ),
         'operator_id': chip.operator_id,

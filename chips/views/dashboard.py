@@ -1,7 +1,9 @@
+import logging
 from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -12,10 +14,21 @@ from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.forms import AssignmentForm
 from chips.models import Batch, Chip, ChipMovement, Operator, Recharge
 from chips.period import periodo_mes_anterior, periodo_padrao, resolver_periodo
-from chips.queries import chips_com_anotacoes_operacionais
-from chips.services import devolver_para_ti, entregar_chip, transferir_chip
+from chips.queries import _para_data, chips_com_anotacoes_operacionais
+from chips.services import entregar_chip, transferir_chip
+
+logger = logging.getLogger(__name__)
 
 ABAS_VALIDAS = ('dashboard', 'assignment', 'inventory', 'operators', 'envelopes')
+
+
+def _auditoria_chips():
+    """Carrega logs de auditoria; retorna vazio se tabela ainda não existir."""
+    try:
+        return logs_do_modulo(MODULO_CHIPS, limite=50)
+    except DatabaseError:
+        logger.exception('Falha ao carregar auditoria de chips.')
+        return []
 
 
 class ChipsView(ModuloObrigatorioMixin, TemplateView):
@@ -29,13 +42,51 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         if tab not in ABAS_VALIDAS:
             tab = 'dashboard'
         context['active_tab'] = tab
+        context['schema_error'] = None
 
-        self._contexto_dashboard(context)
-        self._contexto_assignment(context)
-        self._contexto_inventario(context)
-        self._contexto_operadoras(context)
-        self._contexto_envelopes(context)
+        try:
+            self._contexto_dashboard(context)
+            self._contexto_assignment(context)
+            self._contexto_inventario(context)
+            self._contexto_operadoras(context)
+            self._contexto_envelopes(context)
+        except DatabaseError:
+            logger.exception('Erro de banco ao carregar módulo chips.')
+            context['schema_error'] = (
+                'O banco de dados precisa das migrations recentes. '
+                'Execute: python manage.py migrate chips core'
+            )
+            self._contexto_fallback(context)
+
         return context
+
+    def _contexto_fallback(self, context):
+        """Valores mínimos para a página não quebrar se o schema estiver desatualizado."""
+        context.setdefault('date_from', periodo_padrao()[0].isoformat())
+        context.setdefault('date_to', periodo_padrao()[1].isoformat())
+        context.setdefault('periodo_mes_atual_url', '?tab=dashboard')
+        context.setdefault('periodo_mes_anterior_url', '?tab=dashboard')
+        context.setdefault('total_chips', 0)
+        context.setdefault('metric_available', 0)
+        context.setdefault('metric_in_use', 0)
+        context.setdefault('recharge_due_soon', 0)
+        context.setdefault('period_deliveries', 0)
+        context.setdefault('period_transfers', 0)
+        context.setdefault('period_returns', 0)
+        context.setdefault('period_recharges_count', 0)
+        context.setdefault('period_recharges_total', 0)
+        context.setdefault('period_blocks', 0)
+        context.setdefault('total_recharge_value', 0)
+        context.setdefault('history_logs', [])
+        context.setdefault('audit_logs', [])
+        context.setdefault('audit_titulo', 'Registro de auditoria de chips')
+        context.setdefault('available_chips', [])
+        context.setdefault('in_use_chips', [])
+        context.setdefault('assignment_form', AssignmentForm())
+        context.setdefault('chips', [])
+        context.setdefault('envelopes', [])
+        context.setdefault('operators', [])
+        context.setdefault('batches', [])
 
     def _contexto_dashboard(self, context):
         date_from, date_to = resolver_periodo(self.request)
@@ -52,16 +103,13 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         )
 
         context['total_chips'] = Chip.objects.filter(is_active=True).count()
-        context['available_chips'] = Chip.objects.filter(
+        context['metric_available'] = Chip.objects.filter(
             custody=Chip.CustodyChoices.WITH_TI,
             status=Chip.StatusChoices.AVAILABLE,
         ).count()
-        context['in_use_chips'] = Chip.objects.filter(
+        context['metric_in_use'] = Chip.objects.filter(
             custody=Chip.CustodyChoices.WITH_PERSON,
         ).count()
-        context['blocked_chips'] = Chip.objects.filter(status=Chip.StatusChoices.BLOCKED).count()
-        context['canceled_chips'] = Chip.objects.filter(status=Chip.StatusChoices.CANCELED).count()
-        context['lost_chips'] = Chip.objects.filter(status=Chip.StatusChoices.LOST).count()
 
         movs = ChipMovement.objects.filter(
             timestamp__date__gte=date_from,
@@ -98,7 +146,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         ):
             cycle_start = None
             if chip.last_recharge_at:
-                cycle_start = timezone.localtime(chip.last_recharge_at).date()
+                cycle_start = _para_data(chip.last_recharge_at)
             elif chip.activated_at:
                 cycle_start = chip.activated_at
             if cycle_start and cycle_start + timedelta(days=90) <= limite:
@@ -113,7 +161,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             timestamp__date__lte=date_to,
         ).order_by('-timestamp')[:100]
 
-        context['audit_logs'] = logs_do_modulo(MODULO_CHIPS, limite=50)
+        context['audit_logs'] = _auditoria_chips()
         context['audit_titulo'] = 'Registro de auditoria de chips'
 
     def _contexto_assignment(self, context):
@@ -168,5 +216,4 @@ class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
         return redirect('/chips/?tab=assignment')
 
 
-# Alias para compatibilidade com urls e imports existentes
 DashboardView = ChipsView

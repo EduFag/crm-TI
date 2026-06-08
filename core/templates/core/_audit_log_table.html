@@ -28,7 +28,9 @@
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">{{ reg.get_acao_display }}</span>
                     </td>
                     <td class="px-4 py-3 text-slate-700">{{ reg.descricao }}</td>
-                    <td class="px-4 py-3 text-slate-600">{{ reg.actor.get_full_name|default:reg.actor.username|default:"Sistema" }}</td>
+                    <td class="px-4 py-3 text-slate-600">
+                        {% if reg.actor %}{{ reg.actor.get_full_name|default:reg.actor.username }}{% else %}Sistema{% endif %}
+                    </td>
                     <td class="px-4 py-3 text-slate-500 text-xs">{{ reg.object_repr|default:"—" }}</td>
                 </tr>
                 {% endfor %}

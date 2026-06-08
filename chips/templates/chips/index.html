@@ -18,6 +18,12 @@
         </div>
     </div>
 
+    {% if schema_error %}
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm font-medium bg-amber-50 text-amber-900 border border-amber-200">
+        {{ schema_error }}
+    </div>
+    {% endif %}
+
     {% if messages %}
     <div class="mb-4 space-y-2">
         {% for message in messages %}
