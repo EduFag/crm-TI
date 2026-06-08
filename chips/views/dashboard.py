@@ -1,4 +1,5 @@
 from django.views.generic import TemplateView
+from core.audit import logs_do_modulo
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from django.db.models import Sum, Subquery, OuterRef
 from chips.models import Chip, ChipMovement, Recharge
@@ -43,5 +44,7 @@ class DashboardView(ModuloObrigatorioMixin, TemplateView):
         
         # RF03 - Últimas 50 movimentações
         context['history_logs'] = ChipMovement.objects.select_related('chip').order_by('-timestamp')[:50]
+        context['audit_logs'] = logs_do_modulo(MODULO_CHIPS, limite=50)
+        context['audit_titulo'] = 'Registro de auditoria de chips'
         
         return context

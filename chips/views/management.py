@@ -2,6 +2,7 @@ from django.views.generic import ListView, CreateView, UpdateView
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from core.htmx import HtmxModalMixin
 from chips.models import Chip, Operator, Batch
+from chips.audit import log_chip_atualizado, log_chip_criado, log_lote_criado, log_operadora_criada
 
 
 class _ChipsMixin(ModuloObrigatorioMixin):
@@ -25,6 +26,7 @@ class OperatorCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save()
+        log_operadora_criada(self.object, self.request.user)
         return self.htmx_redirect_response()
 
 # ----------------- BATCH (RF06) -----------------
@@ -44,6 +46,7 @@ class BatchCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save()
+        log_lote_criado(self.object, self.request.user)
         return self.htmx_redirect_response()
 
 # ----------------- CHIP (RF05, RF07) -----------------
@@ -67,7 +70,9 @@ class ChipCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save()
+        log_chip_criado(self.object, self.request.user)
         return self.htmx_redirect_response()
+
 
 class ChipUpdateView(HtmxModalMixin, _ChipsMixin, UpdateView):
     model = Chip
@@ -84,5 +89,7 @@ class ChipUpdateView(HtmxModalMixin, _ChipsMixin, UpdateView):
         return 'Atualize os dados da linha.'
 
     def form_valid(self, form):
+        antes = Chip.objects.get(pk=self.object.pk)
         self.object = form.save()
+        log_chip_atualizado(self.object, self.request.user, antes)
         return self.htmx_redirect_response()

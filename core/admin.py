@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Equipe
+from .models import CustomUser, Equipe, RegistroAcao
 
 
 @admin.register(Equipe)
@@ -34,3 +34,30 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ('role', 'equipe', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(RegistroAcao)
+class RegistroAcaoAdmin(admin.ModelAdmin):
+    """Auditoria somente leitura — registros nunca são editados pelo admin."""
+
+    list_display = ('timestamp', 'modulo', 'acao', 'actor', 'object_repr', 'descricao_curta')
+    list_filter = ('modulo', 'acao', 'timestamp')
+    search_fields = ('descricao', 'object_repr', 'actor__username')
+    readonly_fields = (
+        'modulo', 'acao', 'descricao', 'actor', 'content_type', 'object_id',
+        'object_repr', 'metadata', 'timestamp',
+    )
+    date_hierarchy = 'timestamp'
+
+    @admin.display(description='Descrição')
+    def descricao_curta(self, obj):
+        return obj.descricao[:80]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

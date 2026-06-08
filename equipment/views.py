@@ -2,8 +2,10 @@ from django.utils import timezone
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.contrib import messages
 
+from core.audit import logs_do_modulo
 from core.permissions import MODULO_EQUIPMENT, ModuloObrigatorioMixin
 from core.htmx import HtmxModalMixin
+from equipment.audit import log_cadastro, log_edicao_cadastral, log_do_equipment_log
 from .models import Equipment, EquipmentLog
 
 
@@ -29,6 +31,8 @@ class DashboardView(_EquipmentMixin, TemplateView):
         # Listas para as Tabelas
         context['equipments'] = Equipment.objects.all().order_by('-created_at')
         context['history_logs'] = EquipmentLog.objects.all().select_related('equipment')[:50]
+        context['audit_logs'] = logs_do_modulo(MODULO_EQUIPMENT, limite=50)
+        context['audit_titulo'] = 'Registro de auditoria de equipamentos'
         
         return context
 
@@ -55,6 +59,12 @@ class EquipmentCreateView(HtmxModalMixin, _EquipmentMixin, CreateView):
             equipment=form.instance,
             action=action,
             employee_name=form.instance.current_employee or "Sistema"
+        )
+        log_cadastro(
+            form.instance,
+            action,
+            form.instance.current_employee or "Sistema",
+            self.request.user,
         )
         
         messages.success(self.request, f"Equipamento {form.instance.tag} cadastrado com sucesso!")
@@ -100,6 +110,14 @@ class EquipmentUpdateView(HtmxModalMixin, _EquipmentMixin, UpdateView):
                 action=action,
                 employee_name=form.instance.current_employee or old_employee or "Sistema"
             )
+            log_do_equipment_log(
+                form.instance,
+                action,
+                form.instance.current_employee or old_employee or "Sistema",
+                self.request.user,
+            )
+
+        log_edicao_cadastral(form.instance, self.request.user, old_equipment)
             
         messages.success(self.request, f"Equipamento {form.instance.tag} atualizado!")
         return self.htmx_redirect_response()

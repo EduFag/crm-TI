@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.views.generic import View, TemplateView
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.models import Chip, ChipMovement
+from chips.audit import log_devolucao, log_entrega, log_transferencia
 
 
 class _ChipsMixin(ModuloObrigatorioMixin):
@@ -25,10 +26,11 @@ class AssignmentView(_ChipsMixin, TemplateView):
         employee_name = request.POST.get('employee_name')
         
         chip = get_object_or_404(Chip, id=chip_id)
+        estava_em_uso = chip.status == Chip.StatusChoices.IN_USE
         
         # RF13 - Transferência Direta
         # Se o chip já estivesse em uso com alguém, geraríamos uma Devolução antes.
-        if chip.status == Chip.StatusChoices.IN_USE:
+        if estava_em_uso:
             # Pega o último dono
             last_mov = chip.movements.filter(action=ChipMovement.ActionChoices.DELIVERY).order_by('-timestamp').first()
             old_emp = last_mov.employee_name if last_mov else "Desconhecido"
@@ -39,6 +41,7 @@ class AssignmentView(_ChipsMixin, TemplateView):
                 action=ChipMovement.ActionChoices.RETURN,
                 registered_by=request.user
             )
+            log_devolucao(chip, old_emp, request.user)
             messages.info(request, f"Posse anterior de {old_emp} encerrada automaticamente (Transferência).")
         
         # Registra Entrega
@@ -48,6 +51,10 @@ class AssignmentView(_ChipsMixin, TemplateView):
             action=ChipMovement.ActionChoices.DELIVERY,
             registered_by=request.user
         )
+        if estava_em_uso:
+            log_transferencia(chip, old_emp, employee_name, request.user)
+        else:
+            log_entrega(chip, employee_name, request.user)
         
         # RF11 - Alterar status para Em Uso
         chip.status = Chip.StatusChoices.IN_USE
@@ -71,7 +78,8 @@ class ReturnChipView(_ChipsMixin, View):
             action=ChipMovement.ActionChoices.RETURN,
             registered_by=request.user
         )
-        
+        log_devolucao(chip, old_emp, request.user)
+
         chip.status = Chip.StatusChoices.AVAILABLE
         chip.save()
         

@@ -8,6 +8,14 @@ from django.views.decorators.http import require_POST
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
 from helpdesk.models import Ticket, TicketCategory, Comment
+from helpdesk.audit import (
+    log_atribuicao,
+    log_chamado_criado,
+    log_comentario,
+    log_edicao,
+    log_status_alterado,
+    log_transferencia,
+)
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_pode_acessar_chamado,
@@ -62,6 +70,29 @@ def gerar_comentarios_alteracao(antes, depois):
             f'para {_nome_usuario(depois.assigned_to)}.'
         )
     return mensagens
+
+
+def _metadata_alteracao_ticket(antes, depois):
+    """Monta metadata estruturada para edição de chamado."""
+    metadata = {}
+    if antes.title != depois.title:
+        metadata['title'] = {'antes': antes.title, 'depois': depois.title}
+    if antes.status != depois.status:
+        metadata['status'] = {'antes': antes.status, 'depois': depois.status}
+    if antes.priority != depois.priority:
+        metadata['priority'] = {'antes': antes.priority, 'depois': depois.priority}
+    if antes.category_id != depois.category_id:
+        metadata['category'] = {'antes': str(antes.category), 'depois': str(depois.category)}
+    if antes.requester_name != depois.requester_name:
+        metadata['requester_name'] = {'antes': antes.requester_name, 'depois': depois.requester_name}
+    if antes.assigned_to_id != depois.assigned_to_id:
+        metadata['assigned_to'] = {
+            'antes': _nome_usuario(antes.assigned_to),
+            'depois': _nome_usuario(depois.assigned_to),
+        }
+    if (antes.description or '') != (depois.description or ''):
+        metadata['description'] = {'antes': '...', 'depois': 'atualizada'}
+    return metadata
 
 
 def _contexto_drawer(request, ticket, edit_form=None):
@@ -129,7 +160,14 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
             nome_solicitante_padrao=self._nome_padrao(request),
         )
         if form.is_valid():
-            form.save(created_by=request.user)
+            ticket = form.save(created_by=request.user)
+            autor_nome = request.user.get_full_name() or request.user.username
+            Comment.objects.create(
+                ticket=ticket,
+                author=request.user,
+                text=f'Chamado aberto por {autor_nome}.',
+            )
+            log_chamado_criado(ticket, request.user)
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
                 'ticketUpdated': True,
@@ -199,6 +237,7 @@ def ticket_update_status(request, pk):
         new_status = request.POST.get('status')
 
     if new_status in dict(Ticket.StatusChoices.choices):
+        status_anterior = ticket.status
         ticket.status = new_status
         if not ticket.assigned_to and new_status != Ticket.StatusChoices.NEW:
             ticket.assigned_to = request.user
@@ -207,7 +246,19 @@ def ticket_update_status(request, pk):
                 author=request.user,
                 text=f'Chamado atribuído automaticamente a {request.user.username} (movimentado para {ticket.get_status_display()}).'
             )
+            log_atribuicao(
+                ticket,
+                request.user,
+                descricao_extra=f'(movimentado para {ticket.get_status_display()})',
+            )
         ticket.save()
+        if status_anterior != new_status:
+            log_status_alterado(
+                ticket,
+                request.user,
+                _rotulo_status(status_anterior),
+                _rotulo_status(new_status),
+            )
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'error': 'Status inválido'}, status=400)
 
@@ -246,8 +297,12 @@ def ticket_edit(request, pk):
     form = TicketUpdateForm(request.POST, instance=ticket)
     if form.is_valid():
         depois = form.save()
-        for texto in gerar_comentarios_alteracao(antes, depois):
+        mensagens = gerar_comentarios_alteracao(antes, depois)
+        for texto in mensagens:
             Comment.objects.create(ticket=depois, author=request.user, text=texto)
+        metadata = _metadata_alteracao_ticket(antes, depois)
+        if metadata:
+            log_edicao(depois, request.user, metadata, '; '.join(mensagens))
         ticket.refresh_from_db()
         response = render(
             request,
@@ -296,6 +351,12 @@ def ticket_transfer(request, pk):
             f'para {_nome_usuario(tecnico)}.'
         ),
     )
+    log_transferencia(
+        ticket,
+        request.user,
+        _nome_usuario(anterior),
+        _nome_usuario(tecnico),
+    )
     ticket.refresh_from_db()
     response = render(
         request,
@@ -315,6 +376,7 @@ def ticket_add_comment(request, pk):
     text = request.POST.get('text', '').strip()
     if text:
         Comment.objects.create(ticket=ticket, author=request.user, text=text)
+        log_comentario(ticket, request.user, text)
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     return render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
 

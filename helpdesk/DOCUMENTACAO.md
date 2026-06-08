@@ -26,6 +26,7 @@ Prioridade fica **null** até triagem pela TI. Gerente vê todos os chamados; eq
 | `apps.py` | Configuração do app. |
 | `models.py` | `TicketCategory`, `Ticket` (status Kanban, prioridade nullable, arquivamento, `created_by`, `requester_user`) e `Comment`. |
 | `forms.py` | `TicketCreateForm` (campos por papel) e `TicketUpdateForm` (edição ADMIN). |
+| `audit.py` | Wrappers de `registrar_acao` para eventos do helpdesk. |
 | `ticket_access.py` | Filtro de chamados, permissões de categoria/prioridade/edição/transferência e querysets de equipe/técnicos. |
 | `urls.py` | Rotas sob `/helpdesk/` (kanban, dashboard, histórico, poll, partials, edição). |
 | `admin.py` | Administração de tickets e comentários. |

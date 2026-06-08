@@ -1,0 +1,39 @@
+{% if registros %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full mt-6">
+    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <h4 class="font-bold text-slate-800">{{ titulo|default:"Registro de Ações" }}</h4>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Data/Hora</th>
+                    {% if mostrar_modulo %}
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Módulo</th>
+                    {% endif %}
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Ação</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Descrição</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Autor</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Objeto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for reg in registros %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">{{ reg.timestamp|date:"d/m/Y H:i" }}</td>
+                    {% if mostrar_modulo %}
+                    <td class="px-4 py-3 text-slate-600">{{ reg.get_modulo_display }}</td>
+                    {% endif %}
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">{{ reg.get_acao_display }}</span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-700">{{ reg.descricao }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ reg.actor.get_full_name|default:reg.actor.username|default:"Sistema" }}</td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">{{ reg.object_repr|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}

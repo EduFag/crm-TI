@@ -13,6 +13,7 @@ Cadastro de ativos com tag de patrimônio, série, garantia, valor de compra, st
 | `apps.py` | Configuração do app. |
 | `models.py` | `Equipment` e `EquipmentLog` (ações: atribuição, devolução, manutenção, sucateamento, criação). |
 | `views.py` | `DashboardView`, `EquipmentCreateView`, `EquipmentUpdateView`. |
+| `audit.py` | Espelha `EquipmentLog` e registra edições cadastrais em `RegistroAcao`. |
 | `urls.py` | Rotas sob `/equipment/`. |
 | `admin.py` | Administração no Django Admin. |
 | `tests.py` | Testes. |

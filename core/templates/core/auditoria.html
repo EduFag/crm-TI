@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria do Sistema{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full w-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Auditoria Global</h2>
+            <p class="text-sm text-slate-500 mt-1">Histórico consolidado de ações em todos os módulos (somente ADMIN).</p>
+        </div>
+    </div>
+
+    <form method="get" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Módulo</label>
+            <select name="modulo" class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+                <option value="">Todos</option>
+                {% for val, label in modulo_choices %}
+                <option value="{{ val }}" {% if filtros.modulo == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Ação</label>
+            <select name="acao" class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+                <option value="">Todas</option>
+                {% for val, label in acao_choices %}
+                <option value="{{ val }}" {% if filtros.acao == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Autor</label>
+            <select name="actor" class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+                <option value="">Qualquer</option>
+                {% for u in autores %}
+                <option value="{{ u.pk }}" {% if filtros.actor == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">De</label>
+            <input type="date" name="date_from" value="{{ filtros.date_from }}" class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Até</label>
+            <input type="date" name="date_to" value="{{ filtros.date_to }}" class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Busca</label>
+            <input type="text" name="search" value="{{ filtros.search }}" placeholder="Descrição ou objeto..." class="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none">
+        </div>
+        <div class="md:col-span-3 xl:col-span-6 flex gap-3">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm">Filtrar</button>
+            <a href="{% url 'auditoria' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg font-bold text-sm">Limpar</a>
+        </div>
+    </form>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Data/Hora</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Módulo</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Ação</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Descrição</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Autor</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 uppercase text-xs">Objeto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for reg in registros %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 text-xs font-mono text-slate-500">{{ reg.timestamp|date:"d/m/Y H:i:s" }}</td>
+                    <td class="px-4 py-3">{{ reg.get_modulo_display }}</td>
+                    <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">{{ reg.get_acao_display }}</span></td>
+                    <td class="px-4 py-3 text-slate-700">{{ reg.descricao }}</td>
+                    <td class="px-4 py-3">{{ reg.actor.get_full_name|default:reg.actor.username|default:"Sistema" }}</td>
+                    <td class="px-4 py-3 text-xs text-slate-500">{{ reg.object_repr|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="p-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="flex items-center justify-between mt-6 text-sm text-slate-600">
+        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&modulo={{ filtros.modulo }}&acao={{ filtros.acao }}&actor={{ filtros.actor }}&date_from={{ filtros.date_from }}&date_to={{ filtros.date_to }}&search={{ filtros.search }}" class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&modulo={{ filtros.modulo }}&acao={{ filtros.acao }}&actor={{ filtros.actor }}&date_from={{ filtros.date_from }}&date_to={{ filtros.date_to }}&search={{ filtros.search }}" class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">Próxima</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

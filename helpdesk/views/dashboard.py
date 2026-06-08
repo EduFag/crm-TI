@@ -1,4 +1,5 @@
 from django.views.generic import TemplateView
+from core.audit import logs_do_modulo
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from django.db.models import Count
 from helpdesk.models import Ticket
@@ -29,6 +30,8 @@ class DashboardView(ModuloObrigatorioMixin, TemplateView):
         # Mapeamento limpo para os templates
         context['status_labels'] = dict(Ticket.StatusChoices.choices)
         context['priority_labels'] = dict(Ticket.PriorityChoices.choices)
+        context['audit_logs'] = logs_do_modulo(MODULO_HELPDESK, limite=50)
+        context['audit_titulo'] = 'Últimas ações do Helpdesk'
         
         return context
 

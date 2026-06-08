@@ -4,8 +4,16 @@ from django.views.generic import TemplateView, CreateView, View, ListView
 from django.contrib import messages
 
 from core.permissions import MODULO_EMAILS, ModuloObrigatorioMixin
+from core.audit import logs_do_modulo
 from core.htmx import HtmxModalMixin
 from emails.models import EmailAccount, EmailDomain
+from emails.audit import (
+    log_conta_bloqueada,
+    log_conta_criada,
+    log_conta_desbloqueada,
+    log_dominio_criado,
+    log_reset_senha,
+)
 
 
 class _EmailsMixin(ModuloObrigatorioMixin):
@@ -26,6 +34,8 @@ class DashboardView(_EmailsMixin, TemplateView):
         # Inventário e Filtros
         context['accounts'] = EmailAccount.objects.select_related('domain').all().order_by('employee_name')
         context['domains'] = EmailDomain.objects.all().order_by('name')
+        context['audit_logs'] = logs_do_modulo(MODULO_EMAILS, limite=50)
+        context['audit_titulo'] = 'Registro de auditoria de e-mails'
         
         return context
 
@@ -38,6 +48,7 @@ class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     
     def form_valid(self, form):
         self.object = form.save()
+        log_conta_criada(self.object, self.request.user)
         messages.success(self.request, f"E-mail {form.instance.address} cadastrado com sucesso!")
         return self.htmx_redirect_response()
 
@@ -47,6 +58,7 @@ class ResetPasswordView(_EmailsMixin, View):
         account = get_object_or_404(EmailAccount, pk=pk)
         account.last_password_reset = timezone.now()
         account.save()
+        log_reset_senha(account, request.user)
         messages.success(request, f"Senha da conta {account.address} resetada. Uma notificação temporária foi gerada.")
         return redirect('emails:dashboard')
 
@@ -57,9 +69,11 @@ class ToggleAccountStatusView(_EmailsMixin, View):
         if account.status == EmailAccount.StatusChoices.ACTIVE:
             account.status = EmailAccount.StatusChoices.BLOCKED
             action = "bloqueada"
+            log_conta_bloqueada(account, request.user)
         else:
             account.status = EmailAccount.StatusChoices.ACTIVE
             action = "desbloqueada"
+            log_conta_desbloqueada(account, request.user)
         account.save()
         messages.success(request, f"A conta {account.address} foi {action} com sucesso.")
         return redirect('emails:dashboard')
@@ -88,5 +102,6 @@ class EmailDomainCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
             raw_name = raw_name[1:]
         form.instance.name = raw_name
         self.object = form.save()
+        log_dominio_criado(self.object, self.request.user)
         messages.success(self.request, f"Domínio @{form.instance.name} adicionado ao catálogo!")
         return self.htmx_redirect_response()

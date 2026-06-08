@@ -1,12 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, ListView, UpdateView
 
+from core.audit import MODULO_CORE, logs_do_modulo, registrar_acao, registrar_alteracoes
 from core.forms import CustomUserCreateForm, CustomUserUpdateForm, EquipeForm
 from core.htmx import HtmxModalMixin
-from core.models import CustomUser, Equipe
+from core.models import CustomUser, Equipe, RegistroAcao
 from core.permissions import MODULO_GESTAO_USUARIOS, ModuloObrigatorioMixin, requer_modulo
 
 
@@ -47,6 +49,12 @@ class UserListView(ModuloObrigatorioMixin, ListView):
     def get_queryset(self):
         return CustomUser.objects.select_related('equipe').order_by('-is_active', 'username')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['audit_logs'] = logs_do_modulo(MODULO_CORE, limite=30)
+        context['audit_titulo'] = 'Últimas ações de usuários e equipes'
+        return context
+
 
 class UserCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
     """Cadastro de novo usuário pelo ADMIN (modal HTMX na listagem)."""
@@ -60,6 +68,14 @@ class UserCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save()
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.CREATED,
+            descricao=f'Usuário "{self.object.username}" criado.',
+            actor=self.request.user,
+            obj=self.object,
+            metadata={'role': self.object.role, 'is_active': self.object.is_active},
+        )
         messages.success(self.request, f'Usuário "{form.instance.username}" criado com sucesso.')
         return self.htmx_redirect_response()
 
@@ -80,7 +96,16 @@ class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
         return 'Atualize os dados de acesso e permissões.'
 
     def form_valid(self, form):
+        antes = CustomUser.objects.get(pk=self.object.pk)
         self.object = form.save()
+        registrar_alteracoes(
+            modulo=MODULO_CORE,
+            actor=self.request.user,
+            obj_antes=antes,
+            obj_depois=self.object,
+            campos=['username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active', 'is_staff'],
+            descricao_prefixo=f'Usuário "{self.object.username}" atualizado.',
+        )
         messages.success(self.request, f'Usuário "{form.instance.username}" atualizado com sucesso.')
         return self.htmx_redirect_response()
 
@@ -97,6 +122,13 @@ def user_toggle_active(request, pk):
     usuario.is_active = not usuario.is_active
     usuario.save(update_fields=['is_active'])
     acao = 'ativado' if usuario.is_active else 'desativado'
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.ACTIVATED if usuario.is_active else RegistroAcao.AcaoChoices.DEACTIVATED,
+        descricao=f'Usuário "{usuario.username}" {acao}.',
+        actor=request.user,
+        obj=usuario,
+    )
     messages.success(request, f'Usuário "{usuario.username}" {acao} com sucesso.')
     return redirect('user_list')
 
@@ -124,6 +156,13 @@ class EquipeCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save()
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.CREATED,
+            descricao=f'Equipe "{self.object.name}" criada.',
+            actor=self.request.user,
+            obj=self.object,
+        )
         messages.success(self.request, f'Equipe "{form.instance.name}" criada com sucesso.')
         return self.htmx_redirect_response()
 
@@ -144,7 +183,16 @@ class EquipeUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
         return 'Atualize os dados da equipe.'
 
     def form_valid(self, form):
+        antes = Equipe.objects.get(pk=self.object.pk)
         self.object = form.save()
+        registrar_alteracoes(
+            modulo=MODULO_CORE,
+            actor=self.request.user,
+            obj_antes=antes,
+            obj_depois=self.object,
+            campos=['name', 'is_active'],
+            descricao_prefixo=f'Equipe "{self.object.name}" atualizada.',
+        )
         messages.success(self.request, f'Equipe "{form.instance.name}" atualizada com sucesso.')
         return self.htmx_redirect_response()
 
@@ -157,5 +205,62 @@ def equipe_toggle_active(request, pk):
     equipe.is_active = not equipe.is_active
     equipe.save(update_fields=['is_active'])
     acao = 'ativada' if equipe.is_active else 'desativada'
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.ACTIVATED if equipe.is_active else RegistroAcao.AcaoChoices.DEACTIVATED,
+        descricao=f'Equipe "{equipe.name}" {acao}.',
+        actor=request.user,
+        obj=equipe,
+    )
     messages.success(request, f'Equipe "{equipe.name}" {acao} com sucesso.')
     return redirect('equipe_list')
+
+
+class AuditoriaListView(ModuloObrigatorioMixin, ListView):
+    """Página global de auditoria (somente ADMIN)."""
+    model = RegistroAcao
+    template_name = 'core/auditoria.html'
+    context_object_name = 'registros'
+    paginate_by = 20
+    modulo_obrigatorio = MODULO_GESTAO_USUARIOS
+
+    def get_queryset(self):
+        qs = RegistroAcao.objects.select_related('actor').order_by('-timestamp')
+        params = self.request.GET
+
+        modulo = params.get('modulo')
+        acao = params.get('acao')
+        actor = params.get('actor')
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
+        search = params.get('search', '').strip()
+
+        if modulo:
+            qs = qs.filter(modulo=modulo)
+        if acao:
+            qs = qs.filter(acao=acao)
+        if actor:
+            qs = qs.filter(actor_id=actor)
+        if date_from:
+            qs = qs.filter(timestamp__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(timestamp__date__lte=date_to)
+        if search:
+            qs = qs.filter(Q(descricao__icontains=search) | Q(object_repr__icontains=search))
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['modulo_choices'] = RegistroAcao.ModuloChoices.choices
+        context['acao_choices'] = RegistroAcao.AcaoChoices.choices
+        context['autores'] = CustomUser.objects.filter(acoes_registradas__isnull=False).distinct().order_by('username')
+        context['filtros'] = {
+            'modulo': self.request.GET.get('modulo', ''),
+            'acao': self.request.GET.get('acao', ''),
+            'actor': self.request.GET.get('actor', ''),
+            'date_from': self.request.GET.get('date_from', ''),
+            'date_to': self.request.GET.get('date_to', ''),
+            'search': self.request.GET.get('search', ''),
+        }
+        return context

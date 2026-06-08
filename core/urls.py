@@ -22,4 +22,7 @@ urlpatterns = [
     path('equipes/criar/', views.EquipeCreateView.as_view(), name='equipe_create'),
     path('equipes/<int:pk>/editar/', views.EquipeUpdateView.as_view(), name='equipe_update'),
     path('equipes/<int:pk>/desativar/', views.equipe_toggle_active, name='equipe_toggle_active'),
+
+    # Auditoria global (somente ADMIN)
+    path('auditoria/', views.AuditoriaListView.as_view(), name='auditoria'),
 ]

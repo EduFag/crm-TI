@@ -2,6 +2,7 @@ from django.views.generic import CreateView
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from core.htmx import HtmxModalMixin
 from chips.models import Recharge, Chip
+from chips.audit import log_recarga
 from django.shortcuts import get_object_or_404
 
 class RechargeCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
@@ -26,4 +27,5 @@ class RechargeCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
     def form_valid(self, form):
         form.instance.registered_by = self.request.user
         self.object = form.save()
+        log_recarga(self.object, self.request.user)
         return self.htmx_redirect_response()

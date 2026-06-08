@@ -6,7 +6,7 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 
 - Modelo de usuário com papéis (RBAC): ADMIN, MANAGER, USER.
 - Equipes organizacionais (`Equipe`) para agrupar usuários.
-- URLs `/`, `/login/`, `/logout/`, `/sem-permissao/`, `/usuarios/`, `/equipes/`.
+- URLs `/`, `/login/`, `/logout/`, `/sem-permissao/`, `/usuarios/`, `/equipes/`, `/auditoria/`.
 - Layout base HTML compartilhado pelos outros módulos.
 - Controle de acesso por módulo (menu lateral, views e APIs).
 
@@ -15,12 +15,13 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 | Arquivo | Função |
 |---------|--------|
 | `apps.py` | Configuração do app `CoreConfig`. |
-| `models.py` | `Equipe` e `CustomUser` (AbstractUser + `role`, `equipe`, timestamps). |
+| `models.py` | `Equipe`, `CustomUser` e `RegistroAcao` (auditoria append-only). |
+| `audit.py` | `registrar_acao`, `registrar_alteracoes` e `logs_do_modulo`. |
 | `permissions.py` | Matriz role→módulo, `ModuloObrigatorioMixin`, decorator `@requer_modulo`. |
 | `context_processors.py` | `modulos_menu` — módulos permitidos no menu lateral. |
 | `forms.py` | Formulários de equipes e de criação/edição de usuários. |
 | `htmx.py` | `HtmxModalMixin` — formulários POST como modal flutuante na listagem. |
-| `views.py` | Dashboard, gestão de usuários, gestão de equipes, sem permissão e handlers 403/404/500. |
+| `views.py` | Dashboard, gestão de usuários/equipes, auditoria global, sem permissão e handlers 403/404/500. |
 | `urls.py` | Rotas de dashboard, login, logout, usuários, equipes e sem-permissao. |
 | `admin.py` | Registro de `Equipe` e `CustomUser` no Django Admin. |
 | `tests.py` | Testes automatizados do app (quando implementados). |

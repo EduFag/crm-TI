@@ -13,6 +13,7 @@ Cadastrar domínios (`@empresa.com.br`), contas (usuário + domínio + funcioná
 | `apps.py` | Configuração do app. |
 | `models.py` | `EmailDomain` e `EmailAccount` (propriedade `address`). |
 | `views.py` | Dashboard, CRUD de contas/domínios, reset e toggle de status. |
+| `audit.py` | Registro de ações em `RegistroAcao` (core). |
 | `urls.py` | Rotas sob `/emails/`. |
 | `admin.py` | Administração no Django Admin. |
 | `tests.py` | Testes. |

@@ -16,6 +16,7 @@ Inventário central de chips, cadastro de operadoras e lotes, fluxo de atribuiç
 | `admin.py` | Modelos no Django Admin. |
 | `tests.py` | Testes do módulo. |
 | `views/` | Views divididas por domínio. Ver `views/DOCUMENTACAO.md`. |
+| `audit.py` | Dual-write de movimentações e CRUD em `RegistroAcao`. |
 | `migrations/` | Schema do banco. Ver `migrations/DOCUMENTACAO.md`. |
 | `templates/` | Interface web. Ver `templates/DOCUMENTACAO.md`. |
 
