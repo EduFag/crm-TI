@@ -14,8 +14,12 @@ SELECT_CLASS = (
 )
 
 
-class TipoTitularFormMixin:
-    """Mixin com radio nome livre / usuário do sistema (padrão helpdesk)."""
+class TipoTitularFormMixin(forms.Form):
+    """Mixin com radio nome livre / usuário do sistema (padrão helpdesk).
+
+    Precisa herdar forms.Form para o metaclass remover os campos da classe
+    e o template receber BoundField (iterável) em vez do ChoiceField cru.
+    """
 
     TIPO_TEXTO = 'texto'
     TIPO_USUARIO = 'usuario'
@@ -68,7 +72,7 @@ class TipoTitularFormMixin:
         return employee_name, None
 
 
-class AssignmentForm(TipoTitularFormMixin, forms.Form):
+class AssignmentForm(TipoTitularFormMixin):
     chip_id = forms.IntegerField(label='Chip', widget=forms.HiddenInput())
 
     def clean(self):
@@ -82,7 +86,7 @@ class AssignmentForm(TipoTitularFormMixin, forms.Form):
         return cleaned
 
 
-class TransferForm(TipoTitularFormMixin, forms.Form):
+class TransferForm(TipoTitularFormMixin):
     def clean(self):
         cleaned = super().clean()
         if self.errors:
