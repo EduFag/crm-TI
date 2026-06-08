@@ -1,4 +1,4 @@
-# Systemd — Gunicorn CRM TI
+# Systemd — Gunicorn CRM TI (porta 9001 — 8000+ já usadas por outros apps)
 # Arquivo: /etc/systemd/system/crm-ti.service
 #
 # sudo systemctl daemon-reload
@@ -16,8 +16,8 @@ User=edufa
 Group=edufa
 WorkingDirectory=/home/edufa/crm-TI
 EnvironmentFile=/home/edufa/crm-TI/.env
-ExecStart=/home/edufa/crm-TI/venv/bin/gunicorn setup.wsgi:application \
-    --bind 127.0.0.1:8001 \
+ExecStart=/home/edufa/crm-TI/myvenv/bin/gunicorn setup.wsgi:application \
+    --bind 127.0.0.1:9001 \
     --workers 3 \
     --timeout 120 \
     --access-logfile - \

@@ -126,7 +126,7 @@ Não abra a porta **5432** (Postgres) na internet.
 ```
 Browser → ti.moneypromotora.com.br (443)
        → Nginx (static/media + proxy)
-       → Gunicorn 127.0.0.1:8001
+       → Gunicorn 127.0.0.1:9001
        → Django
        → PostgreSQL 127.0.0.1:5432
 ```
