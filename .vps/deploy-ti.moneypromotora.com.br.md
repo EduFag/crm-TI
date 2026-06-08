@@ -147,6 +147,49 @@ sudo kill -HUP $(systemctl show -p MainPID --value crm-ti)
 
 **Alterou `.env`?** Use `sudo systemctl restart crm-ti` — variáveis de ambiente só são relidas no start.
 
+### DisallowedHost em `ti.moneypromotora.com.br`
+
+Se a página de erro mostrar **outro projeto** no `Python Path` (ex.: `/home/capitalcredito/...` em vez de `/home/edufa/crm-TI/`), o **Nginx está mandando o tráfego para o Gunicorn errado** — não basta alterar `ALLOWED_HOSTS` no capitalcredito.
+
+**Diagnóstico no servidor:**
+
+```bash
+# CRM TI deve estar ativo na 9001
+sudo systemctl status crm-ti
+curl -sI -H "Host: ti.moneypromotora.com.br" http://127.0.0.1:9001/
+
+# Qual config atende o subdomínio (porta 80 e 443)
+sudo nginx -T 2>/dev/null | grep -A30 "server_name ti.moneypromotora.com.br"
+
+# Conferir symlinks (só um site para ti)
+ls -la /etc/nginx/sites-enabled/ | grep -E 'crm-ti|ti\.'
+```
+
+O bloco `location /` de **ti.moneypromotora.com.br** (HTTP **e** HTTPS) deve ter:
+
+```nginx
+proxy_pass http://127.0.0.1:9001;
+```
+
+**Correção:**
+
+```bash
+sudo cp /home/edufa/crm-TI/.vps/nginx.conf.exemple /etc/nginx/sites-available/crm-ti
+# Edite o bloco SSL (443) se o certbot criou proxy_pass para outra porta:
+sudo nano /etc/nginx/sites-available/crm-ti
+sudo rm -f /etc/nginx/sites-enabled/ti.moneypromotora.com.br
+sudo ln -sf /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+No `.env` do CRM TI (`/home/edufa/crm-TI/.env`):
+
+```env
+DJANGO_ALLOWED_HOSTS=ti.moneypromotora.com.br,127.0.0.1,localhost
+```
+
+Após mudar `.env`: `sudo systemctl restart crm-ti`
+
 ---
 
 ## 7. Firewall
