@@ -111,15 +111,25 @@ class ReturnToTiForm(forms.Form):
 
 
 class ChipGridCreateForm(forms.Form):
-    line_number = forms.CharField(max_length=20, label='Número da linha')
+    line_number = forms.CharField(
+        max_length=20,
+        label='Número da linha',
+        widget=forms.TextInput(attrs={
+            'class': INPUT_CLASS,
+            'placeholder': 'Ex: 11999998888',
+        }),
+    )
     operator = forms.ModelChoiceField(
         queryset=Operator.objects.filter(status=Operator.StatusChoices.ACTIVE),
         label='Operadora',
+        empty_label='Selecione a operadora',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
     custody = forms.ChoiceField(
         choices=Chip.CustodyChoices.choices,
         initial=Chip.CustodyChoices.WITH_PERSON,
         label='Custódia',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
     tipo_titular = forms.ChoiceField(
         choices=[
@@ -128,19 +138,41 @@ class ChipGridCreateForm(forms.Form):
         ],
         initial=TipoTitularFormMixin.TIPO_TEXTO,
         required=False,
+        widget=forms.RadioSelect,
+        label='Tipo de titular',
     )
-    employee_name = forms.CharField(required=False, max_length=150)
-    employee_user = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(is_active=True),
+    employee_name = forms.CharField(
         required=False,
+        max_length=150,
+        label='Nome do titular',
+        widget=forms.TextInput(attrs={
+            'class': INPUT_CLASS,
+            'placeholder': 'Nome de quem está usando o chip',
+        }),
     )
-    activated_at = forms.DateField(required=False)
+    employee_user = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(is_active=True).order_by(
+            'first_name', 'last_name', 'username'
+        ),
+        required=False,
+        label='Usuário titular',
+        empty_label='Selecione um usuário',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+    )
+    activated_at = forms.DateField(
+        required=False,
+        label='Data de ativação',
+        widget=forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+    )
     batch = forms.ModelChoiceField(
         queryset=Batch.objects.filter(
             tipo=Batch.TipoChoices.ENVELOPE,
             status=Batch.StatusChoices.OPEN,
-        ),
+        ).order_by('identifier'),
         required=False,
+        label='Envelope na TI',
+        empty_label='Selecione o envelope',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
 
     def clean(self):

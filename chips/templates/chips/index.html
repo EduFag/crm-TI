@@ -512,42 +512,7 @@ $(function() {
     window.chipsGrid = table;
 
     $('#btn-add-chip-row').on('click', function() {
-        var line = prompt('Número da linha (com DDD):');
-        if (!line) return;
-        if (!operators.length) {
-            alert('Cadastre uma operadora antes.');
-            return;
-        }
-        var opId = operators[0].id;
-        if (operators.length > 1) {
-            var nomes = operators.map(function(o, i) { return (i + 1) + '=' + o.name; }).join(', ');
-            var esc = prompt('ID da operadora (' + nomes + '):', '1');
-            if (esc) opId = (operators[parseInt(esc, 10) - 1] || operators[0]).id;
-        }
-        var titular = prompt('Nome do titular (deixe vazio se chip ficará na TI):', '');
-        var custody = titular ? 'WITH_PERSON' : 'WITH_TI';
-        var payload = {
-            line_number: line.trim(),
-            operator: opId,
-            custody: custody,
-            employee_name: titular || '',
-        };
-        if (custody === 'WITH_TI' && envelopes.length) {
-            payload.batch = envelopes[0].id;
-        }
-        fetch('{% url "chips:grid_create" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify(payload),
-        })
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-        .then(function(res) {
-            if (!res.ok) {
-                alert(res.data.error || JSON.stringify(res.data.errors || res.data));
-                return;
-            }
-            table.replaceData();
-        });
+        htmx.ajax('GET', '{% url "chips:grid_create_modal" %}', '#modal-container');
     });
 
     $('#btn-nova-recarga').on('click', function() {

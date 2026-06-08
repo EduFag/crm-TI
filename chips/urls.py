@@ -13,6 +13,7 @@ urlpatterns = [
     # API Grid Tabulator
     path('api/grid/', views.ChipGridDataView.as_view(), name='grid_data'),
     path('api/grid/create/', views.ChipGridCreateView.as_view(), name='grid_create'),
+    path('api/grid/create/modal/', views.ChipGridCreateModalView.as_view(), name='grid_create_modal'),
     path('api/grid/<int:pk>/', views.ChipGridUpdateView.as_view(), name='grid_update'),
     path('api/grid/<int:pk>/transfer/', views.ChipTransferView.as_view(), name='grid_transfer'),
     path('api/grid/<int:pk>/return/', views.ChipReturnView.as_view(), name='grid_return'),

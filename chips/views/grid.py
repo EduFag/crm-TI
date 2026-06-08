@@ -134,6 +134,28 @@ class ChipReturnView(_JsonChipsMixin, View):
         return JsonResponse({'data': row, 'success': True})
 
 
+class ChipGridCreateModalView(ModuloObrigatorioMixin, View):
+    """GET modal HTMX para cadastrar nova linha no grid."""
+
+    modulo_obrigatorio = MODULO_CHIPS
+    template_name = 'chips/_grid_create_modal.html'
+
+    def get(self, request):
+        form = ChipGridCreateForm()
+        has_operators = Operator.objects.filter(
+            status=Operator.StatusChoices.ACTIVE,
+        ).exists()
+        has_envelopes = Batch.objects.filter(
+            tipo=Batch.TipoChoices.ENVELOPE,
+            status=Batch.StatusChoices.OPEN,
+        ).exists()
+        return render(request, self.template_name, {
+            'form': form,
+            'has_operators': has_operators,
+            'has_envelopes': has_envelopes,
+        })
+
+
 class ChipTransferModalView(ModuloObrigatorioMixin, View):
     """GET modal HTMX de transferência."""
 

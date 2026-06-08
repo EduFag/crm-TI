@@ -16,4 +16,5 @@ from .grid import (
     ChipTransferView,
     ChipReturnView,
     ChipTransferModalView,
+    ChipGridCreateModalView,
 )
