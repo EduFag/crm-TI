@@ -10,6 +10,21 @@ from core.models import CustomUser
 from core.permissions import MODULO_GESTAO_USUARIOS, ModuloObrigatorioMixin, requer_modulo
 
 
+def erro_servidor(request):
+    """Página amigável para erro 500 (produção com DEBUG=False)."""
+    return render(request, '500.html', status=500)
+
+
+def pagina_nao_encontrada(request, exception):
+    """Página amigável para erro 404."""
+    return render(request, '404.html', status=404)
+
+
+def acesso_negado(request, exception):
+    """Página amigável para erro 403."""
+    return render(request, '403.html', status=403)
+
+
 @login_required
 def dashboard_view(request):
     """Tela inicial da aplicação (acessível a qualquer usuário autenticado)."""

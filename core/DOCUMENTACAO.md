@@ -18,7 +18,7 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 | `permissions.py` | Matriz role→módulo, `ModuloObrigatorioMixin`, decorator `@requer_modulo`. |
 | `context_processors.py` | `modulos_menu` — módulos permitidos no menu lateral. |
 | `forms.py` | Formulários de criação e edição de usuários. |
-| `views.py` | Dashboard, gestão de usuários, página sem permissão. |
+| `views.py` | Dashboard, gestão de usuários, sem permissão e handlers 403/404/500. |
 | `urls.py` | Rotas de dashboard, login, logout, usuários e sem-permissao. |
 | `admin.py` | Registro de `CustomUser` no Django Admin. |
 | `tests.py` | Testes automatizados do app (quando implementados). |
@@ -38,4 +38,4 @@ Superusuários ignoram restrições. Cadastro de usuários é somente por ADMIN 
 ## Subpastas
 
 - `migrations/` — schema do usuário customizado.
-- `templates/` — `base.html`, login, dashboard e gestão de usuários.
+- `templates/` — `base.html`, login, dashboard, gestão de usuários e páginas de erro (403/404/500).

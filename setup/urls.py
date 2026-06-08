@@ -32,3 +32,8 @@ from django.conf.urls.static import static
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Páginas de erro customizadas (exibidas quando DEBUG=False)
+handler404 = 'core.views.pagina_nao_encontrada'
+handler500 = 'core.views.erro_servidor'
+handler403 = 'core.views.acesso_negado'

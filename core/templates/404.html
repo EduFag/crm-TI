@@ -1,0 +1,19 @@
+{% extends "errors/layout.html" %}
+
+{% block titulo_pagina %}Página não encontrada — Sistema TI{% endblock %}
+{% block codigo_erro %}Erro 404{% endblock %}
+{% block titulo_erro %}Página não encontrada{% endblock %}
+{% block mensagem_erro %}
+O endereço que você acessou não existe ou foi movido. Verifique o link ou volte ao início.
+{% endblock %}
+{% block cor_icone %}bg-amber-50 text-amber-500{% endblock %}
+{% block icone %}
+<svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+</svg>
+{% endblock %}
+{% block acoes %}
+<a href="/" class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors">
+    Voltar ao início
+</a>
+{% endblock %}
