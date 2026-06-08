@@ -37,7 +37,7 @@ class Ticket(models.Model):
         URGENT = 'URGENT', 'Urgente'
         
     title = models.CharField(max_length=200, help_text='Título ou resumo do problema.')
-    description = models.TextField(blank=True, help_text='Descrição detalhada do chamado.')
+    description = models.TextField(help_text='Descrição detalhada do chamado.')
     
     status = models.CharField(
         max_length=20, 

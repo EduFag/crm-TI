@@ -26,7 +26,7 @@
         </div>
 
         <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição</label>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição <span class="text-red-500">*</span></label>
             {{ form.description }}
             {% if form.description.errors %}<p class="text-xs text-red-600 mt-1">{{ form.description.errors.0 }}</p>{% endif %}
         </div>

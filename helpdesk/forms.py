@@ -77,6 +77,13 @@ class TicketCreateForm(forms.ModelForm):
                 self.fields['category'].initial = padrao.pk
 
         self._configurar_por_papel(nome_padrao)
+        self.fields['description'].required = True
+
+    def clean_description(self):
+        descricao = (self.cleaned_data.get('description') or '').strip()
+        if not descricao:
+            raise forms.ValidationError('Informe a descrição do chamado.')
+        return descricao
 
     def _configurar_por_papel(self, nome_padrao):
         if not self.user:
@@ -234,6 +241,7 @@ class TicketUpdateForm(forms.ModelForm):
         self.fields['assigned_to'].empty_label = 'Não atribuído'
         self.fields['priority'].required = False
         self.fields['priority'].empty_label = 'Sem prioridade'
+        self.fields['description'].required = True
         self.fields['requester_user'].label_from_instance = TicketCreateForm._rotulo_usuario
 
         if self.instance and self.instance.pk:
@@ -243,6 +251,12 @@ class TicketUpdateForm(forms.ModelForm):
             else:
                 self.fields['tipo_solicitante'].initial = self.TIPO_TEXTO
                 self.fields['requester_name'].initial = self.instance.requester_name
+
+    def clean_description(self):
+        descricao = (self.cleaned_data.get('description') or '').strip()
+        if not descricao:
+            raise forms.ValidationError('Informe a descrição do chamado.')
+        return descricao
 
     def clean(self):
         cleaned = super().clean()
