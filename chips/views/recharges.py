@@ -12,7 +12,7 @@ class RechargeCreateView(ChipsModalMixin, ModuloObrigatorioMixin, CreateView):
     modulo_obrigatorio = MODULO_CHIPS
     model = Recharge
     fields = ['chip', 'amount']
-    chips_tab = 'dashboard'
+    chips_tab = 'chips'
     modal_title = 'Nova Recarga'
     modal_subtitle = 'Registre o valor recarregado para a linha.'
     modal_submit_label = 'Registrar Recarga'

@@ -1,9 +1,9 @@
+import json
 import logging
 from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -19,7 +19,7 @@ from chips.services import entregar_chip, transferir_chip
 
 logger = logging.getLogger(__name__)
 
-ABAS_VALIDAS = ('dashboard', 'assignment', 'inventory', 'operators', 'envelopes')
+ABAS_VALIDAS = ('dashboard', 'chips', 'operators', 'envelopes')
 
 
 def _auditoria_chips():
@@ -44,6 +44,9 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         tab = self.request.GET.get('tab', 'dashboard')
+        # Abas antigas redirecionam para chips
+        if tab in ('assignment', 'inventory'):
+            tab = 'chips'
         if tab not in ABAS_VALIDAS:
             tab = 'dashboard'
         context['active_tab'] = tab
@@ -51,8 +54,6 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
 
         try:
             self._contexto_dashboard(context)
-            self._contexto_assignment(context)
-            self._contexto_inventario(context)
             self._contexto_operadoras(context)
             self._contexto_envelopes(context)
         except Exception as exc:
@@ -85,13 +86,10 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         context.setdefault('history_logs', [])
         context.setdefault('audit_logs', [])
         context.setdefault('audit_titulo', 'Registro de auditoria de chips')
-        context.setdefault('available_chips', [])
-        context.setdefault('in_use_chips', [])
-        context.setdefault('assignment_form', AssignmentForm())
-        context.setdefault('chips', [])
-        context.setdefault('envelopes', [])
         context.setdefault('operators', [])
         context.setdefault('batches', [])
+        context.setdefault('chart_custodia', '{}')
+        context.setdefault('chart_movimentacao', '{}')
 
     def _contexto_dashboard(self, context):
         date_from, date_to = resolver_periodo(self.request)
@@ -171,30 +169,24 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         context['audit_logs'] = _auditoria_chips()
         context['audit_titulo'] = 'Registro de auditoria de chips'
 
-    def _contexto_assignment(self, context):
-        context['available_chips'] = _listar(
-            Chip.objects.filter(
-                status=Chip.StatusChoices.AVAILABLE,
-                custody=Chip.CustodyChoices.WITH_TI,
-            ).select_related('operator')
+        outros = max(
+            context['total_chips'] - context['metric_available'] - context['metric_in_use'],
+            0,
         )
-        context['in_use_chips'] = _listar(
-            Chip.objects.filter(
-                custody=Chip.CustodyChoices.WITH_PERSON,
-            ).select_related('operator')
-        )
-        context['assignment_form'] = AssignmentForm()
-
-    def _contexto_inventario(self, context):
-        context['chips'] = _listar(
-            Chip.objects.select_related('operator', 'batch').order_by('-created_at')
-        )
-        context['envelopes'] = _listar(
-            Batch.objects.filter(
-                tipo=Batch.TipoChoices.ENVELOPE,
-                status=Batch.StatusChoices.OPEN,
-            ).order_by('identifier')
-        )
+        context['chart_custodia'] = json.dumps({
+            'labels': ['Na TI', 'Callcenter', 'Outros'],
+            'values': [context['metric_available'], context['metric_in_use'], outros],
+        })
+        context['chart_movimentacao'] = json.dumps({
+            'labels': ['Entregas', 'Transferências', 'Devoluções', 'Recargas', 'Bloqueios'],
+            'values': [
+                context['period_deliveries'],
+                context['period_transfers'],
+                context['period_returns'],
+                context['period_recharges_count'],
+                context['period_blocks'],
+            ],
+        })
 
     def _contexto_operadoras(self, context):
         context['operators'] = _listar(Operator.objects.all().order_by('name'))
@@ -204,7 +196,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
 
 
 class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
-    """POST de entrega/transferência — redireciona para aba assignment."""
+    """POST de entrega/transferência — redireciona para aba chips."""
 
     modulo_obrigatorio = MODULO_CHIPS
 
@@ -212,7 +204,7 @@ class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
         form = AssignmentForm(request.POST)
         if not form.is_valid():
             messages.error(request, 'Corrija os erros do formulário.')
-            return redirect('/chips/?tab=assignment')
+            return redirect('/chips/?tab=chips')
 
         chip = get_object_or_404(Chip, id=form.cleaned_data['chip_id'])
         nome = form.cleaned_data['employee_name']
@@ -228,7 +220,7 @@ class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
         except ValidationError as exc:
             messages.error(request, exc.messages[0] if exc.messages else str(exc))
 
-        return redirect('/chips/?tab=assignment')
+        return redirect('/chips/?tab=chips')
 
 
 DashboardView = ChipsView

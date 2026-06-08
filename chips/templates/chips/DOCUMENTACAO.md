@@ -6,12 +6,16 @@ Templates HTML do namespace **chips**.
 
 | Arquivo | Função |
 |---------|--------|
-| `index.html` | Página única com abas (shell principal em `/chips/`). |
-| `_tabs_nav.html` | Botões de abas (client-side, sem troca de página). |
-| `_tab_dashboard.html` | Aba 1: métricas, planilha, histórico e auditoria. |
-| `_tab_assignment.html` | Aba 2: entrega e transferência. |
-| `_tab_inventory.html` | Aba 3: inventário completo. |
-| `_tab_operators.html` | Aba 4: operadoras. |
-| `_tab_envelopes.html` | Aba 5: envelopes na TI. |
-| `_callcenter_grid.html` | Grid Tabulator editável (na aba dashboard). |
-| `_transfer_modal.html` | Modal HTMX de transferência. |
+| `index.html` | Página única em `/chips/` — 4 abas (jQuery), KPIs, gráficos Chart.js, grid Tabulator, operadoras e envelopes. |
+| `_transfer_modal.html` | Modal HTMX de transferência de chip (acionado pelo grid). |
+
+## Abas (`?tab=`)
+
+| Tab | Conteúdo |
+|-----|----------|
+| `dashboard` | Filtro de período, KPIs, gráficos, histórico e auditoria. |
+| `chips` | Planilha Tabulator — cadastro, edição, transferência e recarga. |
+| `operators` | Listagem e CRUD de operadoras (modais HTMX). |
+| `envelopes` | Listagem e CRUD de envelopes/lotes (modais HTMX). |
+
+Abas legadas `assignment` e `inventory` abrem automaticamente a aba `chips`.

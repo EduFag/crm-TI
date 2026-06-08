@@ -20,7 +20,9 @@ urlpatterns = [
 
     # Modais HTMX (create/update)
     path('operators/create/', views.OperatorCreateView.as_view(), name='operator_create'),
+    path('operators/<int:pk>/edit/', views.OperatorUpdateView.as_view(), name='operator_edit'),
     path('batches/create/', views.BatchCreateView.as_view(), name='batch_create'),
+    path('batches/<int:pk>/edit/', views.BatchUpdateView.as_view(), name='batch_edit'),
     path('management/create/', views.ChipCreateView.as_view(), name='chip_create'),
     path('management/<int:pk>/edit/', views.ChipUpdateView.as_view(), name='chip_edit'),
     path('return/<int:pk>/', views.ReturnChipView.as_view(), name='return_chip'),
@@ -29,5 +31,5 @@ urlpatterns = [
     # Rotas legadas → redirecionam para aba correspondente
     path('operators/', RedirectView.as_view(url='/chips/?tab=operators', permanent=False), name='operator_list'),
     path('batches/', RedirectView.as_view(url='/chips/?tab=envelopes', permanent=False), name='batch_list'),
-    path('management/', RedirectView.as_view(url='/chips/?tab=inventory', permanent=False), name='chip_list'),
+    path('management/', RedirectView.as_view(url='/chips/?tab=chips', permanent=False), name='chip_list'),
 ]

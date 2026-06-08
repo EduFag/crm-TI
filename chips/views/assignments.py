@@ -18,7 +18,7 @@ class ReturnChipView(_ChipsMixin, View):
     def post(self, request, pk):
         chip = get_object_or_404(Chip, pk=pk, custody=Chip.CustodyChoices.WITH_PERSON)
         envelope_id = request.POST.get('envelope_id')
-        tab = request.POST.get('tab', 'inventory')
+        tab = request.POST.get('tab', 'chips')
 
         if not envelope_id:
             messages.error(request, 'Selecione o envelope na TI.')

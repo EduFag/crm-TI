@@ -3,18 +3,13 @@
 {% block title %}Gestão de Chips{% endblock %}
 
 {% block content %}
+<link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator_modern.min.css" rel="stylesheet">
+
 <div class="flex flex-col h-full" id="chips-app">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Chips</h2>
-            <p class="text-sm text-slate-500 mt-1">Dashboard, planilha callcenter, inventário e cadastros.</p>
-        </div>
-        <div class="flex gap-2">
-            <button type="button"
-                    hx-get="{% url 'chips:recharge_create' %}"
-                    hx-target="#modal-container"
-                    hx-swap="innerHTML"
-                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</button>
+            <p class="text-sm text-slate-500 mt-1">Dashboard, planilha operacional, operadoras e envelopes.</p>
         </div>
     </div>
 
@@ -25,7 +20,7 @@
     {% endif %}
 
     {% if messages %}
-    <div class="mb-4 space-y-2">
+    <div class="mb-4 space-y-2" id="chips-messages">
         {% for message in messages %}
         <div class="px-4 py-3 rounded-lg text-sm font-medium
             {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200
@@ -37,37 +32,305 @@
     </div>
     {% endif %}
 
-    {% include "chips/_tabs_nav.html" %}
+    <!-- Navegação de abas -->
+    <nav class="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6" id="chips-tabs-nav" role="tablist">
+        <button type="button" role="tab" data-tab="dashboard"
+                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Dashboard
+        </button>
+        <button type="button" role="tab" data-tab="chips"
+                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Chips
+        </button>
+        <button type="button" role="tab" data-tab="operators"
+                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Operadoras
+        </button>
+        <button type="button" role="tab" data-tab="envelopes"
+                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Envelopes
+        </button>
+    </nav>
 
-    <div id="chips-tab-content">
-        {% include "chips/_tab_dashboard.html" %}
-        {% include "chips/_tab_assignment.html" %}
-        {% include "chips/_tab_inventory.html" %}
-        {% include "chips/_tab_operators.html" %}
-        {% include "chips/_tab_envelopes.html" %}
+    <!-- ========== ABA 1: DASHBOARD ========== -->
+    <div class="chips-tab-panel space-y-6" data-tab-panel="dashboard">
+        <form method="get" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
+            <input type="hidden" name="tab" value="dashboard">
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">De</label>
+                <input type="date" name="date_from" value="{{ date_from }}"
+                       class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Até</label>
+                <input type="date" name="date_to" value="{{ date_to }}"
+                       class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Filtrar</button>
+            <a href="{{ periodo_mes_atual_url }}" class="text-sm text-blue-600 font-semibold py-2">Mês atual</a>
+            <a href="{{ periodo_mes_anterior_url }}" class="text-sm text-slate-500 font-semibold py-2">Mês anterior</a>
+        </form>
+
+        <div>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estado atual</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Total ativos</p>
+                    <h3 class="text-2xl font-bold text-slate-900">{{ total_chips }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Na TI</p>
+                    <h3 class="text-2xl font-bold text-emerald-600">{{ metric_available }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Callcenter</p>
+                    <h3 class="text-2xl font-bold text-blue-600">{{ metric_in_use }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Vencem em 30 dias</p>
+                    <h3 class="text-2xl font-bold text-amber-600">{{ recharge_due_soon }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Movimentação no período</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Entregas</p>
+                    <h3 class="text-xl font-bold text-blue-600">{{ period_deliveries }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Transferências</p>
+                    <h3 class="text-xl font-bold text-indigo-600">{{ period_transfers }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Devoluções</p>
+                    <h3 class="text-xl font-bold text-orange-600">{{ period_returns }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Recargas</p>
+                    <h3 class="text-xl font-bold text-emerald-600">{{ period_recharges_count }}</h3>
+                    <p class="text-xs text-slate-500">R$ {{ period_recharges_total|floatformat:2 }}</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Bloqueios</p>
+                    <h3 class="text-xl font-bold text-red-600">{{ period_blocks }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Acumulado</p>
+                    <h3 class="text-xl font-bold text-slate-900">R$ {{ total_recharge_value|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 class="font-bold text-slate-800 mb-4">Distribuição de custódia</h4>
+                <div class="h-64 flex items-center justify-center">
+                    <canvas id="chart-custodia"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 class="font-bold text-slate-800 mb-4">Movimentação no período</h4>
+                <div class="h-64">
+                    <canvas id="chart-movimentacao"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[400px]">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+                <h4 class="font-bold text-slate-800">Movimentações no período</h4>
+            </div>
+            <div class="overflow-y-auto flex-1">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Data</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Ação</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Titular</th>
+                            <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for mov in history_logs %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 text-xs text-slate-500">{{ mov.timestamp|date:"d/m/y H:i" }}</td>
+                            <td class="px-4 py-3">
+                                {% if mov.action == 'DELIVERY' %}
+                                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Entrega</span>
+                                {% elif mov.action == 'TRANSFER' %}
+                                <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Transferência</span>
+                                {% else %}
+                                <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Devolução</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ mov.employee_name }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ mov.chip.line_number }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="p-4 text-center text-slate-400">Nenhuma movimentação no período.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% include "core/_audit_log_table.html" with registros=audit_logs titulo=audit_titulo %}
+    </div>
+
+    <!-- ========== ABA 2: CHIPS ========== -->
+    <div class="chips-tab-panel hidden" data-tab-panel="chips">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-4">
+            <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50 rounded-t-xl">
+                <div>
+                    <h4 class="font-bold text-slate-800">Planilha de Chips</h4>
+                    <p class="text-xs text-slate-500">Edite inline, registre novos, transfira ou devolva. Ciclo de recarga: 90 dias.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="btn-add-chip-row"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                        + Nova linha
+                    </button>
+                    <button type="button" id="btn-nova-recarga"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                        Nova Recarga
+                    </button>
+                </div>
+            </div>
+            <div id="callcenter-grid" class="p-2"></div>
+        </div>
+    </div>
+
+    <!-- ========== ABA 3: OPERADORAS ========== -->
+    <div class="chips-tab-panel hidden" data-tab-panel="operators">
+        <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-slate-500">Operadoras de telefonia cadastradas.</p>
+            <button type="button"
+                    hx-get="{% url 'chips:operator_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                + Nova Operadora
+            </button>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">ID</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Nome</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for op in operators %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-6 py-4 font-mono text-slate-500">#{{ op.id }}</td>
+                        <td class="px-6 py-4 font-bold text-slate-900">{{ op.name }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded text-xs font-bold {% if op.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">{{ op.get_status_display }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button type="button"
+                                    hx-get="{% url 'chips:operator_edit' op.id %}"
+                                    hx-target="#modal-container"
+                                    hx-swap="innerHTML"
+                                    class="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase px-2">Editar</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="p-6 text-center text-slate-400">Nenhuma operadora cadastrada.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ========== ABA 4: ENVELOPES ========== -->
+    <div class="chips-tab-panel hidden" data-tab-panel="envelopes">
+        <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-slate-500">Chips físicos na TI ficam em envelopes com nome, setor e data de entrada.</p>
+            <button type="button"
+                    hx-get="{% url 'chips:batch_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                + Novo envelope
+            </button>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Código</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Tipo</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Nome</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Setor</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Entrada</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for batch in batches %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-6 py-4 font-mono font-bold text-slate-900">{{ batch.identifier }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ batch.get_tipo_display }}</td>
+                        <td class="px-6 py-4 text-slate-800">{{ batch.nome|default:"—" }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ batch.setor|default:"—" }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ batch.received_at|date:"d/m/Y" }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded text-xs font-bold {% if batch.status == 'OPEN' %}bg-blue-100 text-blue-700{% else %}bg-slate-200 text-slate-600{% endif %}">{{ batch.get_status_display }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button type="button"
+                                    hx-get="{% url 'chips:batch_edit' batch.id %}"
+                                    hx-target="#modal-container"
+                                    hx-swap="innerHTML"
+                                    class="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase px-2">Editar</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="p-6 text-center text-slate-400">Nenhum envelope cadastrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<script>
-(function() {
-    var activeTab = '{{ active_tab }}';
-    var panels = document.querySelectorAll('.chips-tab-panel');
-    var buttons = document.querySelectorAll('.chips-tab-btn');
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
 
+<script>
+$(function() {
+    var activeTab = '{{ active_tab }}';
+    var csrfToken = '{{ csrf_token }}';
+    var chartCustodia = null;
+    var chartMovimentacao = null;
+
+    var chartDataCustodia = {{ chart_custodia|safe }};
+    var chartDataMovimentacao = {{ chart_movimentacao|safe }};
+
+    /* ---- Abas (jQuery) ---- */
     function showTab(tabId, pushState) {
         activeTab = tabId;
-        panels.forEach(function(panel) {
-            var isActive = panel.getAttribute('data-tab-panel') === tabId;
-            panel.classList.toggle('hidden', !isActive);
-        });
-        buttons.forEach(function(btn) {
-            var isActive = btn.getAttribute('data-tab') === tabId;
-            btn.classList.toggle('text-blue-600', isActive);
-            btn.classList.toggle('border-blue-600', isActive);
-            btn.classList.toggle('text-slate-500', !isActive);
-            btn.classList.toggle('border-transparent', !isActive);
-            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-        });
+        $('.chips-tab-panel').addClass('hidden');
+        $('.chips-tab-panel[data-tab-panel="' + tabId + '"]').removeClass('hidden');
+
+        $('.chips-tab-btn')
+            .removeClass('text-blue-600 border-blue-600')
+            .addClass('text-slate-500 border-transparent')
+            .attr('aria-selected', 'false');
+        $('.chips-tab-btn[data-tab="' + tabId + '"]')
+            .removeClass('text-slate-500 border-transparent')
+            .addClass('text-blue-600 border-blue-600')
+            .attr('aria-selected', 'true');
+
         if (pushState !== false) {
             var url = new URL(window.location.href);
             url.searchParams.set('tab', tabId);
@@ -77,44 +340,261 @@
             }
             history.replaceState({ tab: tabId }, '', url.toString());
         }
-        if (tabId === 'dashboard' && window.chipsGrid) {
+
+        if (tabId === 'dashboard') {
+            initCharts();
+        }
+        if (tabId === 'chips' && window.chipsGrid) {
             try { window.chipsGrid.redraw(true); } catch (e) {}
         }
     }
 
-    buttons.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            showTab(btn.getAttribute('data-tab'));
-        });
+    $('.chips-tab-btn').on('click', function() {
+        showTab($(this).data('tab'));
     });
 
     window.chipsShowTab = showTab;
     showTab(activeTab, false);
 
-    window.chipsSelectChip = function(id) {
-        var input = document.getElementById('chip_id');
-        if (!input) return;
-        input.value = id;
-        input.classList.add('bg-blue-50', 'border-blue-400', 'text-blue-700', 'font-bold');
-        showTab('assignment');
-        input.focus();
-        var nome = document.querySelector('[name="employee_name"]');
-        if (nome) nome.focus();
-    };
+    /* ---- Gráficos ---- */
+    function initCharts() {
+        var ctxCustodia = document.getElementById('chart-custodia');
+        if (ctxCustodia) {
+            if (chartCustodia) chartCustodia.destroy();
+            chartCustodia = new Chart(ctxCustodia, {
+                type: 'doughnut',
+                data: {
+                    labels: chartDataCustodia.labels,
+                    datasets: [{
+                        data: chartDataCustodia.values,
+                        backgroundColor: ['#10b981', '#3b82f6', '#94a3b8'],
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                },
+            });
+        }
 
-    var tipoUsuario = document.querySelector('input[name="tipo_titular"][value="usuario"]');
-    var campoTexto = document.getElementById('campo-titular-texto');
-    var campoUsuario = document.getElementById('campo-titular-usuario');
-    function toggleTitularAssignment() {
-        if (!campoTexto || !campoUsuario) return;
-        var u = tipoUsuario && tipoUsuario.checked;
-        campoTexto.classList.toggle('hidden', u);
-        campoUsuario.classList.toggle('hidden', !u);
+        var ctxMov = document.getElementById('chart-movimentacao');
+        if (ctxMov) {
+            if (chartMovimentacao) chartMovimentacao.destroy();
+            chartMovimentacao = new Chart(ctxMov, {
+                type: 'bar',
+                data: {
+                    labels: chartDataMovimentacao.labels,
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: chartDataMovimentacao.values,
+                        backgroundColor: ['#3b82f6', '#6366f1', '#f97316', '#10b981', '#ef4444'],
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                },
+            });
+        }
     }
-    document.querySelectorAll('input[name="tipo_titular"]').forEach(function(r) {
-        r.addEventListener('change', toggleTitularAssignment);
+
+    /* ---- Tabulator (aba Chips) ---- */
+    var operators = [];
+    var envelopes = [];
+
+    function patchChip(id, payload) {
+        return fetch('/chips/api/grid/' + id + '/', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(payload),
+        }).then(function(r) {
+            return r.json().then(function(d) {
+                if (!r.ok) throw new Error(d.error || 'Erro ao salvar.');
+                return d.data;
+            });
+        });
+    }
+
+    function formatRecharge(cell) {
+        var d = cell.getRow().getData();
+        var cls = 'text-slate-600';
+        if (d.recharge_status === 'warning') cls = 'text-amber-600 font-bold';
+        if (d.recharge_status === 'overdue') cls = 'text-red-600 font-bold';
+        var txt = d.recharge_due_at ? d.recharge_due_at.split('-').reverse().join('/') : '—';
+        if (d.days_to_recharge !== null && d.days_to_recharge !== undefined) {
+            txt += ' (' + d.days_to_recharge + 'd)';
+        }
+        return '<span class="' + cls + '">' + txt + '</span>';
+    }
+
+    function formatActions(cell) {
+        var d = cell.getRow().getData();
+        var html = '';
+        if (d.custody === 'WITH_PERSON') {
+            html += '<button type="button" class="text-blue-600 text-xs font-bold mr-2 btn-transfer" data-id="' + d.id + '">Transferir</button>';
+            html += '<button type="button" class="text-orange-600 text-xs font-bold mr-2 btn-return" data-id="' + d.id + '">Devolver TI</button>';
+        }
+        html += '<button type="button" class="text-emerald-600 text-xs font-bold btn-recharge" data-id="' + d.id + '">Recarregar</button>';
+        return html;
+    }
+
+    var table = new Tabulator('#callcenter-grid', {
+        ajaxURL: '{% url "chips:grid_data" %}',
+        ajaxResponse: function(url, params, response) {
+            operators = response.operators || [];
+            envelopes = response.envelopes || [];
+            return response.data;
+        },
+        layout: 'fitDataFill',
+        height: '520px',
+        placeholder: 'Nenhum chip cadastrado. Clique em "+ Nova linha".',
+        clipboard: true,
+        clipboardPasteAction: 'update',
+        columns: [
+            { title: 'Linha', field: 'line_number', editor: 'input', width: 130 },
+            { title: 'Titular', field: 'employee_name', editor: 'input', width: 160,
+              editable: function(cell) { return cell.getData().custody === 'WITH_PERSON'; } },
+            { title: 'Ativação', field: 'activated_at', editor: 'input', width: 110 },
+            { title: 'Entrega', field: 'last_delivery_at', width: 100, headerSort: false },
+            { title: 'Últ. recarga', field: 'last_recharge_at', width: 100, headerSort: false },
+            { title: 'Últ. bloqueio', field: 'last_blocked_at', width: 110, headerSort: false },
+            { title: 'Operadora', field: 'operator_id', width: 110,
+              editor: 'select',
+              editorParams: function() {
+                  return { values: Object.fromEntries(operators.map(function(o) { return [o.id, o.name]; })) };
+              },
+              formatter: function(cell) { return cell.getData().operator_name; } },
+            { title: 'Custódia', field: 'custody', width: 110,
+              editor: 'select',
+              editorParams: { values: { 'WITH_TI': 'Na TI', 'WITH_PERSON': 'Com pessoa' } },
+              formatter: function(cell) { return cell.getData().custody_display; } },
+            { title: 'Envelope', field: 'batch_id', width: 150,
+              editor: 'select',
+              editorParams: function() {
+                  var vals = { '': '—' };
+                  envelopes.forEach(function(e) { vals[e.id] = e.label; });
+                  return { values: vals };
+              },
+              editable: function(cell) { return cell.getData().custody === 'WITH_TI'; },
+              formatter: function(cell) { return cell.getData().envelope_label || '—'; } },
+            { title: 'Vence recarga', field: 'recharge_due_at', width: 130, formatter: formatRecharge, headerSort: false },
+            { title: 'Ações', field: 'actions', width: 200, formatter: formatActions, headerSort: false },
+        ],
+        cellEdited: function(cell) {
+            var row = cell.getRow();
+            var d = row.getData();
+            if (!d.id) return;
+            var field = cell.getField();
+            var payload = {};
+            payload[field] = cell.getValue();
+            if (field === 'operator_id') payload.operator_id = parseInt(cell.getValue(), 10);
+            if (field === 'batch_id') payload.batch_id = cell.getValue() ? parseInt(cell.getValue(), 10) : null;
+            if (field === 'custody' && cell.getValue() === 'WITH_PERSON') {
+                var nome = prompt('Nome do titular:');
+                if (!nome) { row.update(d); return; }
+                payload.employee_name = nome;
+            }
+            if (field === 'custody' && cell.getValue() === 'WITH_TI' && !d.batch_id && envelopes.length) {
+                payload.batch_id = envelopes[0].id;
+            }
+            patchChip(d.id, payload)
+                .then(function(updated) { row.update(updated); })
+                .catch(function(err) {
+                    alert(err.message);
+                    row.update(d);
+                });
+        },
     });
-    toggleTitularAssignment();
-})();
+
+    window.chipsGrid = table;
+
+    $('#btn-add-chip-row').on('click', function() {
+        var line = prompt('Número da linha (com DDD):');
+        if (!line) return;
+        if (!operators.length) {
+            alert('Cadastre uma operadora antes.');
+            return;
+        }
+        var opId = operators[0].id;
+        if (operators.length > 1) {
+            var nomes = operators.map(function(o, i) { return (i + 1) + '=' + o.name; }).join(', ');
+            var esc = prompt('ID da operadora (' + nomes + '):', '1');
+            if (esc) opId = (operators[parseInt(esc, 10) - 1] || operators[0]).id;
+        }
+        var titular = prompt('Nome do titular (deixe vazio se chip ficará na TI):', '');
+        var custody = titular ? 'WITH_PERSON' : 'WITH_TI';
+        var payload = {
+            line_number: line.trim(),
+            operator: opId,
+            custody: custody,
+            employee_name: titular || '',
+        };
+        if (custody === 'WITH_TI' && envelopes.length) {
+            payload.batch = envelopes[0].id;
+        }
+        fetch('{% url "chips:grid_create" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(payload),
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+            if (!res.ok) {
+                alert(res.data.error || JSON.stringify(res.data.errors || res.data));
+                return;
+            }
+            table.replaceData();
+        });
+    });
+
+    $('#btn-nova-recarga').on('click', function() {
+        htmx.ajax('GET', '{% url "chips:recharge_create" %}', '#modal-container');
+    });
+
+    $('#callcenter-grid').on('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        if (btn.classList.contains('btn-transfer')) {
+            htmx.ajax('GET', '/chips/api/grid/' + id + '/transfer/modal/', '#modal-container');
+        }
+        if (btn.classList.contains('btn-return')) {
+            if (!envelopes.length) { alert('Cadastre um envelope aberto.'); return; }
+            var opts = envelopes.map(function(env, i) { return (i + 1) + ': ' + env.label; }).join('\n');
+            var esc = prompt('Envelope na TI:\n' + opts, '1');
+            if (!esc) return;
+            var env = envelopes[parseInt(esc, 10) - 1];
+            if (!env) return;
+            var fd = new FormData();
+            fd.append('envelope', env.id);
+            fd.append('csrfmiddlewaretoken', csrfToken);
+            fetch('/chips/api/grid/' + id + '/return/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: fd,
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) alert(d.error);
+                else table.replaceData();
+            });
+        }
+        if (btn.classList.contains('btn-recharge')) {
+            htmx.ajax('GET', '{% url "chips:recharge_create" %}?chip_id=' + id, '#modal-container');
+        }
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful && evt.detail.elt && evt.detail.elt.id === 'modal-container') {
+            var xhr = evt.detail.xhr;
+            if (xhr && xhr.status === 204 && window.chipsGrid) {
+                window.chipsGrid.replaceData();
+            }
+        }
+    });
+});
 </script>
 {% endblock %}

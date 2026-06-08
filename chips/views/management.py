@@ -10,6 +10,24 @@ class _ChipsMixin(ModuloObrigatorioMixin):
     modulo_obrigatorio = MODULO_CHIPS
 
 
+class OperatorUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
+    model = Operator
+    fields = ['name', 'status']
+    chips_tab = 'operators'
+    modal_submit_label = 'Salvar'
+    form_layout = 'as_p'
+
+    def get_modal_title(self):
+        return f'Editar Operadora — {self.object.name}'
+
+    def get_modal_subtitle(self):
+        return 'Atualize nome e status da operadora.'
+
+    def form_valid(self, form):
+        self.object = form.save()
+        return self.htmx_redirect_response()
+
+
 class OperatorCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
     model = Operator
     fields = ['name', 'status']
@@ -22,6 +40,24 @@ class OperatorCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
     def form_valid(self, form):
         self.object = form.save()
         log_operadora_criada(self.object, self.request.user)
+        return self.htmx_redirect_response()
+
+
+class BatchUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
+    model = Batch
+    fields = ['identifier', 'tipo', 'nome', 'setor', 'status']
+    chips_tab = 'envelopes'
+    modal_submit_label = 'Salvar'
+    form_layout = 'as_p'
+
+    def get_modal_title(self):
+        return f'Editar — {self.object.label}'
+
+    def get_modal_subtitle(self):
+        return 'Atualize os dados do envelope ou lote.'
+
+    def form_valid(self, form):
+        self.object = form.save()
         return self.htmx_redirect_response()
 
 
@@ -46,7 +82,7 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
         'line_number', 'status', 'custody', 'technology', 'fixed_cost', 'iccid',
         'plan_type', 'operator', 'batch', 'activated_at',
     ]
-    chips_tab = 'inventory'
+    chips_tab = 'chips'
     modal_title = 'Novo Chip'
     modal_subtitle = 'Cadastre uma nova linha no inventário.'
     modal_submit_label = 'Salvar'
@@ -65,7 +101,7 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
         'line_number', 'status', 'custody', 'technology', 'fixed_cost', 'iccid',
         'plan_type', 'operator', 'batch', 'activated_at',
     ]
-    chips_tab = 'inventory'
+    chips_tab = 'chips'
     modal_submit_label = 'Salvar'
     modal_max_width = 'max-w-2xl'
     form_layout = 'as_p'

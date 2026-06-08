@@ -43,6 +43,5 @@ Inventário central de chips, cadastro de operadoras e envelopes físicos na TI,
 
 ## Onde visualizar
 
-- **Dashboard** (`/chips/`) — apanhado geral, filtro de período, planilha callcenter, histórico.
-- **Envelopes** (`/chips/batches/`) — cadastro de envelopes físicos.
+- **Página única** (`/chips/`) — 4 abas: dashboard (KPIs + gráficos), chips (Tabulator), operadoras e envelopes.
 - **Auditoria** — via `RegistroAcao` no rodapé do dashboard.
