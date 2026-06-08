@@ -10,12 +10,16 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
             <p class="text-sm text-slate-500 mt-1">Gerencie os chamados e suporte interno.</p>
         </div>
-        <a href="{% url 'helpdesk:ticket_create' %}" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+        <button type="button"
+                hx-get="{% url 'helpdesk:ticket_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
             Novo Chamado
-        </a>
+        </button>
     </div>
 
     <!-- Navegação interna do módulo -->
@@ -34,11 +38,19 @@
     </div>
 </div>
 
+<!-- Modal de criação (preenchido via HTMX) -->
+<div id="modal-container"></div>
+
 <!-- Drawer Container (será preenchido pelo HTMX) -->
 <div id="drawer-container"></div>
 
 <!-- JavaScript para o Drag and Drop do Kanban -->
 <script>
+    document.body.addEventListener('closeCreateModal', function() {
+        var modal = document.getElementById('modal-container');
+        if (modal) modal.innerHTML = '';
+    });
+
     function drag(event) {
         // Envia o id do ticket
         event.dataTransfer.setData("ticket_id", event.target.id);

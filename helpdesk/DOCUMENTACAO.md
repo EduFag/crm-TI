@@ -11,8 +11,9 @@ Registrar tickets (título, prioridade, categoria, solicitante), movê-los entre
 | Arquivo | Função |
 |---------|--------|
 | `apps.py` | Configuração do app. |
-| `models.py` | `Ticket` (status Kanban, prioridade, arquivamento, `created_by`) e `Comment`. |
-| `ticket_access.py` | Filtro de chamados: USER vê apenas os próprios; ADMIN/MANAGER veem todos. |
+| `models.py` | `Ticket` (status Kanban, prioridade, arquivamento, `created_by`, `requester_user`) e `Comment`. |
+| `forms.py` | `TicketCreateForm` — criação via modal com solicitante por texto ou usuário do sistema. |
+| `ticket_access.py` | Filtro de chamados: USER vê os que abriu ou onde é solicitante; ADMIN/MANAGER veem todos. |
 | `urls.py` | Rotas sob `/helpdesk/` (kanban, dashboard, histórico, poll, partials). |
 | `admin.py` | Administração de tickets e comentários. |
 | `tests.py` | Testes automatizados. |

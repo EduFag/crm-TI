@@ -53,6 +53,15 @@ class Ticket(models.Model):
         help_text='Nome do solicitante (ex: vindo do WhatsApp).'
     )
 
+    requester_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requested_tickets',
+        help_text='Usuário do sistema selecionado como solicitante.',
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

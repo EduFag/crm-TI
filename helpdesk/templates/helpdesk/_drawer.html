@@ -31,7 +31,22 @@
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Solicitante</span>
                 <span class="font-medium text-slate-800">{{ ticket.requester_name }}</span>
+                {% if ticket.requester_user %}
+                <span class="block text-xs text-slate-400 mt-0.5">@{{ ticket.requester_user.username }}</span>
+                {% endif %}
             </div>
+            {% if pode_ver_quem_abriu %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Aberto por</span>
+                <span class="font-medium text-slate-800">
+                    {% if ticket.created_by %}
+                        {{ ticket.created_by.get_full_name|default:ticket.created_by.username }}
+                    {% else %}
+                        <span class="text-slate-400 italic">Não informado</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Técnico</span>
                 <span class="font-medium text-slate-800">

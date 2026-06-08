@@ -1,12 +1,17 @@
 import json
-from django.shortcuts import render, get_object_or_404
-from django.views.generic import TemplateView, CreateView
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views import View
+from django.views.generic import TemplateView
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo
 from django.views.decorators.http import require_POST
-from django.urls import reverse_lazy
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from helpdesk.forms import TicketCreateForm
 from helpdesk.models import Ticket, Comment
-from helpdesk.ticket_access import filtrar_chamados_para_usuario, usuario_pode_acessar_chamado
+from helpdesk.ticket_access import (
+    filtrar_chamados_para_usuario,
+    usuario_pode_acessar_chamado,
+    usuario_pode_ver_quem_abriu_chamado,
+)
 
 class KanbanView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/kanban.html'
@@ -22,7 +27,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets = filtrar_chamados_para_usuario(
             Ticket.objects.filter(is_active=True, is_archived=False),
             self.request.user,
-        ).select_related('assigned_to', 'created_by')
+        ).select_related('assigned_to', 'created_by', 'requester_user')
         
         context['tickets_new'] = tickets.filter(status=Ticket.StatusChoices.NEW).order_by('-created_at')
         context['tickets_in_progress'] = tickets.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-created_at')
@@ -31,27 +36,34 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         
         return context
 
-class TicketCreateView(ModuloObrigatorioMixin, CreateView):
+class TicketCreateView(ModuloObrigatorioMixin, View):
+    """Abre modal via HTMX (GET) e cria chamado via POST sem sair do Kanban."""
     modulo_obrigatorio = MODULO_HELPDESK
-    model = Ticket
-    fields = ['title', 'description', 'priority', 'category', 'requester_name']
-    template_name = 'helpdesk/ticket_form.html'
-    success_url = reverse_lazy('helpdesk:kanban')
+    template_name = 'helpdesk/_ticket_create_modal.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['nome_solicitante_padrao'] = (
-            self.request.user.get_full_name() or self.request.user.username
+    def _nome_padrao(self, request):
+        return request.user.get_full_name() or request.user.username
+
+    def get(self, request):
+        if not request.headers.get('HX-Request'):
+            return redirect('helpdesk:kanban')
+        form = TicketCreateForm(nome_solicitante_padrao=self._nome_padrao(request))
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request):
+        form = TicketCreateForm(
+            request.POST,
+            nome_solicitante_padrao=self._nome_padrao(request),
         )
-        return context
-
-    def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        if not form.instance.requester_name.strip():
-            form.instance.requester_name = (
-                self.request.user.get_full_name() or self.request.user.username
-            )
-        return super().form_valid(form)
+        if form.is_valid():
+            form.save(created_by=request.user)
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                'ticketUpdated': True,
+                'closeCreateModal': True,
+            })
+            return response
+        return render(request, self.template_name, {'form': form}, status=422)
 
 
 @requer_modulo(MODULO_HELPDESK)
@@ -82,11 +94,19 @@ def ticket_update_status(request, pk):
 
 @requer_modulo(MODULO_HELPDESK)
 def ticket_drawer(request, pk):
-    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    ticket = get_object_or_404(
+        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user'),
+        pk=pk,
+        is_active=True,
+    )
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    return render(request, 'helpdesk/_drawer.html', {'ticket': ticket, 'comments': comments})
+    return render(request, 'helpdesk/_drawer.html', {
+        'ticket': ticket,
+        'comments': comments,
+        'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
+    })
 
 
 @requer_modulo(MODULO_HELPDESK)
