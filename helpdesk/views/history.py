@@ -1,6 +1,6 @@
 from django.views.generic import ListView
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
-from helpdesk.models import Ticket
+from helpdesk.models import Ticket, TicketCategory
 from helpdesk.ticket_access import filtrar_chamados_para_usuario
 
 class HistoryListView(ModuloObrigatorioMixin, ListView):
@@ -14,7 +14,7 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         qs = filtrar_chamados_para_usuario(
             super().get_queryset().filter(is_active=True),
             self.request.user,
-        ).select_related('assigned_to', 'created_by', 'requester_user').order_by('-created_at')
+        ).select_related('assigned_to', 'created_by', 'requester_user', 'category').order_by('-created_at')
         
         # Recupera os filtros da QueryString
         status = self.request.GET.get('status')
@@ -30,7 +30,7 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         if priority:
             qs = qs.filter(priority=priority)
         if category:
-            qs = qs.filter(category=category)
+            qs = qs.filter(category_id=category)
         if archived == 'yes':
             qs = qs.filter(is_archived=True)
         elif archived == 'no':
@@ -50,5 +50,5 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['status_choices'] = Ticket.StatusChoices
         context['priority_choices'] = Ticket.PriorityChoices
-        context['category_choices'] = Ticket.CategoryChoices
+        context['categorias'] = TicketCategory.objects.filter(is_active=True).order_by('name')
         return context

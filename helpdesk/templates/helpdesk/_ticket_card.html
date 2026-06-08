@@ -17,14 +17,14 @@
             {% endif %}
             
             <!-- Category Badge -->
-            {% if ticket.category == 'HARDWARE' %}
-                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">Hardware</span>
-            {% elif ticket.category == 'NETWORK' %}
-                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">Rede</span>
-            {% elif ticket.category == 'SOFTWARE' %}
-                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">Software</span>
+            {% if ticket.category.name == 'Hardware' %}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">{{ ticket.category.name }}</span>
+            {% elif ticket.category.name == 'Rede' %}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">{{ ticket.category.name }}</span>
+            {% elif ticket.category.name == 'Software' %}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">{{ ticket.category.name }}</span>
             {% else %}
-                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">Outros</span>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">{{ ticket.category.name }}</span>
             {% endif %}
         </div>
         

@@ -3,6 +3,22 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 
+
+class TicketCategory(models.Model):
+    """Categoria de chamado configurável (ex.: Hardware, Software)."""
+    name = models.CharField(max_length=80, unique=True, help_text='Nome exibido da categoria.')
+    is_active = models.BooleanField(default=True, help_text='Categorias inativas não aparecem no formulário.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'categoria de chamado'
+        verbose_name_plural = 'categorias de chamado'
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Ticket(models.Model):
     """
     Modelo que representa um chamado (Ticket) de Helpdesk.
@@ -20,12 +36,6 @@ class Ticket(models.Model):
         HIGH = 'HIGH', 'Alta'
         URGENT = 'URGENT', 'Urgente'
         
-    class CategoryChoices(models.TextChoices):
-        HARDWARE = 'HARDWARE', 'Hardware'
-        SOFTWARE = 'SOFTWARE', 'Software'
-        NETWORK = 'NETWORK', 'Rede'
-        OTHER = 'OTHER', 'Outros'
-
     title = models.CharField(max_length=200, help_text='Título ou resumo do problema.')
     description = models.TextField(blank=True, help_text='Descrição detalhada do chamado.')
     
@@ -41,11 +51,11 @@ class Ticket(models.Model):
         default=PriorityChoices.MEDIUM,
         help_text='Nível de prioridade do chamado.'
     )
-    category = models.CharField(
-        max_length=20, 
-        choices=CategoryChoices.choices, 
-        default=CategoryChoices.OTHER,
-        help_text='Categoria do problema.'
+    category = models.ForeignKey(
+        TicketCategory,
+        on_delete=models.PROTECT,
+        related_name='tickets',
+        help_text='Categoria do problema.',
     )
     
     requester_name = models.CharField(

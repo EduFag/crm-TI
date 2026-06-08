@@ -20,6 +20,7 @@ urlpatterns = [
     
     # Criação de chamados
     path('ticket/create/', views.TicketCreateView.as_view(), name='ticket_create'),
+    path('category/create/', views.ticket_category_create, name='category_create'),
     
     # Ações assíncronas via Fetch/HTMX
     path('ticket/<int:pk>/update-status/', views.ticket_update_status, name='ticket_update_status'),

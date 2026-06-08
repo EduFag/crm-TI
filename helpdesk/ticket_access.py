@@ -7,6 +7,15 @@ from django.db.models import Q, QuerySet
 from core.models import CustomUser
 
 
+def usuario_pode_gerenciar_categorias(user) -> bool:
+    """ADMIN e superusuário podem criar categorias no modal de novo chamado."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return user.role == CustomUser.RoleChoices.ADMIN
+
+
 def usuario_ve_todos_chamados(user) -> bool:
     """ADMIN, MANAGER e superusuário enxergam todos os chamados."""
     if not user or not user.is_authenticated:

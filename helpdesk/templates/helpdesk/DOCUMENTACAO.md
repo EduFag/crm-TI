@@ -18,6 +18,7 @@ Telas completas e fragmentos reutilizáveis para Kanban dinâmico e drawer later
 | `_dashboard_metrics.html` | Partial das métricas — atualizado via poll HTMX. |
 | `history.html` | Histórico de chamados. |
 | `_ticket_create_modal.html` | Modal flutuante de criação de chamado (HTMX, carregado no Kanban). |
+| `_category_field.html` | Select de categoria com painel de criação inline (ADMIN/superuser). |
 | `_drawer.html` | Painel lateral com detalhes do ticket selecionado. |
 | `_comments_list.html` | Lista de comentários no drawer. |
 | `_nav.html` | Navegação interna do módulo helpdesk. |

@@ -6,10 +6,11 @@ from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_mod
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from helpdesk.forms import TicketCreateForm
-from helpdesk.models import Ticket, Comment
+from helpdesk.models import Ticket, TicketCategory, Comment
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_pode_acessar_chamado,
+    usuario_pode_gerenciar_categorias,
     usuario_pode_ver_quem_abriu_chamado,
 )
 
@@ -27,7 +28,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets = filtrar_chamados_para_usuario(
             Ticket.objects.filter(is_active=True, is_archived=False),
             self.request.user,
-        ).select_related('assigned_to', 'created_by', 'requester_user')
+        ).select_related('assigned_to', 'created_by', 'requester_user', 'category')
         
         context['tickets_new'] = tickets.filter(status=Ticket.StatusChoices.NEW).order_by('-created_at')
         context['tickets_in_progress'] = tickets.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-created_at')
@@ -44,11 +45,18 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
     def _nome_padrao(self, request):
         return request.user.get_full_name() or request.user.username
 
+    def _contexto_modal(self, request, form, **extra):
+        return {
+            'form': form,
+            'pode_gerenciar_categorias': usuario_pode_gerenciar_categorias(request.user),
+            **extra,
+        }
+
     def get(self, request):
         if not request.headers.get('HX-Request'):
             return redirect('helpdesk:kanban')
         form = TicketCreateForm(nome_solicitante_padrao=self._nome_padrao(request))
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, self._contexto_modal(request, form))
 
     def post(self, request):
         form = TicketCreateForm(
@@ -63,7 +71,47 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
                 'closeCreateModal': True,
             })
             return response
-        return render(request, self.template_name, {'form': form}, status=422)
+        return render(
+            request,
+            self.template_name,
+            self._contexto_modal(request, form),
+            status=422,
+        )
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_category_create(request):
+    """Cria categoria no modal (somente ADMIN/superuser) e atualiza o select via HTMX."""
+    if not usuario_pode_gerenciar_categorias(request.user):
+        return HttpResponseForbidden('Sem permissão para criar categorias.')
+
+    nome = request.POST.get('name', '').strip()
+    if not nome:
+        form = TicketCreateForm(nome_solicitante_padrao=request.user.get_full_name() or request.user.username)
+        return render(request, 'helpdesk/_category_field.html', {
+            'form': form,
+            'pode_gerenciar_categorias': True,
+            'erro_categoria': 'Informe o nome da categoria.',
+            'painel_nova_categoria_aberto': True,
+        }, status=422)
+
+    categoria = TicketCategory.objects.filter(name__iexact=nome).first()
+    if categoria:
+        if not categoria.is_active:
+            categoria.is_active = True
+            categoria.save(update_fields=['is_active'])
+    else:
+        categoria = TicketCategory.objects.create(name=nome)
+
+    form = TicketCreateForm(
+        nome_solicitante_padrao=request.user.get_full_name() or request.user.username,
+        categoria_inicial=categoria.pk,
+    )
+    return render(request, 'helpdesk/_category_field.html', {
+        'form': form,
+        'pode_gerenciar_categorias': True,
+    })
 
 
 @requer_modulo(MODULO_HELPDESK)
@@ -95,7 +143,7 @@ def ticket_update_status(request, pk):
 @requer_modulo(MODULO_HELPDESK)
 def ticket_drawer(request, pk):
     ticket = get_object_or_404(
-        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user'),
+        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category'),
         pk=pk,
         is_active=True,
     )

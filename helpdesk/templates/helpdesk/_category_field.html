@@ -1,0 +1,49 @@
+<div id="category-field-wrapper" class="space-y-2">
+    <label for="{{ form.category.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">
+        Categoria <span class="text-red-500">*</span>
+    </label>
+
+    <div class="flex gap-2 items-start">
+        <div class="flex-1">
+            {{ form.category }}
+        </div>
+        {% if pode_gerenciar_categorias %}
+        <button type="button"
+                id="btn-toggle-nova-categoria"
+                onclick="var p=document.getElementById('nova-categoria-panel'); if(p){ p.classList.toggle('hidden'); }"
+                title="Nova categoria"
+                class="shrink-0 w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 transition-colors text-lg font-bold leading-none">
+            +
+        </button>
+        {% endif %}
+    </div>
+
+    {% if form.category.errors %}
+    <p class="text-xs text-red-600">{{ form.category.errors.0 }}</p>
+    {% endif %}
+    {% if erro_categoria %}
+    <p class="text-xs text-red-600">{{ erro_categoria }}</p>
+    {% endif %}
+
+    {% if pode_gerenciar_categorias %}
+    <div id="nova-categoria-panel" class="{% if not painel_nova_categoria_aberto %}hidden {% endif %}mt-1 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Nova categoria</p>
+        <div class="flex gap-2">
+            <input type="text"
+                   name="name"
+                   id="nova-categoria-nome"
+                   maxlength="80"
+                   placeholder="Nome da categoria"
+                   class="flex-1 text-sm p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <button type="button"
+                    hx-post="{% url 'helpdesk:category_create' %}"
+                    hx-target="#category-field-wrapper"
+                    hx-swap="outerHTML"
+                    hx-include="#nova-categoria-nome, [name=csrfmiddlewaretoken]"
+                    class="shrink-0 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
+                Adicionar
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>

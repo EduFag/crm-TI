@@ -65,13 +65,7 @@
             </div>
 
             <!-- Categoria -->
-            <div>
-                <label for="{{ form.category.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Categoria <span class="text-red-500">*</span></label>
-                {{ form.category }}
-                {% if form.category.errors %}
-                <p class="text-xs text-red-600 mt-1">{{ form.category.errors.0 }}</p>
-                {% endif %}
-            </div>
+            {% include "helpdesk/_category_field.html" %}
 
             <!-- Título -->
             <div>

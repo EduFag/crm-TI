@@ -1,7 +1,7 @@
 from django import forms
 
 from core.models import CustomUser
-from helpdesk.models import Ticket
+from helpdesk.models import Ticket, TicketCategory
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -61,9 +61,18 @@ class TicketCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         nome_padrao = kwargs.pop('nome_solicitante_padrao', '')
+        categoria_inicial = kwargs.pop('categoria_inicial', None)
         super().__init__(*args, **kwargs)
+        self.fields['category'].queryset = TicketCategory.objects.filter(is_active=True).order_by('name')
         if not self.is_bound and nome_padrao:
             self.fields['requester_name'].initial = nome_padrao
+        if not self.is_bound:
+            if categoria_inicial:
+                self.fields['category'].initial = categoria_inicial
+            else:
+                padrao = TicketCategory.objects.filter(is_active=True, name__iexact='Outros').first()
+                if padrao:
+                    self.fields['category'].initial = padrao.pk
         self.fields['requester_user'].label_from_instance = self._rotulo_usuario
 
     @staticmethod
