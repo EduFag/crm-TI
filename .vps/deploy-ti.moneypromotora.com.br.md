@@ -131,12 +131,21 @@ sudo systemctl restart crm-ti
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**Deploy de código** (sem mudar unit do systemd): prefira reload suave em vez de restart completo:
+**Deploy de código** (Python/templates, sem alterar `.env`): prefira reload suave em vez de restart completo:
 
 ```bash
 sudo systemctl reload crm-ti
-# ou: sudo kill -HUP $(pgrep -f 'gunicorn setup.wsgi')
 ```
+
+> `reload` só funciona se o unit tiver `ExecReload` (já incluso em `gunicorn.service.exemple`). Após atualizar o `.service`, rode `sudo systemctl daemon-reload` uma vez.
+
+Se `reload` não estiver configurado ainda, use o sinal HUP direto no master do Gunicorn:
+
+```bash
+sudo kill -HUP $(systemctl show -p MainPID --value crm-ti)
+```
+
+**Alterou `.env`?** Use `sudo systemctl restart crm-ti` — variáveis de ambiente só são relidas no start.
 
 ---
 

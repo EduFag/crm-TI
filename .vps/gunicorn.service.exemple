@@ -26,6 +26,8 @@ ExecStart=/home/edufa/crm-TI/myvenv/bin/gunicorn setup.wsgi:application \
     --preload \
     --access-logfile - \
     --error-logfile -
+# Reload suave (troca workers sem derrubar o master) — habilita: systemctl reload crm-ti
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 # Força encerramento se workers SSE não liberarem a tempo
 TimeoutStopSec=35
