@@ -165,9 +165,22 @@ Crie/renove o HTTPS **só** para o subdomínio `ti`:
 
 ```bash
 sudo certbot --nginx -d ti.moneypromotora.com.br
+# Se já existir certificado: escolha opção 1 (reinstall)
 sudo nginx -T 2>/dev/null | grep -A35 "server_name ti.moneypromotora.com.br"
 # No bloco listen 443, proxy_pass deve ser http://127.0.0.1:9001
 sudo nginx -t && sudo systemctl reload nginx
+```
+
+> **Não** rode `cp nginx.conf.exemple` depois que o certbot já configurou SSL — isso apaga o bloco `:443`. Use `certbot --nginx -d ti.moneypromotora.com.br` (opção 1 reinstall) para recriar o HTTPS.
+
+Se o certbot criar `return 404` na porta 80, troque por redirect:
+
+```nginx
+server {
+    listen 80;
+    server_name ti.moneypromotora.com.br;
+    return 301 https://$host$request_uri;
+}
 ```
 
 **Diagnóstico no servidor:**

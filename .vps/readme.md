@@ -31,7 +31,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart crm-ti
 ```
 
-**Após copiar nginx** (não apaga bloco HTTPS do certbot se já existir — veja deploy):
+**Após copiar nginx** — use `cp` do exemplo **só na primeira instalação** (sem SSL). Se o certbot já rodou, **não sobrescreva** o arquivo; edite com `nano` ou rode `sudo certbot --nginx -d ti.moneypromotora.com.br` (opção 1 reinstall):
 
 ```bash
 sudo ln -sf /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
