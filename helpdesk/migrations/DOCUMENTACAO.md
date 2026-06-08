@@ -15,3 +15,4 @@ Versiona tabelas `Ticket` e `Comment` e campos adicionais (ex.: arquivamento).
 | `0003_ticket_created_by.py` | Campo `created_by` — usuário que abriu o chamado (filtro para papel USER). |
 | `0004_ticket_requester_user.py` | Campo `requester_user` — FK opcional do solicitante quando selecionado no sistema. |
 | `0005_ticketcategory.py` | Modelo `TicketCategory` e migração do campo `category` de CharField para FK. |
+| `0006_ticket_priority_nullable.py` | Prioridade nullable (triagem pela TI). |

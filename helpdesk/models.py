@@ -46,10 +46,11 @@ class Ticket(models.Model):
         help_text='Coluna atual do cartão no Kanban.'
     )
     priority = models.CharField(
-        max_length=20, 
-        choices=PriorityChoices.choices, 
-        default=PriorityChoices.MEDIUM,
-        help_text='Nível de prioridade do chamado.'
+        max_length=20,
+        choices=PriorityChoices.choices,
+        null=True,
+        blank=True,
+        help_text='Definida pela TI; null até triagem.',
     )
     category = models.ForeignKey(
         TicketCategory,

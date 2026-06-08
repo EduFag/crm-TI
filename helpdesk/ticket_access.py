@@ -7,13 +7,52 @@ from django.db.models import Q, QuerySet
 from core.models import CustomUser
 
 
-def usuario_pode_gerenciar_categorias(user) -> bool:
-    """ADMIN e superusuário podem criar categorias no modal de novo chamado."""
+def _eh_admin_ou_superuser(user) -> bool:
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
     return user.role == CustomUser.RoleChoices.ADMIN
+
+
+def usuario_pode_gerenciar_categorias(user) -> bool:
+    """ADMIN e superusuário podem criar categorias no modal de novo chamado."""
+    return _eh_admin_ou_superuser(user)
+
+
+def usuario_pode_definir_prioridade(user) -> bool:
+    """Somente ADMIN e superusuário definem prioridade na criação ou edição."""
+    return _eh_admin_ou_superuser(user)
+
+
+def usuario_pode_editar_chamado(user) -> bool:
+    """Somente ADMIN e superusuário podem editar chamados."""
+    return _eh_admin_ou_superuser(user)
+
+
+def usuario_pode_transferir_chamado(user) -> bool:
+    """Somente ADMIN e superusuário podem transferir técnico responsável."""
+    return _eh_admin_ou_superuser(user)
+
+
+def usuarios_solicitantes_equipe(user) -> QuerySet:
+    """Membros ativos da mesma equipe do gerente (inclui o próprio gerente)."""
+    if not user or not user.is_authenticated:
+        return CustomUser.objects.none()
+    if not user.equipe_id:
+        return CustomUser.objects.filter(pk=user.pk, is_active=True)
+    return CustomUser.objects.filter(
+        is_active=True,
+        equipe_id=user.equipe_id,
+    ).order_by('first_name', 'last_name', 'username')
+
+
+def usuarios_tecnicos_para_transferencia() -> QuerySet:
+    """Técnicos disponíveis para transferência: usuários ADMIN ativos."""
+    return CustomUser.objects.filter(
+        is_active=True,
+        role=CustomUser.RoleChoices.ADMIN,
+    ).order_by('first_name', 'last_name', 'username')
 
 
 def usuario_ve_todos_chamados(user) -> bool:

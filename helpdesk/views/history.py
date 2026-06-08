@@ -27,7 +27,9 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         
         if status:
             qs = qs.filter(status=status)
-        if priority:
+        if priority == '__null__':
+            qs = qs.filter(priority__isnull=True)
+        elif priority:
             qs = qs.filter(priority=priority)
         if category:
             qs = qs.filter(category_id=category)

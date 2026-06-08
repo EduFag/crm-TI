@@ -11,3 +11,4 @@ Versiona alterações do modelo `CustomUser` no banco de dados. Não edite manua
 | Arquivo | Função |
 |---------|--------|
 | `0001_initial.py` | Criação inicial da tabela de usuário customizado (`CustomUser`) com campos de role e auditoria. |
+| `0002_equipe.py` | Modelo `Equipe` e FK `equipe` em `CustomUser`. |

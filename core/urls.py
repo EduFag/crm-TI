@@ -16,4 +16,10 @@ urlpatterns = [
     path('usuarios/criar/', views.UserCreateView.as_view(), name='user_create'),
     path('usuarios/<int:pk>/editar/', views.UserUpdateView.as_view(), name='user_update'),
     path('usuarios/<int:pk>/desativar/', views.user_toggle_active, name='user_toggle_active'),
+
+    # Gestão de equipes (somente ADMIN)
+    path('equipes/', views.EquipeListView.as_view(), name='equipe_list'),
+    path('equipes/criar/', views.EquipeCreateView.as_view(), name='equipe_create'),
+    path('equipes/<int:pk>/editar/', views.EquipeUpdateView.as_view(), name='equipe_update'),
+    path('equipes/<int:pk>/desativar/', views.equipe_toggle_active, name='equipe_toggle_active'),
 ]

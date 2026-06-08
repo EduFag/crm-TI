@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Equipes{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full w-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Equipes</h2>
+            <p class="text-sm text-slate-500 mt-1">Cadastro de equipes para agrupar usuários do sistema.</p>
+        </div>
+        <a href="{% url 'equipe_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+            + Nova Equipe
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="mb-4 space-y-2">
+        {% for message in messages %}
+        <p class="px-4 py-3 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-green-50 text-green-700{% endif %}">
+            {{ message }}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Nome</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Membros</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for equipe in equipes %}
+                <tr class="hover:bg-slate-50 transition-colors {% if not equipe.is_active %}opacity-60{% endif %}">
+                    <td class="px-6 py-4 font-semibold text-slate-800">{{ equipe.name }}</td>
+                    <td class="px-6 py-4 text-slate-600">{{ equipe.membros.count }}</td>
+                    <td class="px-6 py-4">
+                        {% if equipe.is_active %}
+                        <span class="text-green-600 font-medium">Ativa</span>
+                        {% else %}
+                        <span class="text-red-500 font-medium">Inativa</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'equipe_update' equipe.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs">Editar</a>
+                            <form method="post" action="{% url 'equipe_toggle_active' equipe.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="text-xs font-medium {% if equipe.is_active %}text-red-600 hover:text-red-800{% else %}text-green-600 hover:text-green-800{% endif %}">
+                                    {% if equipe.is_active %}Desativar{% else %}Ativar{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="p-16 text-center text-slate-400">Nenhuma equipe cadastrada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

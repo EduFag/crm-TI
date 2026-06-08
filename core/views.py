@@ -5,8 +5,8 @@ from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, ListView, UpdateView
 
-from core.forms import CustomUserCreateForm, CustomUserUpdateForm
-from core.models import CustomUser
+from core.forms import CustomUserCreateForm, CustomUserUpdateForm, EquipeForm
+from core.models import CustomUser, Equipe
 from core.permissions import MODULO_GESTAO_USUARIOS, ModuloObrigatorioMixin, requer_modulo
 
 
@@ -45,7 +45,7 @@ class UserListView(ModuloObrigatorioMixin, ListView):
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
 
     def get_queryset(self):
-        return CustomUser.objects.all().order_by('-is_active', 'username')
+        return CustomUser.objects.select_related('equipe').order_by('-is_active', 'username')
 
 
 class UserCreateView(ModuloObrigatorioMixin, CreateView):
@@ -89,3 +89,53 @@ def user_toggle_active(request, pk):
     acao = 'ativado' if usuario.is_active else 'desativado'
     messages.success(request, f'Usuário "{usuario.username}" {acao} com sucesso.')
     return redirect('user_list')
+
+
+class EquipeListView(ModuloObrigatorioMixin, ListView):
+    """Listagem de equipes do sistema (somente ADMIN)."""
+    model = Equipe
+    template_name = 'core/equipe_list.html'
+    context_object_name = 'equipes'
+    modulo_obrigatorio = MODULO_GESTAO_USUARIOS
+
+    def get_queryset(self):
+        return Equipe.objects.all().order_by('-is_active', 'name')
+
+
+class EquipeCreateView(ModuloObrigatorioMixin, CreateView):
+    """Cadastro de nova equipe."""
+    model = Equipe
+    form_class = EquipeForm
+    template_name = 'core/equipe_form.html'
+    success_url = reverse_lazy('equipe_list')
+    modulo_obrigatorio = MODULO_GESTAO_USUARIOS
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Equipe "{form.instance.name}" criada com sucesso.')
+        return super().form_valid(form)
+
+
+class EquipeUpdateView(ModuloObrigatorioMixin, UpdateView):
+    """Edição de equipe existente."""
+    model = Equipe
+    form_class = EquipeForm
+    template_name = 'core/equipe_form.html'
+    success_url = reverse_lazy('equipe_list')
+    modulo_obrigatorio = MODULO_GESTAO_USUARIOS
+    context_object_name = 'equipe'
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Equipe "{form.instance.name}" atualizada com sucesso.')
+        return super().form_valid(form)
+
+
+@requer_modulo(MODULO_GESTAO_USUARIOS)
+@require_POST
+def equipe_toggle_active(request, pk):
+    """Ativa ou desativa uma equipe."""
+    equipe = get_object_or_404(Equipe, pk=pk)
+    equipe.is_active = not equipe.is_active
+    equipe.save(update_fields=['is_active'])
+    acao = 'ativada' if equipe.is_active else 'desativada'
+    messages.success(request, f'Equipe "{equipe.name}" {acao} com sucesso.')
+    return redirect('equipe_list')

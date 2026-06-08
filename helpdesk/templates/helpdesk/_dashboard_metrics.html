@@ -44,7 +44,11 @@
             {% for item in priority_distribution %}
             <div class="flex justify-between items-center mb-3 last:mb-0">
                 <span class="text-sm font-medium text-slate-600">
-                    {% for k,v in priority_labels.items %}{% if k == item.priority %}{{ v }}{% endif %}{% endfor %}
+                    {% if item.priority %}
+                        {% for k,v in priority_labels.items %}{% if k == item.priority %}{{ v }}{% endif %}{% endfor %}
+                    {% else %}
+                        Sem prioridade
+                    {% endif %}
                 </span>
                 <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">{{ item.total }}</span>
             </div>

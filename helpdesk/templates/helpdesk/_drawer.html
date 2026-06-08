@@ -8,13 +8,28 @@
     <!-- Cabeçalho -->
     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <h3 class="text-lg font-bold text-slate-900 tracking-tight">Detalhes do Chamado</h3>
-        <button onclick="document.getElementById('drawer-container').innerHTML = ''" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
+        <div class="flex items-center gap-2">
+            {% if pode_editar and not mostrar_edicao %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_edit' ticket.id %}"
+                    hx-target="#drawer-container"
+                    hx-swap="innerHTML"
+                    class="text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors">
+                Editar
+            </button>
+            {% endif %}
+            <button onclick="document.getElementById('drawer-container').innerHTML = ''" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
     </div>
 
     <!-- Corpo (Scrollável) -->
     <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+
+        {% if mostrar_edicao and edit_form %}
+        {% include "helpdesk/_ticket_edit_section.html" with form=edit_form %}
+        {% endif %}
         
         <!-- Info Principal -->
         <div>
@@ -59,13 +74,40 @@
             </div>
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Prioridade</span>
-                <span class="font-medium text-slate-800">{{ ticket.get_priority_display }}</span>
+                <span class="font-medium text-slate-800">{% if ticket.priority %}{{ ticket.get_priority_display }}{% else %}Não definida{% endif %}</span>
             </div>
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Criado em</span>
                 <span class="font-medium text-slate-800">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
             </div>
         </div>
+
+        {% if pode_transferir and not mostrar_edicao %}
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Transferir técnico</p>
+            <form method="post"
+                  action="{% url 'helpdesk:ticket_transfer' ticket.id %}"
+                  hx-post="{% url 'helpdesk:ticket_transfer' ticket.id %}"
+                  hx-target="#drawer-container"
+                  hx-swap="innerHTML"
+                  class="flex gap-2 items-end">
+                {% csrf_token %}
+                <div class="flex-1">
+                    <select name="assigned_to" required class="w-full text-sm p-2 border border-slate-300 rounded-lg bg-white">
+                        <option value="">Selecione o técnico</option>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.pk }}" {% if ticket.assigned_to_id == tecnico.pk %}selected{% endif %}>
+                            {{ tecnico.get_full_name|default:tecnico.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Transferir
+                </button>
+            </form>
+        </div>
+        {% endif %}
 
         <!-- Seção de Comentários -->
         <div class="flex-1 flex flex-col">

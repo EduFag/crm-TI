@@ -12,8 +12,10 @@
                 <span class="px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">Alta</span>
             {% elif ticket.priority == 'LOW' %}
                 <span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">Baixa</span>
-            {% else %}
+            {% elif ticket.priority == 'MEDIUM' %}
                 <span class="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">Média</span>
+            {% else %}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-500">Sem prioridade</span>
             {% endif %}
             
             <!-- Category Badge -->

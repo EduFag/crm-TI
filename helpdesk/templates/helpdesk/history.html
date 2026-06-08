@@ -35,6 +35,7 @@
             <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Prioridade</label>
             <select name="priority" class="w-full text-sm p-2 border border-slate-300 rounded-lg">
                 <option value="">Todas</option>
+                <option value="__null__" {% if request.GET.priority == '__null__' %}selected{% endif %}>Sem prioridade</option>
                 {% for k, v in priority_choices.choices %}
                 <option value="{{ k }}" {% if request.GET.priority == k %}selected{% endif %}>{{ v }}</option>
                 {% endfor %}

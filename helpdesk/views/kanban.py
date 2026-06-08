@@ -2,17 +2,79 @@ import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
+from core.models import CustomUser
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
-from helpdesk.forms import TicketCreateForm
+from helpdesk.forms import TicketCreateForm, TicketUpdateForm
 from helpdesk.models import Ticket, TicketCategory, Comment
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_pode_acessar_chamado,
+    usuario_pode_editar_chamado,
     usuario_pode_gerenciar_categorias,
+    usuario_pode_transferir_chamado,
     usuario_pode_ver_quem_abriu_chamado,
+    usuarios_tecnicos_para_transferencia,
 )
+
+
+def _rotulo_prioridade(valor):
+    if not valor:
+        return 'Sem prioridade'
+    return dict(Ticket.PriorityChoices.choices).get(valor, valor)
+
+
+def _rotulo_status(valor):
+    return dict(Ticket.StatusChoices.choices).get(valor, valor)
+
+
+def _nome_usuario(user):
+    if not user:
+        return 'Não atribuído'
+    return user.get_full_name() or user.username
+
+
+def gerar_comentarios_alteracao(antes, depois):
+    """Gera mensagens de histórico para campos alterados na edição."""
+    mensagens = []
+    if antes.title != depois.title:
+        mensagens.append(f'Título alterado para "{depois.title}".')
+    if (antes.description or '') != (depois.description or ''):
+        mensagens.append('Descrição atualizada.')
+    if antes.category_id != depois.category_id:
+        mensagens.append(f'Categoria alterada para {depois.category.name}.')
+    if antes.status != depois.status:
+        mensagens.append(
+            f'Status alterado de {_rotulo_status(antes.status)} para {_rotulo_status(depois.status)}.'
+        )
+    if antes.priority != depois.priority:
+        mensagens.append(
+            f'Prioridade alterada de {_rotulo_prioridade(antes.priority)} '
+            f'para {_rotulo_prioridade(depois.priority)}.'
+        )
+    if antes.requester_name != depois.requester_name or antes.requester_user_id != depois.requester_user_id:
+        mensagens.append(f'Solicitante alterado para {depois.requester_name}.')
+    if antes.assigned_to_id != depois.assigned_to_id:
+        mensagens.append(
+            f'Técnico transferido de {_nome_usuario(antes.assigned_to)} '
+            f'para {_nome_usuario(depois.assigned_to)}.'
+        )
+    return mensagens
+
+
+def _contexto_drawer(request, ticket, edit_form=None):
+    pode_editar = usuario_pode_editar_chamado(request.user)
+    return {
+        'ticket': ticket,
+        'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
+        'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
+        'pode_editar': pode_editar,
+        'pode_transferir': usuario_pode_transferir_chamado(request.user),
+        'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
+        'edit_form': edit_form or (TicketUpdateForm(instance=ticket) if pode_editar else None),
+        'mostrar_edicao': edit_form is not None,
+    }
 
 class KanbanView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/kanban.html'
@@ -55,12 +117,13 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
     def get(self, request):
         if not request.headers.get('HX-Request'):
             return redirect('helpdesk:kanban')
-        form = TicketCreateForm(nome_solicitante_padrao=self._nome_padrao(request))
+        form = TicketCreateForm(user=request.user, nome_solicitante_padrao=self._nome_padrao(request))
         return render(request, self.template_name, self._contexto_modal(request, form))
 
     def post(self, request):
         form = TicketCreateForm(
             request.POST,
+            user=request.user,
             nome_solicitante_padrao=self._nome_padrao(request),
         )
         if form.is_valid():
@@ -88,7 +151,10 @@ def ticket_category_create(request):
 
     nome = request.POST.get('name', '').strip()
     if not nome:
-        form = TicketCreateForm(nome_solicitante_padrao=request.user.get_full_name() or request.user.username)
+        form = TicketCreateForm(
+            user=request.user,
+            nome_solicitante_padrao=request.user.get_full_name() or request.user.username,
+        )
         return render(request, 'helpdesk/_category_field.html', {
             'form': form,
             'pode_gerenciar_categorias': True,
@@ -105,6 +171,7 @@ def ticket_category_create(request):
         categoria = TicketCategory.objects.create(name=nome)
 
     form = TicketCreateForm(
+        user=request.user,
         nome_solicitante_padrao=request.user.get_full_name() or request.user.username,
         categoria_inicial=categoria.pk,
     )
@@ -149,12 +216,89 @@ def ticket_drawer(request, pk):
     )
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
-    comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    return render(request, 'helpdesk/_drawer.html', {
-        'ticket': ticket,
-        'comments': comments,
-        'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
-    })
+    return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
+
+
+@requer_modulo(MODULO_HELPDESK)
+def ticket_edit(request, pk):
+    """Exibe ou salva edição de chamado (somente ADMIN/superuser)."""
+    ticket = get_object_or_404(
+        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category'),
+        pk=pk,
+        is_active=True,
+    )
+    if not usuario_pode_editar_chamado(request.user):
+        return HttpResponseForbidden('Sem permissão para editar chamados.')
+
+    if request.method == 'GET':
+        return render(
+            request,
+            'helpdesk/_drawer.html',
+            _contexto_drawer(request, ticket, edit_form=TicketUpdateForm(instance=ticket)),
+        )
+
+    antes = Ticket.objects.select_related('assigned_to', 'category').get(pk=ticket.pk)
+    form = TicketUpdateForm(request.POST, instance=ticket)
+    if form.is_valid():
+        depois = form.save()
+        for texto in gerar_comentarios_alteracao(antes, depois):
+            Comment.objects.create(ticket=depois, author=request.user, text=texto)
+        ticket.refresh_from_db()
+        response = render(
+            request,
+            'helpdesk/_drawer.html',
+            _contexto_drawer(request, ticket),
+        )
+        response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+        return response
+
+    return render(
+        request,
+        'helpdesk/_drawer.html',
+        _contexto_drawer(request, ticket, edit_form=form),
+        status=422,
+    )
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_transfer(request, pk):
+    """Transferência rápida de técnico responsável (somente ADMIN/superuser)."""
+    if not usuario_pode_transferir_chamado(request.user):
+        return HttpResponseForbidden('Sem permissão para transferir chamados.')
+
+    ticket = get_object_or_404(
+        Ticket.objects.select_related('assigned_to'),
+        pk=pk,
+        is_active=True,
+    )
+    tecnico_id = request.POST.get('assigned_to')
+    if not tecnico_id:
+        return HttpResponseForbidden('Selecione um técnico.')
+
+    tecnico = get_object_or_404(usuarios_tecnicos_para_transferencia(), pk=tecnico_id)
+    if ticket.assigned_to_id == tecnico.pk:
+        return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
+
+    anterior = ticket.assigned_to
+    ticket.assigned_to = tecnico
+    ticket.save(update_fields=['assigned_to', 'updated_at'])
+    Comment.objects.create(
+        ticket=ticket,
+        author=request.user,
+        text=(
+            f'Técnico transferido de {_nome_usuario(anterior)} '
+            f'para {_nome_usuario(tecnico)}.'
+        ),
+    )
+    ticket.refresh_from_db()
+    response = render(
+        request,
+        'helpdesk/_drawer.html',
+        _contexto_drawer(request, ticket),
+    )
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
 
 
 @requer_modulo(MODULO_HELPDESK)

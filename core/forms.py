@@ -1,7 +1,16 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.db.models import Q
 
-from core.models import CustomUser
+from core.models import CustomUser, Equipe
+
+
+class EquipeForm(forms.ModelForm):
+    """Formulário de criação e edição de equipes."""
+
+    class Meta:
+        model = Equipe
+        fields = ('name', 'is_active')
 
 
 class CustomUserCreateForm(UserCreationForm):
@@ -9,7 +18,13 @@ class CustomUserCreateForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = CustomUser
-        fields = ('username', 'email', 'first_name', 'last_name', 'role', 'is_active')
+        fields = ('username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
+        self.fields['equipe'].required = False
+        self.fields['equipe'].empty_label = 'Sem equipe'
 
 
 class CustomUserUpdateForm(forms.ModelForm):
@@ -24,7 +39,17 @@ class CustomUserUpdateForm(forms.ModelForm):
 
     class Meta:
         model = CustomUser
-        fields = ('username', 'email', 'first_name', 'last_name', 'role', 'is_active')
+        fields = ('username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
+        self.fields['equipe'].required = False
+        self.fields['equipe'].empty_label = 'Sem equipe'
+        if self.instance and self.instance.equipe_id and not self.instance.equipe.is_active:
+            self.fields['equipe'].queryset = Equipe.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.equipe_id)
+            ).order_by('name')
 
     def save(self, commit=True):
         usuario = super().save(commit=False)
