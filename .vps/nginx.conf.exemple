@@ -35,5 +35,8 @@ server {
     }
 }
 
-# Após certbot, o bloco HTTPS será adicionado automaticamente.
+# OBRIGATÓRIO em produção: sem bloco HTTPS abaixo, https://ti... cai no default_server
+# de outro site (ex.: capitalcredito) e gera DisallowedHost.
+# sudo certbot --nginx -d ti.moneypromotora.com.br
+# Após certbot, confira no bloco :443: proxy_pass http://127.0.0.1:9001;
 # Mantenha DJANGO_CSRF_TRUSTED_ORIGINS=https://ti.moneypromotora.com.br no .env

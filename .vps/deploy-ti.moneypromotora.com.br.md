@@ -151,6 +151,25 @@ sudo kill -HUP $(systemctl show -p MainPID --value crm-ti)
 
 Se a página de erro mostrar **outro projeto** no `Python Path` (ex.: `/home/capitalcredito/...` em vez de `/home/edufa/crm-TI/`), o **Nginx está mandando o tráfego para o Gunicorn errado** — não basta alterar `ALLOWED_HOSTS` no capitalcredito.
 
+**Causa frequente:** existe bloco só na porta **80** para `ti.moneypromotora.com.br`, mas **não existe bloco na 443**. O navegador acessa HTTPS e o Nginx usa o `default_server` de outro site (capitalcredito/moneylinkpro).
+
+Confirme:
+
+```bash
+sudo nginx -T 2>/dev/null | grep -n "ti.moneypromotora.com.br"
+curl -sI http://ti.moneypromotora.com.br/    # deve dar 302 → /login/
+curl -sI https://ti.moneypromotora.com.br/   # se der erro de outro app, falta SSL do crm-ti
+```
+
+Crie/renove o HTTPS **só** para o subdomínio `ti`:
+
+```bash
+sudo certbot --nginx -d ti.moneypromotora.com.br
+sudo nginx -T 2>/dev/null | grep -A35 "server_name ti.moneypromotora.com.br"
+# No bloco listen 443, proxy_pass deve ser http://127.0.0.1:9001
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 **Diagnóstico no servidor:**
 
 ```bash
