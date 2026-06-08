@@ -1,18 +1,16 @@
 # Documentação — `chips/templates/chips/`
 
-Templates HTML do módulo **chips**.
-
-## Para que serve
-
-Interface de usuário para inventário, cadastros auxiliares e fluxo operacional.
+Templates HTML do namespace **chips**.
 
 ## Arquivos
 
 | Arquivo | Função |
 |---------|--------|
-| `dashboard.html` | Painel principal do módulo. |
-| `_nav.html` | Menu lateral/navegação interna do módulo chips. |
-| `operator_list.html` | Listagem de operadoras — create via modal HTMX. |
-| `batch_list.html` | Listagem de lotes/saquinhos — create via modal HTMX. |
-| `chip_list.html` | Listagem e gestão de chips — create/edit via modal HTMX. |
-| `assignment.html` | Tela de atribuição (entrega) de chip a funcionário. |
+| `dashboard.html` | Dashboard com filtro de período, cards e planilha callcenter. |
+| `_callcenter_grid.html` | Grid Tabulator editável (partial incluído no dashboard). |
+| `_transfer_modal.html` | Modal HTMX de transferência com titular nome livre/usuário. |
+| `_nav.html` | Navegação entre telas do módulo. |
+| `assignment.html` | Entrega e transferência (fluxo alternativo ao grid). |
+| `chip_list.html` | Inventário completo de chips. |
+| `batch_list.html` | Envelopes e lotes físicos na TI. |
+| `operator_list.html` | Operadoras cadastradas. |

@@ -1,10 +1,13 @@
+from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.contrib import messages
-from django.views.generic import View, TemplateView
+from django.views.generic import TemplateView, View
+
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
-from chips.models import Chip, ChipMovement
-from chips.audit import log_devolucao, log_entrega, log_transferencia
+from chips.forms import AssignmentForm
+from chips.models import Chip
+from chips.services import devolver_para_ti, entregar_chip, transferir_chip
 
 
 class _ChipsMixin(ModuloObrigatorioMixin):
@@ -12,76 +15,65 @@ class _ChipsMixin(ModuloObrigatorioMixin):
 
 
 class AssignmentView(_ChipsMixin, TemplateView):
-    """Tela dupla: Formulário de Atribuição (Esquerda) e Estoque (Direita) - RF08, RF09, RF10"""
+    """Tela de atribuição — entrega ou transferência (RF08, RF09, RF10)."""
     template_name = 'chips/assignment.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Exibe apenas os que têm status exato 'Disponível' (RF10)
-        context['available_chips'] = Chip.objects.filter(status=Chip.StatusChoices.AVAILABLE).select_related('operator')
+        context['available_chips'] = Chip.objects.filter(
+            status=Chip.StatusChoices.AVAILABLE,
+            custody=Chip.CustodyChoices.WITH_TI,
+        ).select_related('operator')
+        context['in_use_chips'] = Chip.objects.filter(
+            custody=Chip.CustodyChoices.WITH_PERSON,
+        ).select_related('operator')
+        context['form'] = AssignmentForm()
         return context
-        
+
     def post(self, request, *args, **kwargs):
-        chip_id = request.POST.get('chip_id')
-        employee_name = request.POST.get('employee_name')
-        
-        chip = get_object_or_404(Chip, id=chip_id)
-        estava_em_uso = chip.status == Chip.StatusChoices.IN_USE
-        
-        # RF13 - Transferência Direta
-        # Se o chip já estivesse em uso com alguém, geraríamos uma Devolução antes.
-        if estava_em_uso:
-            # Pega o último dono
-            last_mov = chip.movements.filter(action=ChipMovement.ActionChoices.DELIVERY).order_by('-timestamp').first()
-            old_emp = last_mov.employee_name if last_mov else "Desconhecido"
-            
-            ChipMovement.objects.create(
-                chip=chip,
-                employee_name=old_emp,
-                action=ChipMovement.ActionChoices.RETURN,
-                registered_by=request.user
-            )
-            log_devolucao(chip, old_emp, request.user)
-            messages.info(request, f"Posse anterior de {old_emp} encerrada automaticamente (Transferência).")
-        
-        # Registra Entrega
-        ChipMovement.objects.create(
-            chip=chip,
-            employee_name=employee_name,
-            action=ChipMovement.ActionChoices.DELIVERY,
-            registered_by=request.user
-        )
-        if estava_em_uso:
-            log_transferencia(chip, old_emp, employee_name, request.user)
-        else:
-            log_entrega(chip, employee_name, request.user)
-        
-        # RF11 - Alterar status para Em Uso
-        chip.status = Chip.StatusChoices.IN_USE
-        chip.save()
-        
-        messages.success(request, f"Chip {chip.line_number} atribuído com sucesso para {employee_name}!")
+        form = AssignmentForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Corrija os erros do formulário.')
+            return redirect('chips:assignment')
+
+        chip = get_object_or_404(Chip, id=form.cleaned_data['chip_id'])
+        nome = form.cleaned_data['employee_name']
+        usuario = form.cleaned_data.get('employee_user')
+
+        try:
+            if chip.custody == Chip.CustodyChoices.WITH_PERSON:
+                transferir_chip(chip, novo_nome=nome, novo_user=usuario, actor=request.user)
+                messages.success(request, f'Chip {chip.line_number} transferido para {nome}.')
+            else:
+                entregar_chip(chip, employee_name=nome, employee_user=usuario, actor=request.user)
+                messages.success(request, f'Chip {chip.line_number} entregue para {nome}.')
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if exc.messages else str(exc))
+
         return redirect('chips:dashboard')
+
 
 class ReturnChipView(_ChipsMixin, View):
-    """Devolve um chip ao estoque (RF12)"""
-    def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)
-        
-        # Encontra com quem estava
-        last_mov = chip.movements.filter(action=ChipMovement.ActionChoices.DELIVERY).order_by('-timestamp').first()
-        old_emp = last_mov.employee_name if last_mov else "Desconhecido"
-        
-        ChipMovement.objects.create(
-            chip=chip,
-            employee_name=old_emp,
-            action=ChipMovement.ActionChoices.RETURN,
-            registered_by=request.user
-        )
-        log_devolucao(chip, old_emp, request.user)
+    """Devolve um chip ao estoque na TI (RF12)."""
 
-        chip.status = Chip.StatusChoices.AVAILABLE
-        chip.save()
-        
-        messages.success(request, f"Chip {chip.line_number} retornado ao estoque.")
-        return redirect('chips:dashboard')
+    def post(self, request, pk):
+        chip = get_object_or_404(Chip, pk=pk, custody=Chip.CustodyChoices.WITH_PERSON)
+        envelope_id = request.POST.get('envelope_id')
+        if not envelope_id:
+            messages.error(request, 'Selecione o envelope na TI.')
+            return redirect('chips:chip_list')
+
+        from chips.models import Batch
+        envelope = get_object_or_404(
+            Batch,
+            pk=envelope_id,
+            tipo=Batch.TipoChoices.ENVELOPE,
+        )
+
+        try:
+            devolver_para_ti(chip, envelope=envelope, actor=request.user)
+            messages.success(request, f'Chip {chip.line_number} retornado ao envelope {envelope.label}.')
+        except ValidationError as exc:
+            messages.error(request, str(exc))
+
+        return redirect(request.POST.get('next') or 'chips:dashboard')

@@ -7,10 +7,9 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Chips</h2>
-            <p class="text-sm text-slate-500 mt-1">Métricas, estoque e movimentações em tempo real.</p>
+            <p class="text-sm text-slate-500 mt-1">Apanhado geral, planilha callcenter e movimentações.</p>
         </div>
         <div class="flex gap-2">
-            <a href="{% url 'chips:assignment' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Entrega Rápida</a>
             <button type="button"
                     hx-get="{% url 'chips:recharge_create' %}"
                     hx-target="#modal-container"
@@ -18,160 +17,118 @@
                     class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</button>
         </div>
     </div>
-    
+
     {% include "chips/_nav.html" %}
 
-    <!-- RF01: Métricas Gerais -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <!-- Filtro de período fixo -->
+    <form method="get" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">De</label>
+            <input type="date" name="date_from" value="{{ date_from }}"
+                   class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Até</label>
+            <input type="date" name="date_to" value="{{ date_to }}"
+                   class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Filtrar</button>
+        <a href="{{ periodo_mes_atual_url }}" class="text-sm text-blue-600 font-semibold py-2">Mês atual</a>
+        <a href="{{ periodo_mes_anterior_url }}" class="text-sm text-slate-500 font-semibold py-2">Mês anterior</a>
+    </form>
+
+    <!-- Snapshot operacional -->
+    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estado atual</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Total de Chips</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Total ativos</p>
             <h3 class="text-2xl font-bold text-slate-900">{{ total_chips }}</h3>
         </div>
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Disponíveis</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Na TI</p>
             <h3 class="text-2xl font-bold text-emerald-600">{{ available_chips }}</h3>
         </div>
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Em Uso</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Callcenter (em uso)</p>
             <h3 class="text-2xl font-bold text-blue-600">{{ in_use_chips }}</h3>
         </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Bloqueados/Canc</p>
-            <h3 class="text-2xl font-bold text-red-600">{{ blocked_chips|add:canceled_chips }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-500">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Perdidos</p>
-            <h3 class="text-2xl font-bold text-orange-600">{{ lost_chips }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Recargas Acumuladas</p>
-            <h3 class="text-2xl font-bold text-slate-900">R$ {{ total_recharge_value|floatformat:2 }}</h3>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Vencem em 30 dias</p>
+            <h3 class="text-2xl font-bold text-amber-600">{{ recharge_due_soon }}</h3>
         </div>
     </div>
 
-    <!-- Layout Dividido -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 h-full pb-8">
-        
-        <!-- RF02 & RF04: Chips em Uso -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px]">
-            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl gap-4">
-                <h4 class="font-bold text-slate-800 min-w-max">Chips na Rua (Em Uso)</h4>
-                <input type="text" id="filter-usage" onkeyup="filterUsage()" placeholder="Buscar linha ou funcionário..." class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 outline-none">
-            </div>
-            <div class="overflow-y-auto p-0 flex-1">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
-                        <tr>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Funcionário</th>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Última Recarga</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usage-tbody" class="divide-y divide-slate-100">
-                        {% for chip in chips_in_use %}
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-3 font-medium text-slate-900">{{ chip.employee|default:"—" }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ chip.line_number }} <span class="text-xs text-slate-400">({{ chip.operator.name }})</span></td>
-                            <td class="px-4 py-3 text-xs">
-                                {% if chip.last_recharge_date %}
-                                    <span class="text-emerald-600 font-bold">R$ {{ chip.last_recharge_amount }}</span> em {{ chip.last_recharge_date|date:"d/m/Y" }}
-                                {% else %}
-                                    <span class="text-slate-400">Sem recargas</span>
-                                {% endif %}
-                                <!-- Botão Atalho RF15 -->
-                                <button type="button"
-                                        hx-get="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}"
-                                        hx-target="#modal-container"
-                                        hx-swap="innerHTML"
-                                        class="ml-2 text-blue-500 hover:text-blue-700 font-semibold text-[10px] uppercase">Recarregar</button>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="3" class="p-4 text-center text-slate-400">Nenhum chip em uso no momento.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <!-- Métricas do período -->
+    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Movimentação no período ({{ date_from }} — {{ date_to }})</p>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Entregas</p>
+            <h3 class="text-xl font-bold text-blue-600">{{ period_deliveries }}</h3>
         </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Transferências</p>
+            <h3 class="text-xl font-bold text-indigo-600">{{ period_transfers }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Devoluções</p>
+            <h3 class="text-xl font-bold text-orange-600">{{ period_returns }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Recargas</p>
+            <h3 class="text-xl font-bold text-emerald-600">{{ period_recharges_count }}</h3>
+            <p class="text-xs text-slate-500">R$ {{ period_recharges_total|floatformat:2 }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Bloqueios</p>
+            <h3 class="text-xl font-bold text-red-600">{{ period_blocks }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase">Recargas acumuladas</p>
+            <h3 class="text-xl font-bold text-slate-900">R$ {{ total_recharge_value|floatformat:2 }}</h3>
+        </div>
+    </div>
 
-        <!-- RF03 & RF04: Histórico Log -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[600px]">
-            <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl flex flex-col gap-3">
-                <h4 class="font-bold text-slate-800">50 Últimas Movimentações</h4>
-                <div class="flex flex-wrap md:flex-nowrap gap-3 w-full">
-                    <input type="text" id="filter-hist-text" onkeyup="filterHistory()" placeholder="Busca..." class="text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 outline-none">
-                    <select id="filter-hist-action" onchange="filterHistory()" class="text-sm p-2 border border-slate-300 rounded-lg flex-1 outline-none">
-                        <option value="">Todas Ações</option>
-                        <option value="DELIVERY">Entregas</option>
-                        <option value="RETURN">Devoluções</option>
-                    </select>
-                    <input type="date" id="filter-hist-date" onchange="filterHistory()" class="text-sm p-2 border border-slate-300 rounded-lg flex-1 outline-none">
-                </div>
-            </div>
-            <div class="overflow-y-auto p-0 flex-1">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
-                        <tr>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Data</th>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Ação</th>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Funcionário</th>
-                            <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-tbody" class="divide-y divide-slate-100">
-                        {% for mov in history_logs %}
-                        <tr class="hover:bg-slate-50" data-action="{{ mov.action }}" data-date="{{ mov.timestamp|date:'Y-m-d' }}">
-                            <td class="px-4 py-3 text-xs text-slate-500">{{ mov.timestamp|date:"d/m/y H:i" }}</td>
-                            <td class="px-4 py-3">
-                                {% if mov.action == 'DELIVERY' %}
-                                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Entrega</span>
-                                {% else %}
-                                <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Devolução</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-3 font-medium text-slate-900">{{ mov.employee_name }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ mov.chip.line_number }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="4" class="p-4 text-center text-slate-400">Nenhuma movimentação registrada.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    {% include "chips/_callcenter_grid.html" %}
+
+    <!-- Histórico no período -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col max-h-[400px] mb-8">
+        <div class="p-4 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+            <h4 class="font-bold text-slate-800">Movimentações no período</h4>
+        </div>
+        <div class="overflow-y-auto p-0 flex-1">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
+                    <tr>
+                        <th class="px-4 py-3 font-semibold text-slate-600">Data</th>
+                        <th class="px-4 py-3 font-semibold text-slate-600">Ação</th>
+                        <th class="px-4 py-3 font-semibold text-slate-600">Titular</th>
+                        <th class="px-4 py-3 font-semibold text-slate-600">Linha</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for mov in history_logs %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-xs text-slate-500">{{ mov.timestamp|date:"d/m/y H:i" }}</td>
+                        <td class="px-4 py-3">
+                            {% if mov.action == 'DELIVERY' %}
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Entrega</span>
+                            {% elif mov.action == 'TRANSFER' %}
+                            <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Transferência</span>
+                            {% else %}
+                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Devolução</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 font-medium text-slate-900">{{ mov.employee_name }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ mov.chip.line_number }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="p-4 text-center text-slate-400">Nenhuma movimentação no período.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-
-<!-- JS p/ Filtragem Instantânea (RF04) -->
-<script>
-    function filterUsage() {
-        let input = document.getElementById('filter-usage').value.toLowerCase();
-        let rows = document.querySelectorAll('#usage-tbody tr');
-        rows.forEach(row => {
-            let text = row.innerText.toLowerCase();
-            row.style.display = text.includes(input) ? '' : 'none';
-        });
-    }
-
-    function filterHistory() {
-        let textInput = document.getElementById('filter-hist-text').value.toLowerCase();
-        let actionInput = document.getElementById('filter-hist-action').value;
-        let dateInput = document.getElementById('filter-hist-date').value;
-        
-        let rows = document.querySelectorAll('#history-tbody tr');
-        rows.forEach(row => {
-            let rowText = row.innerText.toLowerCase();
-            let rowAction = row.getAttribute('data-action');
-            let rowDate = row.getAttribute('data-date');
-            
-            let matchText = rowText.includes(textInput);
-            let matchAction = actionInput === "" || rowAction === actionInput;
-            let matchDate = dateInput === "" || rowDate === dateInput;
-            
-            row.style.display = (matchText && matchAction && matchDate) ? '' : 'none';
-        });
-    }
-</script>
 
 {% include "core/_audit_log_table.html" with registros=audit_logs titulo=audit_titulo %}
 {% endblock %}

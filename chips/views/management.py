@@ -37,10 +37,10 @@ class BatchListView(_ChipsMixin, ListView):
 
 class BatchCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
     model = Batch
-    fields = ['identifier', 'status']
+    fields = ['identifier', 'tipo', 'nome', 'setor', 'status']
     list_url_name = 'chips:batch_list'
-    modal_title = 'Novo Lote'
-    modal_subtitle = 'Registre um lote ou envelope de recebimento.'
+    modal_title = 'Novo envelope / lote'
+    modal_subtitle = 'Envelopes físicos na TI: nome, setor e data de entrada automática.'
     modal_submit_label = 'Salvar'
     form_layout = 'as_p'
 
@@ -54,13 +54,24 @@ class ChipListView(_ChipsMixin, ListView):
     model = Chip
     template_name = 'chips/chip_list.html'
     context_object_name = 'chips'
-    
+
     def get_queryset(self):
         return Chip.objects.select_related('operator', 'batch').all().order_by('-created_at')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['envelopes'] = Batch.objects.filter(
+            tipo=Batch.TipoChoices.ENVELOPE,
+            status=Batch.StatusChoices.OPEN,
+        ).order_by('identifier')
+        return context
+
 class ChipCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
     model = Chip
-    fields = ['line_number', 'status', 'technology', 'fixed_cost', 'iccid', 'plan_type', 'operator', 'batch']
+    fields = [
+        'line_number', 'status', 'custody', 'technology', 'fixed_cost', 'iccid',
+        'plan_type', 'operator', 'batch', 'activated_at',
+    ]
     list_url_name = 'chips:chip_list'
     modal_title = 'Novo Chip'
     modal_subtitle = 'Cadastre uma nova linha no inventário.'
@@ -76,7 +87,10 @@ class ChipCreateView(HtmxModalMixin, _ChipsMixin, CreateView):
 
 class ChipUpdateView(HtmxModalMixin, _ChipsMixin, UpdateView):
     model = Chip
-    fields = ['line_number', 'status', 'technology', 'fixed_cost', 'iccid', 'plan_type', 'operator', 'batch']
+    fields = [
+        'line_number', 'status', 'custody', 'technology', 'fixed_cost', 'iccid',
+        'plan_type', 'operator', 'batch', 'activated_at',
+    ]
     list_url_name = 'chips:chip_list'
     modal_submit_label = 'Salvar'
     modal_max_width = 'max-w-2xl'
@@ -91,5 +105,17 @@ class ChipUpdateView(HtmxModalMixin, _ChipsMixin, UpdateView):
     def form_valid(self, form):
         antes = Chip.objects.get(pk=self.object.pk)
         self.object = form.save()
+        if (
+            self.object.status == Chip.StatusChoices.BLOCKED
+            and antes.status != Chip.StatusChoices.BLOCKED
+        ):
+            from chips.services import registrar_bloqueio
+            registrar_bloqueio(self.object, self.request.user)
+        elif (
+            antes.status == Chip.StatusChoices.BLOCKED
+            and self.object.status != Chip.StatusChoices.BLOCKED
+        ):
+            self.object.last_blocked_at = None
+            self.object.save(update_fields=['last_blocked_at'])
         log_chip_atualizado(self.object, self.request.user, antes)
         return self.htmx_redirect_response()
