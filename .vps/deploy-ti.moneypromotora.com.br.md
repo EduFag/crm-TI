@@ -112,6 +112,32 @@ Reinicie o Gunicorn após alterar `.env`:
 sudo systemctl restart crm-ti
 ```
 
+### Restart lento / página carregando infinitamente
+
+Causas comuns neste projeto:
+
+1. **SSE do helpdesk** (dashboard/kanban) mantém workers do Gunicorn ocupados. Com poucos workers, o restart espera essas conexões encerrarem.
+2. **Sem `--preload`**, cada worker recarrega o Django inteiro após o restart (lento em VPS com pouca RAM).
+3. **Nginx** sem `proxy_connect_timeout` baixo deixa o navegador esperando minutos com o Gunicorn fora do ar.
+
+**Correção** — atualize os arquivos no servidor e recarregue:
+
+```bash
+cd /home/edufa/crm-TI && git pull   # ou copie as alterações manualmente
+sudo cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service
+sudo cp /home/edufa/crm-TI/.vps/nginx.conf.exemple /etc/nginx/sites-available/crm-ti
+sudo systemctl daemon-reload
+sudo systemctl restart crm-ti
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**Deploy de código** (sem mudar unit do systemd): prefira reload suave em vez de restart completo:
+
+```bash
+sudo systemctl reload crm-ti
+# ou: sudo kill -HUP $(pgrep -f 'gunicorn setup.wsgi')
+```
+
 ---
 
 ## 7. Firewall

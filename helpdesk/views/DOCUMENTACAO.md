@@ -14,4 +14,4 @@ Kanban interativo, dashboard de métricas, histórico filtrado, drawer de detalh
 | `kanban.py` | `KanbanView`, `KanbanBoardPartialView`, criação/edição de status, drawer e comentários. |
 | `dashboard.py` | `DashboardView` e `DashboardMetricsPartialView` — métricas agregadas. |
 | `history.py` | `HistoryListView` — listagem de chamados passados/arquivados. |
-| `sse.py` | `sse_stream` — Server-Sent Events; emite `ticket_updated` quando há alterações no banco. |
+| `sse.py` | `sse_stream` — Server-Sent Events; emite `ticket_updated` quando há alterações no banco. Conexão limitada a 4 min (HTMX reconecta) para não bloquear workers do Gunicorn. |

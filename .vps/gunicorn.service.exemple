@@ -16,13 +16,20 @@ User=edufa
 Group=edufa
 WorkingDirectory=/home/edufa/crm-TI
 EnvironmentFile=/home/edufa/crm-TI/.env
+# --preload: carrega Django uma vez no master (startup muito mais rápido após restart)
+# --graceful-timeout: encerra workers com SSE aberto em até 30s (evita restart travado)
 ExecStart=/home/edufa/crm-TI/myvenv/bin/gunicorn setup.wsgi:application \
     --bind 127.0.0.1:9001 \
-    --workers 3 \
+    --workers 5 \
     --timeout 120 \
+    --graceful-timeout 30 \
+    --preload \
     --access-logfile - \
     --error-logfile -
 Restart=on-failure
+# Força encerramento se workers SSE não liberarem a tempo
+TimeoutStopSec=35
+KillMode=mixed
 
 [Install]
 WantedBy=multi-user.target

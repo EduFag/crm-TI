@@ -4,6 +4,9 @@ from django.utils import timezone
 from core.permissions import MODULO_HELPDESK, requer_modulo
 from helpdesk.models import Ticket
 
+# Duração máxima da conexão SSE (segundos). Libera o worker do Gunicorn; o HTMX reconecta sozinho.
+_SSE_MAX_SEGUNDOS = 240
+
 @requer_modulo(MODULO_HELPDESK)
 def sse_stream(request):
     """
@@ -12,8 +15,9 @@ def sse_stream(request):
     """
     def event_stream():
         last_check = timezone.now()
-        
-        while True:
+        inicio = time.monotonic()
+
+        while time.monotonic() - inicio < _SSE_MAX_SEGUNDOS:
             # Polling: Verifica modificações desde a última checagem
             has_changes = Ticket.objects.filter(updated_at__gt=last_check).exists()
             
