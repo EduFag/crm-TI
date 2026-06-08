@@ -79,12 +79,17 @@ sudo systemctl status crm-ti
 
 ## 5. Nginx
 
+Use **apenas** `crm-ti` (não duplique com `ti.moneypromotora.com.br`):
+
 ```bash
 sudo cp /home/edufa/crm-TI/.vps/nginx.conf.exemple /etc/nginx/sites-available/crm-ti
+sudo rm -f /etc/nginx/sites-enabled/ti.moneypromotora.com.br
 sudo ln -sf /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+Se existir `/etc/nginx/sites-available/ti.moneypromotora.com.br`, desative o symlink em `sites-enabled` (pode manter o arquivo como backup).
 
 ---
 

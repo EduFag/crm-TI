@@ -1,5 +1,6 @@
 # Nginx — CRM TI
-# Arquivo: /etc/nginx/sites-available/crm-ti
+# Arquivo: /etc/nginx/sites-available/crm-ti  (nome padrão do site)
+# Remova duplicata: sudo rm -f /etc/nginx/sites-enabled/ti.moneypromotora.com.br
 # sudo ln -s /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
 # sudo nginx -t && sudo systemctl reload nginx
 #
