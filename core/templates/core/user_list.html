@@ -9,9 +9,13 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Usuários</h2>
             <p class="text-sm text-slate-500 mt-1">Cadastro e controle de acesso dos usuários do sistema.</p>
         </div>
-        <a href="{% url 'user_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+        <button type="button"
+                hx-get="{% url 'user_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
             + Novo Usuário
-        </a>
+        </button>
     </div>
 
     {% if messages %}
@@ -58,7 +62,11 @@
                     </td>
                     <td class="px-6 py-4 text-right">
                         <div class="flex items-center justify-end gap-2">
-                            <a href="{% url 'user_update' usuario.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs">Editar</a>
+                            <button type="button"
+                                    hx-get="{% url 'user_update' usuario.pk %}"
+                                    hx-target="#modal-container"
+                                    hx-swap="innerHTML"
+                                    class="text-blue-600 hover:text-blue-800 font-medium text-xs">Editar</button>
                             {% if usuario != user %}
                             <form method="post" action="{% url 'user_toggle_active' usuario.pk %}" class="inline">
                                 {% csrf_token %}

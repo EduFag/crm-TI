@@ -10,5 +10,4 @@ Listagem/resumo de equipamentos e formulário de manutenção do cadastro.
 
 | Arquivo | Função |
 |---------|--------|
-| `dashboard.html` | Painel com ativos e indicadores (`/equipment/`). |
-| `form.html` | Formulário de criação (`/equipment/create/`) e edição (`/equipment/<id>/update/`). |
+| `dashboard.html` | Painel com ativos e indicadores (`/equipment/`) — create/edit via modal HTMX. |

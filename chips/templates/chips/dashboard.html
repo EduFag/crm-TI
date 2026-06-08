@@ -11,7 +11,11 @@
         </div>
         <div class="flex gap-2">
             <a href="{% url 'chips:assignment' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Entrega Rápida</a>
-            <a href="{% url 'chips:recharge_create' %}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</a>
+            <button type="button"
+                    hx-get="{% url 'chips:recharge_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</button>
         </div>
     </div>
     
@@ -75,7 +79,11 @@
                                     <span class="text-slate-400">Sem recargas</span>
                                 {% endif %}
                                 <!-- Botão Atalho RF15 -->
-                                <a href="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}" class="ml-2 text-blue-500 hover:text-blue-700 font-semibold text-[10px] uppercase">Recarregar</a>
+                                <button type="button"
+                                        hx-get="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}"
+                                        hx-target="#modal-container"
+                                        hx-swap="innerHTML"
+                                        class="ml-2 text-blue-500 hover:text-blue-700 font-semibold text-[10px] uppercase">Recarregar</button>
                             </td>
                         </tr>
                         {% empty %}

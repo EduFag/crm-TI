@@ -1,0 +1,122 @@
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+
+<!-- Modal centralizado -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full {{ modal_max_width }} max-h-[90vh] overflow-y-auto pointer-events-auto"
+         onclick="event.stopPropagation()">
+
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">{{ modal_title }}</h3>
+                {% if modal_subtitle %}
+                <p class="text-xs text-slate-500 mt-0.5">{{ modal_subtitle }}</p>
+                {% endif %}
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <form method="post"
+              action="{{ form_action }}"
+              hx-post="{{ form_action }}"
+              hx-target="#modal-container"
+              hx-swap="innerHTML"
+              class="p-6 space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {% if form_layout == 'as_p' %}
+            <div class="htmx-modal-form-as-p space-y-5">
+                {{ form.as_p }}
+            </div>
+            {% else %}
+            {% for field in form %}
+            <div>
+                <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">
+                    {{ field.label }}
+                </label>
+                {{ field }}
+                {% if field.help_text %}
+                <p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>
+                {% endif %}
+                {% if field.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ field.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="pt-2 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                        class="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm">
+                    {{ modal_submit_label }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .htmx-modal-form-as-p p { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .htmx-modal-form-as-p label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.025em; }
+    .htmx-modal-form-as-p input,
+    .htmx-modal-form-as-p select,
+    .htmx-modal-form-as-p textarea {
+        font-size: 0.875rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        outline: none;
+        transition: all 0.2s;
+        background-color: #fff;
+    }
+    .htmx-modal-form-as-p input:focus,
+    .htmx-modal-form-as-p select:focus,
+    .htmx-modal-form-as-p textarea:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    .htmx-modal-form-as-p input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: #3b82f6; }
+    .htmx-modal-form-as-p .helptext { font-size: 0.7rem; color: #94a3b8; font-weight: 500; }
+    .htmx-modal-form-as-p .errorlist {
+        color: #ef4444;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #fef2f2;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        list-style: none;
+    }
+    form input[type="text"],
+    form input[type="email"],
+    form input[type="password"],
+    form input[type="date"],
+    form input[type="number"],
+    form select,
+    form textarea {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+    form input:focus, form select:focus, form textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    form input[type="checkbox"] { width: 1rem; height: 1rem; }
+</style>

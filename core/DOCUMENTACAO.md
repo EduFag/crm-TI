@@ -19,6 +19,7 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 | `permissions.py` | Matriz role→módulo, `ModuloObrigatorioMixin`, decorator `@requer_modulo`. |
 | `context_processors.py` | `modulos_menu` — módulos permitidos no menu lateral. |
 | `forms.py` | Formulários de equipes e de criação/edição de usuários. |
+| `htmx.py` | `HtmxModalMixin` — formulários POST como modal flutuante na listagem. |
 | `views.py` | Dashboard, gestão de usuários, gestão de equipes, sem permissão e handlers 403/404/500. |
 | `urls.py` | Rotas de dashboard, login, logout, usuários, equipes e sem-permissao. |
 | `admin.py` | Registro de `Equipe` e `CustomUser` no Django Admin. |

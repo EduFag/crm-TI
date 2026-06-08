@@ -1,10 +1,9 @@
 from django.utils import timezone
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.contrib import messages
 
 from core.permissions import MODULO_EQUIPMENT, ModuloObrigatorioMixin
+from core.htmx import HtmxModalMixin
 from .models import Equipment, EquipmentLog
 
 
@@ -33,15 +32,19 @@ class DashboardView(_EquipmentMixin, TemplateView):
         
         return context
 
-class EquipmentCreateView(_EquipmentMixin, CreateView):
-    """ RF04: Cadastro de Novo Ativo """
+class EquipmentCreateView(HtmxModalMixin, _EquipmentMixin, CreateView):
+    """ RF04: Cadastro de novo ativo via modal no dashboard """
     model = Equipment
-    template_name = 'equipment/form.html'
+    list_url_name = 'equipment:dashboard'
+    modal_title = 'Novo Ativo de TI'
+    modal_subtitle = 'Insira patrimônio, série, garantia e demais dados.'
+    modal_submit_label = 'Gravar Patrimônio'
+    modal_max_width = 'max-w-2xl'
+    form_layout = 'as_p'
     fields = ['type', 'tag', 'serial_number', 'brand_model', 'purchase_date', 'warranty_end', 'purchase_value', 'status', 'current_employee']
-    success_url = reverse_lazy('equipment:dashboard')
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        self.object = form.save()
         
         # RF02: Log de Criação Automática
         action = EquipmentLog.ActionChoices.CREATED
@@ -55,21 +58,29 @@ class EquipmentCreateView(_EquipmentMixin, CreateView):
         )
         
         messages.success(self.request, f"Equipamento {form.instance.tag} cadastrado com sucesso!")
-        return response
+        return self.htmx_redirect_response()
 
-class EquipmentUpdateView(_EquipmentMixin, UpdateView):
-    """ Edição e Mudança de Status do Ativo """
+class EquipmentUpdateView(HtmxModalMixin, _EquipmentMixin, UpdateView):
+    """ Edição e mudança de status do ativo via modal """
     model = Equipment
-    template_name = 'equipment/form.html'
+    list_url_name = 'equipment:dashboard'
+    modal_submit_label = 'Salvar Alterações'
+    modal_max_width = 'max-w-2xl'
+    form_layout = 'as_p'
     fields = ['type', 'tag', 'serial_number', 'brand_model', 'purchase_date', 'warranty_end', 'purchase_value', 'status', 'current_employee']
-    success_url = reverse_lazy('equipment:dashboard')
+
+    def get_modal_title(self):
+        return f'Editar Ativo — {self.object.tag}'
+
+    def get_modal_subtitle(self):
+        return 'Atualize dados e status do patrimônio.'
 
     def form_valid(self, form):
         old_equipment = Equipment.objects.get(pk=self.object.pk)
         old_status = old_equipment.status
         old_employee = old_equipment.current_employee
         
-        response = super().form_valid(form)
+        self.object = form.save()
         
         # RF02: Histórico de Atribuições Inteligente
         if old_status != form.instance.status or old_employee != form.instance.current_employee:
@@ -91,4 +102,4 @@ class EquipmentUpdateView(_EquipmentMixin, UpdateView):
             )
             
         messages.success(self.request, f"Equipamento {form.instance.tag} atualizado!")
-        return response
+        return self.htmx_redirect_response()

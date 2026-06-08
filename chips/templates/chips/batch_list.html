@@ -8,7 +8,11 @@
         <div>
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Lotes e Envelopes</h2>
         </div>
-        <a href="{% url 'chips:batch_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Lote</a>
+        <button type="button"
+                hx-get="{% url 'chips:batch_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Lote</button>
     </div>
     
     {% include "chips/_nav.html" %}

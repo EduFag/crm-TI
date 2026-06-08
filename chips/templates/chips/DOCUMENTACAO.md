@@ -12,8 +12,7 @@ Interface de usuário para inventário, cadastros auxiliares e fluxo operacional
 |---------|--------|
 | `dashboard.html` | Painel principal do módulo. |
 | `_nav.html` | Menu lateral/navegação interna do módulo chips. |
-| `operator_list.html` | Listagem de operadoras. |
-| `batch_list.html` | Listagem de lotes/saquinhos. |
-| `chip_list.html` | Listagem e gestão de chips. |
-| `form_base.html` | Layout base de formulários (create/edit). |
+| `operator_list.html` | Listagem de operadoras — create via modal HTMX. |
+| `batch_list.html` | Listagem de lotes/saquinhos — create via modal HTMX. |
+| `chip_list.html` | Listagem e gestão de chips — create/edit via modal HTMX. |
 | `assignment.html` | Tela de atribuição (entrega) de chip a funcionário. |

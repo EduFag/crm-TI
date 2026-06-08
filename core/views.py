@@ -1,11 +1,11 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, ListView, UpdateView
 
 from core.forms import CustomUserCreateForm, CustomUserUpdateForm, EquipeForm
+from core.htmx import HtmxModalMixin
 from core.models import CustomUser, Equipe
 from core.permissions import MODULO_GESTAO_USUARIOS, ModuloObrigatorioMixin, requer_modulo
 
@@ -48,31 +48,41 @@ class UserListView(ModuloObrigatorioMixin, ListView):
         return CustomUser.objects.select_related('equipe').order_by('-is_active', 'username')
 
 
-class UserCreateView(ModuloObrigatorioMixin, CreateView):
-    """Cadastro de novo usuário pelo ADMIN (sem auto-registro público)."""
+class UserCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
+    """Cadastro de novo usuário pelo ADMIN (modal HTMX na listagem)."""
     model = CustomUser
     form_class = CustomUserCreateForm
-    template_name = 'core/user_form.html'
-    success_url = reverse_lazy('user_list')
+    list_url_name = 'user_list'
+    modal_title = 'Novo Usuário'
+    modal_subtitle = 'Cadastro realizado pelo administrador.'
+    modal_submit_label = 'Salvar'
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
 
     def form_valid(self, form):
+        self.object = form.save()
         messages.success(self.request, f'Usuário "{form.instance.username}" criado com sucesso.')
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
 
-class UserUpdateView(ModuloObrigatorioMixin, UpdateView):
-    """Edição de usuário existente."""
+class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
+    """Edição de usuário existente (modal HTMX na listagem)."""
     model = CustomUser
     form_class = CustomUserUpdateForm
-    template_name = 'core/user_form.html'
-    success_url = reverse_lazy('user_list')
+    list_url_name = 'user_list'
+    modal_submit_label = 'Salvar'
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
     context_object_name = 'usuario'
 
+    def get_modal_title(self):
+        return f'Editar Usuário — {self.object.username}'
+
+    def get_modal_subtitle(self):
+        return 'Atualize os dados de acesso e permissões.'
+
     def form_valid(self, form):
+        self.object = form.save()
         messages.success(self.request, f'Usuário "{form.instance.username}" atualizado com sucesso.')
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
 
 @requer_modulo(MODULO_GESTAO_USUARIOS)
@@ -102,31 +112,41 @@ class EquipeListView(ModuloObrigatorioMixin, ListView):
         return Equipe.objects.all().order_by('-is_active', 'name')
 
 
-class EquipeCreateView(ModuloObrigatorioMixin, CreateView):
-    """Cadastro de nova equipe."""
+class EquipeCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
+    """Cadastro de nova equipe (modal HTMX na listagem)."""
     model = Equipe
     form_class = EquipeForm
-    template_name = 'core/equipe_form.html'
-    success_url = reverse_lazy('equipe_list')
+    list_url_name = 'equipe_list'
+    modal_title = 'Nova Equipe'
+    modal_subtitle = 'Cadastro de equipe para agrupar usuários.'
+    modal_submit_label = 'Salvar'
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
 
     def form_valid(self, form):
+        self.object = form.save()
         messages.success(self.request, f'Equipe "{form.instance.name}" criada com sucesso.')
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
 
-class EquipeUpdateView(ModuloObrigatorioMixin, UpdateView):
-    """Edição de equipe existente."""
+class EquipeUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
+    """Edição de equipe existente (modal HTMX na listagem)."""
     model = Equipe
     form_class = EquipeForm
-    template_name = 'core/equipe_form.html'
-    success_url = reverse_lazy('equipe_list')
+    list_url_name = 'equipe_list'
+    modal_submit_label = 'Salvar'
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
     context_object_name = 'equipe'
 
+    def get_modal_title(self):
+        return f'Editar Equipe — {self.object.name}'
+
+    def get_modal_subtitle(self):
+        return 'Atualize os dados da equipe.'
+
     def form_valid(self, form):
+        self.object = form.save()
         messages.success(self.request, f'Equipe "{form.instance.name}" atualizada com sucesso.')
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
 
 @requer_modulo(MODULO_GESTAO_USUARIOS)

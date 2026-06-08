@@ -11,7 +11,11 @@
         </div>
         <div class="flex gap-3">
             <a href="{% url 'emails:dashboard' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">Voltar</a>
-            <a href="{% url 'emails:domain_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Adicionar Domínio</a>
+            <button type="button"
+                    hx-get="{% url 'emails:domain_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Adicionar Domínio</button>
         </div>
     </div>
 

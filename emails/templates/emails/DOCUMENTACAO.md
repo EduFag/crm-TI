@@ -10,7 +10,6 @@ Dashboard unificado, formulários de conta e listagem de domínios.
 
 | Arquivo | Função |
 |---------|--------|
-| `dashboard.html` | Painel principal com listagem de contas (`/emails/`). |
-| `account_form.html` | Formulário de criação/edição de conta. |
-| `form_base.html` | Layout base compartilhado por formulários. |
-| `domain_list.html` | Listagem e gestão de domínios corporativos. |
+| `dashboard.html` | Painel principal com listagem de contas (`/emails/`) — create via modal HTMX. |
+| `_account_form_modal.html` | Modal de criação de conta de e-mail. |
+| `domain_list.html` | Listagem e gestão de domínios — create via modal HTMX. |

@@ -9,7 +9,11 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Equipamentos</h2>
             <p class="text-sm text-slate-500 mt-1">Controle de ciclo de vida de ativos e hardware corporativo.</p>
         </div>
-        <a href="{% url 'equipment:equipment_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Ativo de TI</a>
+        <button type="button"
+                hx-get="{% url 'equipment:equipment_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Ativo de TI</button>
     </div>
 
     <!-- RF01: Métricas 3x3 -->
@@ -89,7 +93,11 @@
                                 {% endif %}
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{% url 'equipment:equipment_update' eq.id %}" class="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase underline">Editar</a>
+                                <button type="button"
+                                        hx-get="{% url 'equipment:equipment_update' eq.id %}"
+                                        hx-target="#modal-container"
+                                        hx-swap="innerHTML"
+                                        class="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase underline">Editar</button>
                             </td>
                         </tr>
                         {% empty %}

@@ -1,10 +1,10 @@
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, View, ListView
 from django.contrib import messages
 
 from core.permissions import MODULO_EMAILS, ModuloObrigatorioMixin
+from core.htmx import HtmxModalMixin
 from emails.models import EmailAccount, EmailDomain
 
 
@@ -29,16 +29,17 @@ class DashboardView(_EmailsMixin, TemplateView):
         
         return context
 
-class EmailAccountCreateView(_EmailsMixin, CreateView):
-    """Cadastro de Novo E-mail (UX Melhorada com Dropdown de Domínio)"""
+class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
+    """Cadastro de novo e-mail via modal no dashboard."""
     model = EmailAccount
     fields = ['username', 'domain', 'employee_name', 'status']
-    template_name = 'emails/account_form.html'
-    success_url = reverse_lazy('emails:dashboard')
+    modal_template_name = 'emails/_account_form_modal.html'
+    list_url_name = 'emails:dashboard'
     
     def form_valid(self, form):
+        self.object = form.save()
         messages.success(self.request, f"E-mail {form.instance.address} cadastrado com sucesso!")
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
 class ResetPasswordView(_EmailsMixin, View):
     """Ação: Reset de Senha"""
@@ -71,11 +72,14 @@ class EmailDomainListView(_EmailsMixin, ListView):
     template_name = 'emails/domain_list.html'
     context_object_name = 'domains'
 
-class EmailDomainCreateView(_EmailsMixin, CreateView):
+class EmailDomainCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     model = EmailDomain
     fields = ['name']
-    template_name = 'emails/form_base.html'
-    success_url = reverse_lazy('emails:domain_list')
+    list_url_name = 'emails:domain_list'
+    modal_title = 'Novo Domínio'
+    modal_subtitle = 'Adicione um domínio corporativo autorizado (ex: empresa.com.br).'
+    modal_submit_label = 'Salvar'
+    form_layout = 'as_p'
     
     def form_valid(self, form):
         # Limpar espaços ou '@' se o usuário digitar sem querer
@@ -83,6 +87,6 @@ class EmailDomainCreateView(_EmailsMixin, CreateView):
         if raw_name.startswith('@'):
             raw_name = raw_name[1:]
         form.instance.name = raw_name
-        
+        self.object = form.save()
         messages.success(self.request, f"Domínio @{form.instance.name} adicionado ao catálogo!")
-        return super().form_valid(form)
+        return self.htmx_redirect_response()

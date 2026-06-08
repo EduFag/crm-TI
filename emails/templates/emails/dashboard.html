@@ -11,7 +11,11 @@
         </div>
         <div class="flex gap-3">
             <a href="{% url 'emails:domain_list' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-800 px-5 py-2.5 rounded-lg font-bold shadow-sm border border-slate-200 transition-colors text-sm">Gerenciar Domínios</a>
-            <a href="{% url 'emails:account_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Cadastrar E-mail</a>
+            <button type="button"
+                    hx-get="{% url 'emails:account_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Cadastrar E-mail</button>
         </div>
     </div>
 

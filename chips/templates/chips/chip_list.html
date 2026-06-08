@@ -9,7 +9,11 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Inventário de Chips</h2>
             <p class="text-sm text-slate-500 mt-1">Gestão de todas as linhas cadastradas.</p>
         </div>
-        <a href="{% url 'chips:chip_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Chip</a>
+        <button type="button"
+                hx-get="{% url 'chips:chip_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Chip</button>
     </div>
     
     {% include "chips/_nav.html" %}
@@ -46,7 +50,11 @@
                     </td>
                     <td class="px-4 py-3 text-slate-600 font-medium">R$ {{ chip.fixed_cost }}</td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{% url 'chips:chip_edit' chip.id %}" class="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase px-2 transition-colors">Editar</a>
+                        <button type="button"
+                                hx-get="{% url 'chips:chip_edit' chip.id %}"
+                                hx-target="#modal-container"
+                                hx-swap="innerHTML"
+                                class="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase px-2 transition-colors">Editar</button>
                         
                         {% if chip.status == 'IN_USE' %}
                         <!-- Botão de Devolução (RF12) -->

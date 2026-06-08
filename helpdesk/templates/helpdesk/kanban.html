@@ -44,20 +44,12 @@
     </div>
 </div>
 
-<!-- Modal de criação (preenchido via HTMX) -->
-<div id="modal-container"></div>
-
 <!-- Drawer Container (será preenchido pelo HTMX) -->
 <div id="drawer-container"></div>
 
 <!-- JavaScript para o Drag and Drop do Kanban -->
 {% if pode_operar_kanban %}
 <script>
-    document.body.addEventListener('closeCreateModal', function() {
-        var modal = document.getElementById('modal-container');
-        if (modal) modal.innerHTML = '';
-    });
-
     function drag(event) {
         // Envia o id do ticket
         event.dataTransfer.setData("ticket_id", event.target.id);
