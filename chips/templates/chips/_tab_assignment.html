@@ -1,23 +1,8 @@
-{% extends "base.html" %}
-
-{% block title %}Atribuição - Gestão de Chips{% endblock %}
-
-{% block content %}
-<div class="flex flex-col h-full">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Entregar ou Transferir Chip</h2>
-            <p class="text-sm text-slate-500 mt-1">Use a planilha no dashboard para edição rápida; aqui o fluxo completo.</p>
-        </div>
-        <a href="{% url 'chips:dashboard' %}" class="text-sm text-blue-600 font-semibold">← Voltar ao dashboard</a>
-    </div>
-
-    {% include "chips/_nav.html" %}
-
+<div class="chips-tab-panel hidden" data-tab-panel="assignment">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
             <h4 class="font-bold text-slate-800 mb-4">Confirmar atribuição</h4>
-            <form method="POST">
+            <form method="POST" action="{% url 'chips:assignment' %}">
                 {% csrf_token %}
                 <div class="mb-4">
                     <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">ID do chip</label>
@@ -25,11 +10,10 @@
                            placeholder="Selecione na tabela →"
                            class="w-full text-sm p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-500 font-mono">
                 </div>
-
                 <div class="mb-4">
                     <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Tipo de titular</p>
-                    <div class="flex gap-4 text-sm" id="tipo-titular-radios">
-                        {% for radio in form.tipo_titular %}
+                    <div class="flex gap-4 text-sm">
+                        {% for radio in assignment_form.tipo_titular %}
                         <label class="flex items-center gap-2 cursor-pointer">
                             {{ radio.tag }}
                             <span>{{ radio.choice_label }}</span>
@@ -39,11 +23,11 @@
                 </div>
                 <div class="mb-4" id="campo-titular-texto">
                     <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Nome do titular</label>
-                    {{ form.employee_name }}
+                    {{ assignment_form.employee_name }}
                 </div>
                 <div class="mb-6 hidden" id="campo-titular-usuario">
                     <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Usuário do sistema</label>
-                    {{ form.employee_user }}
+                    {{ assignment_form.employee_user }}
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold transition-colors shadow-sm">
                     Salvar
@@ -73,7 +57,7 @@
                                 <td class="px-4 py-3 font-bold">{{ chip.line_number }}</td>
                                 <td class="px-4 py-3">{{ chip.operator.name }}</td>
                                 <td class="px-4 py-3 text-right">
-                                    <button type="button" onclick="selectChip({{ chip.id }})"
+                                    <button type="button" onclick="chipsSelectChip({{ chip.id }})"
                                             class="bg-slate-200 hover:bg-blue-600 hover:text-white text-xs px-3 py-1.5 rounded-md font-bold">Selecionar</button>
                                 </td>
                             </tr>
@@ -106,7 +90,7 @@
                                 <td class="px-4 py-3 font-bold">{{ chip.line_number }}</td>
                                 <td class="px-4 py-3">{{ chip.operator.name }}</td>
                                 <td class="px-4 py-3 text-right">
-                                    <button type="button" onclick="selectChip({{ chip.id }})"
+                                    <button type="button" onclick="chipsSelectChip({{ chip.id }})"
                                             class="bg-indigo-100 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs px-3 py-1.5 rounded-md font-bold">Transferir</button>
                                 </td>
                             </tr>
@@ -120,27 +104,3 @@
         </div>
     </div>
 </div>
-
-<script>
-    function selectChip(id) {
-        var input = document.getElementById('chip_id');
-        input.value = id;
-        input.classList.add('bg-blue-50', 'border-blue-400', 'text-blue-700', 'font-bold');
-        document.querySelector('[name="employee_name"]')?.focus();
-    }
-    (function() {
-        var tipoUsuario = document.querySelector('input[name="tipo_titular"][value="usuario"]');
-        var campoTexto = document.getElementById('campo-titular-texto');
-        var campoUsuario = document.getElementById('campo-titular-usuario');
-        function toggle() {
-            var u = tipoUsuario && tipoUsuario.checked;
-            campoTexto.classList.toggle('hidden', u);
-            campoUsuario.classList.toggle('hidden', !u);
-        }
-        document.querySelectorAll('input[name="tipo_titular"]').forEach(function(r) {
-            r.addEventListener('change', toggle);
-        });
-        toggle();
-    })();
-</script>
-{% endblock %}

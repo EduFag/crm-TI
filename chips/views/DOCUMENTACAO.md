@@ -11,7 +11,7 @@ Implementa listagens, formulários, API JSON do grid Tabulator e ações operaci
 | Arquivo | Função |
 |---------|--------|
 | `__init__.py` | Reexporta classes para `urls.py`. |
-| `dashboard.py` | `DashboardView` — apanhado geral com filtro de período em `/chips/`. |
+| `dashboard.py` | `ChipsView` — página única com abas em `/chips/`; `ChipsAssignmentPostView` para POST de atribuição. |
 | `grid.py` | API JSON e modal de transferência para planilha Tabulator. |
 | `management.py` | CRUD de operadoras, envelopes/lotes e chips. |
 | `assignments.py` | `AssignmentView` e `ReturnChipView` — entrega, transferência e devolução. |

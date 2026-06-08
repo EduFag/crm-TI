@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Chips{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full" id="chips-app">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Chips</h2>
+            <p class="text-sm text-slate-500 mt-1">Dashboard, planilha callcenter, inventário e cadastros.</p>
+        </div>
+        <div class="flex gap-2">
+            <button type="button"
+                    hx-get="{% url 'chips:recharge_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm">Nova Recarga</button>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mb-4 space-y-2">
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded-lg text-sm font-medium
+            {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200
+            {% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200
+            {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% include "chips/_tabs_nav.html" %}
+
+    <div id="chips-tab-content">
+        {% include "chips/_tab_dashboard.html" %}
+        {% include "chips/_tab_assignment.html" %}
+        {% include "chips/_tab_inventory.html" %}
+        {% include "chips/_tab_operators.html" %}
+        {% include "chips/_tab_envelopes.html" %}
+    </div>
+</div>
+
+<script>
+(function() {
+    var activeTab = '{{ active_tab }}';
+    var panels = document.querySelectorAll('.chips-tab-panel');
+    var buttons = document.querySelectorAll('.chips-tab-btn');
+
+    function showTab(tabId, pushState) {
+        activeTab = tabId;
+        panels.forEach(function(panel) {
+            var isActive = panel.getAttribute('data-tab-panel') === tabId;
+            panel.classList.toggle('hidden', !isActive);
+        });
+        buttons.forEach(function(btn) {
+            var isActive = btn.getAttribute('data-tab') === tabId;
+            btn.classList.toggle('text-blue-600', isActive);
+            btn.classList.toggle('border-blue-600', isActive);
+            btn.classList.toggle('text-slate-500', !isActive);
+            btn.classList.toggle('border-transparent', !isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        if (pushState !== false) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('tab', tabId);
+            if (tabId !== 'dashboard') {
+                url.searchParams.delete('date_from');
+                url.searchParams.delete('date_to');
+            }
+            history.replaceState({ tab: tabId }, '', url.toString());
+        }
+        if (tabId === 'dashboard' && window.chipsGrid) {
+            try { window.chipsGrid.redraw(true); } catch (e) {}
+        }
+    }
+
+    buttons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            showTab(btn.getAttribute('data-tab'));
+        });
+    });
+
+    window.chipsShowTab = showTab;
+    showTab(activeTab, false);
+
+    window.chipsSelectChip = function(id) {
+        var input = document.getElementById('chip_id');
+        if (!input) return;
+        input.value = id;
+        input.classList.add('bg-blue-50', 'border-blue-400', 'text-blue-700', 'font-bold');
+        showTab('assignment');
+        input.focus();
+        var nome = document.querySelector('[name="employee_name"]');
+        if (nome) nome.focus();
+    };
+
+    var tipoUsuario = document.querySelector('input[name="tipo_titular"][value="usuario"]');
+    var campoTexto = document.getElementById('campo-titular-texto');
+    var campoUsuario = document.getElementById('campo-titular-usuario');
+    function toggleTitularAssignment() {
+        if (!campoTexto || !campoUsuario) return;
+        var u = tipoUsuario && tipoUsuario.checked;
+        campoTexto.classList.toggle('hidden', u);
+        campoUsuario.classList.toggle('hidden', !u);
+    }
+    document.querySelectorAll('input[name="tipo_titular"]').forEach(function(r) {
+        r.addEventListener('change', toggleTitularAssignment);
+    });
+    toggleTitularAssignment();
+})();
+</script>
+{% endblock %}
