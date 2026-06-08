@@ -167,26 +167,32 @@ def atualizar_chip_grid(chip, *, dados, actor):
     from chips.audit import log_chip_atualizado
 
     antes = Chip.objects.get(pk=chip.pk)
+    alterou = False
 
-    if dados.get('line_number'):
-        chip.line_number = dados['line_number'].strip()
+    if 'line_number' in dados and dados['line_number']:
+        chip.line_number = str(dados['line_number']).strip()
+        alterou = True
 
-    if dados.get('operator_id'):
-        chip.operator_id = int(dados['operator_id'])
+    if 'operator_id' in dados:
+        op_id = _inteiro_opcional(dados['operator_id'])
+        if op_id is None:
+            raise ValidationError('Selecione uma operadora válida.')
+        chip.operator_id = op_id
+        alterou = True
 
-    if dados.get('activated_at'):
-        chip.activated_at = date.fromisoformat(dados['activated_at'])
+    if 'activated_at' in dados:
+        chip.activated_at = _parse_data_grid(dados.get('activated_at'))
+        alterou = True
 
     custody_nova = dados.get('custody')
     if custody_nova and custody_nova != chip.custody:
         if custody_nova == Chip.CustodyChoices.WITH_TI:
-            batch_id = dados.get('batch_id')
+            batch_id = _inteiro_opcional(dados.get('batch_id'))
             if not batch_id:
                 raise ValidationError('Selecione o envelope para chips na TI.')
-            envelope = Batch.objects.get(pk=int(batch_id))
+            envelope = Batch.objects.get(pk=batch_id)
             if chip.custody == Chip.CustodyChoices.WITH_PERSON:
                 devolver_para_ti(chip, envelope=envelope, actor=actor)
-                chip.refresh_from_db()
             else:
                 chip.custody = Chip.CustodyChoices.WITH_TI
                 chip.status = Chip.StatusChoices.AVAILABLE
@@ -197,9 +203,12 @@ def atualizar_chip_grid(chip, *, dados, actor):
             if not nome:
                 raise ValidationError('Informe o titular para entregar o chip.')
             user = None
-            if dados.get('employee_user_id'):
-                user = CustomUser.objects.filter(pk=int(dados['employee_user_id'])).first()
+            user_id = _inteiro_opcional(dados.get('employee_user_id'))
+            if user_id:
+                user = CustomUser.objects.filter(pk=user_id).first()
             if chip.custody == Chip.CustodyChoices.WITH_TI:
+                if alterou:
+                    chip.save()
                 entregar_chip(
                     chip,
                     employee_name=nome,
@@ -207,20 +216,28 @@ def atualizar_chip_grid(chip, *, dados, actor):
                     actor=actor,
                     activated_at=chip.activated_at,
                 )
-                chip.refresh_from_db()
             else:
                 transferir_chip(chip, novo_nome=nome, novo_user=user, actor=actor)
-                chip.refresh_from_db()
-    else:
-        if dados.get('batch_id') and chip.custody == Chip.CustodyChoices.WITH_TI:
-            chip.batch_id = int(dados['batch_id'])
-        if dados.get('employee_name') and chip.custody == Chip.CustodyChoices.WITH_PERSON:
-            nome = dados['employee_name'].strip()
-            if nome:
-                atual = _titular_atual(chip)
-                if not atual or atual.employee_name != nome:
-                    transferir_chip(chip, novo_nome=nome, novo_user=None, actor=actor)
-                    chip.refresh_from_db()
+        chip.refresh_from_db()
+        log_chip_atualizado(chip, actor, antes)
+        return _chip_grid(chip.pk)
+
+    if 'batch_id' in dados and chip.custody == Chip.CustodyChoices.WITH_TI:
+        chip.batch_id = _inteiro_opcional(dados.get('batch_id'))
+        alterou = True
+
+    if 'employee_name' in dados and chip.custody == Chip.CustodyChoices.WITH_PERSON:
+        nome = (dados.get('employee_name') or '').strip()
+        if nome:
+            atual = _titular_atual(chip)
+            if not atual or atual.employee_name != nome:
+                if alterou:
+                    chip.save()
+                log_chip_atualizado(chip, actor, antes)
+                return transferir_chip(chip, novo_nome=nome, novo_user=None, actor=actor)
+        alterou = True
+
+    if alterou:
         chip.save()
 
     chip.refresh_from_db()
@@ -231,3 +248,26 @@ def atualizar_chip_grid(chip, *, dados, actor):
 def _chip_grid(pk):
     chip = chips_com_anotacoes_operacionais(Chip.objects.filter(pk=pk)).first()
     return chip_para_grid_dict(chip) if chip else {}
+
+
+def _inteiro_opcional(valor):
+    """Converte valor do JSON do grid para int ou None."""
+    if valor is None or valor == '':
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_data_grid(valor):
+    """Interpreta data enviada pelo grid (ISO ou vazio)."""
+    if not valor:
+        return None
+    texto = str(valor).strip()
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto)
+    except ValueError as exc:
+        raise ValidationError('Data de ativação inválida. Use AAAA-MM-DD.') from exc

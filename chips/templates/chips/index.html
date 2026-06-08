@@ -182,6 +182,8 @@
 
     <!-- ========== ABA 2: CHIPS ========== -->
     <div class="chips-tab-panel hidden" data-tab-panel="chips">
+        <div id="grid-toast" class="hidden mb-4 px-4 py-3 rounded-lg text-sm font-medium border"></div>
+
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-4">
             <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50 rounded-t-xl">
                 <div>
@@ -200,6 +202,46 @@
                 </div>
             </div>
             <div id="callcenter-grid" class="p-2"></div>
+        </div>
+
+        <!-- Modal inline: alteração de custódia -->
+        <div id="modal-custodia-grid" class="hidden fixed inset-0 z-50">
+            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" data-fechar-custodia></div>
+            <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+                <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md pointer-events-auto" onclick="event.stopPropagation()">
+                    <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+                        <h3 class="text-lg font-bold text-slate-900">Alterar custódia</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Linha <span id="custodia-modal-linha" class="font-mono font-bold"></span></p>
+                    </div>
+                    <form id="form-custodia-grid" class="p-6 space-y-4">
+                        <div id="custodia-modal-erro" class="hidden px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200"></div>
+                        <input type="hidden" id="custodia-modal-chip-id">
+                        <input type="hidden" id="custodia-modal-custody">
+                        <div id="custodia-campo-titular" class="hidden space-y-2">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase">Nome do titular</label>
+                            <input type="text" id="custodia-modal-titular"
+                                   class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                   placeholder="Quem ficará com o chip">
+                        </div>
+                        <div id="custodia-campo-envelope" class="hidden space-y-2">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase">Envelope na TI</label>
+                            <select id="custodia-modal-envelope"
+                                    class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50">
+                            </select>
+                        </div>
+                        <div class="flex gap-2 pt-2 border-t border-slate-100">
+                            <button type="button" data-fechar-custodia
+                                    class="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold">
+                                Confirmar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -404,19 +446,162 @@ $(function() {
     /* ---- Tabulator (aba Chips) ---- */
     var operators = [];
     var envelopes = [];
+    var custodiaModalRow = null;
+    var custodiaModalValorAntigo = null;
+
+    function mostrarGridToast(msg, tipo) {
+        var $t = $('#grid-toast');
+        $t.removeClass('hidden bg-red-50 text-red-800 border-red-200 bg-emerald-50 text-emerald-800 border-emerald-200');
+        if (tipo === 'ok') {
+            $t.addClass('bg-emerald-50 text-emerald-800 border-emerald-200');
+        } else {
+            $t.addClass('bg-red-50 text-red-800 border-red-200');
+        }
+        $t.text(msg).removeClass('hidden');
+        setTimeout(function() { $t.addClass('hidden'); }, 5000);
+    }
+
+    function normalizarLinhaGrid(row) {
+        if (!row) return row;
+        if (row.operator_id != null && row.operator_id !== '') {
+            row.operator_id = String(row.operator_id);
+        }
+        row.batch_id = (row.batch_id != null && row.batch_id !== '') ? String(row.batch_id) : '';
+        return row;
+    }
+
+    function montarPayloadCampo(field, value) {
+        var payload = {};
+        if (field === 'operator_id') {
+            var opId = parseInt(value, 10);
+            if (isNaN(opId)) throw new Error('Operadora inválida.');
+            payload.operator_id = opId;
+        } else if (field === 'batch_id') {
+            payload.batch_id = (value !== '' && value != null) ? parseInt(value, 10) : null;
+        } else if (field === 'activated_at') {
+            payload.activated_at = value || null;
+        } else {
+            payload[field] = value;
+        }
+        return payload;
+    }
 
     function patchChip(id, payload) {
         return fetch('/chips/api/grid/' + id + '/', {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
             body: JSON.stringify(payload),
         }).then(function(r) {
             return r.json().then(function(d) {
-                if (!r.ok) throw new Error(d.error || 'Erro ao salvar.');
-                return d.data;
+                if (!r.ok) {
+                    var msg = d.error || 'Erro ao salvar.';
+                    if (d.errors) {
+                        msg = Object.keys(d.errors).map(function(k) {
+                            var v = d.errors[k];
+                            return Array.isArray(v) ? v.join(' ') : v;
+                        }).join(' ');
+                    }
+                    throw new Error(msg);
+                }
+                return normalizarLinhaGrid(d.data);
             });
         });
     }
+
+    function salvarCelulaGrid(cell, row, dadosAntigos) {
+        var field = cell.getField();
+        var payload;
+        try {
+            payload = montarPayloadCampo(field, cell.getValue());
+        } catch (err) {
+            row.update(dadosAntigos);
+            mostrarGridToast(err.message, 'erro');
+            return;
+        }
+        patchChip(dadosAntigos.id, payload)
+            .then(function(updated) {
+                row.update(updated);
+                mostrarGridToast('Alteração salva.', 'ok');
+            })
+            .catch(function(err) {
+                row.update(dadosAntigos);
+                mostrarGridToast(err.message, 'erro');
+            });
+    }
+
+    function fecharModalCustodia() {
+        $('#modal-custodia-grid').addClass('hidden');
+        $('#custodia-modal-erro').addClass('hidden').text('');
+        if (custodiaModalRow && custodiaModalValorAntigo != null) {
+            custodiaModalRow.update({ custody: custodiaModalValorAntigo });
+        }
+        custodiaModalRow = null;
+        custodiaModalValorAntigo = null;
+    }
+
+    function abrirModalCustodia(row, dados, novaCustodia) {
+        custodiaModalRow = row;
+        custodiaModalValorAntigo = dados.custody;
+        $('#custodia-modal-chip-id').val(dados.id);
+        $('#custodia-modal-custody').val(novaCustodia);
+        $('#custodia-modal-linha').text(dados.line_number);
+        $('#custodia-campo-titular').toggleClass('hidden', novaCustodia !== 'WITH_PERSON');
+        $('#custodia-campo-envelope').toggleClass('hidden', novaCustodia !== 'WITH_TI');
+        $('#custodia-modal-titular').val(dados.employee_name || '');
+        var $sel = $('#custodia-modal-envelope').empty();
+        if (novaCustodia === 'WITH_TI') {
+            if (!envelopes.length) {
+                mostrarGridToast('Cadastre um envelope aberto na aba Envelopes.', 'erro');
+                row.update(dados);
+                return;
+            }
+            envelopes.forEach(function(env) {
+                $sel.append($('<option>').val(env.id).text(env.label));
+            });
+            if (dados.batch_id) $sel.val(String(dados.batch_id));
+        }
+        $('#modal-custodia-grid').removeClass('hidden');
+    }
+
+    $('[data-fechar-custodia]').on('click', fecharModalCustodia);
+
+    $('#form-custodia-grid').on('submit', function(e) {
+        e.preventDefault();
+        var chipId = $('#custodia-modal-chip-id').val();
+        var custody = $('#custodia-modal-custody').val();
+        var payload = { custody: custody };
+        var $erro = $('#custodia-modal-erro');
+
+        if (custody === 'WITH_PERSON') {
+            var nome = ($('#custodia-modal-titular').val() || '').trim();
+            if (!nome) {
+                $erro.text('Informe o nome do titular.').removeClass('hidden');
+                return;
+            }
+            payload.employee_name = nome;
+        } else {
+            var envId = $('#custodia-modal-envelope').val();
+            if (!envId) {
+                $erro.text('Selecione o envelope na TI.').removeClass('hidden');
+                return;
+            }
+            payload.batch_id = parseInt(envId, 10);
+        }
+
+        $erro.addClass('hidden');
+        patchChip(chipId, payload)
+            .then(function(updated) {
+                if (custodiaModalRow) custodiaModalRow.update(updated);
+                $('#modal-custodia-grid').addClass('hidden');
+                custodiaModalRow = null;
+                custodiaModalValorAntigo = null;
+                mostrarGridToast('Custódia atualizada.', 'ok');
+            })
+            .catch(function(err) {
+                $erro.text(err.message).removeClass('hidden');
+            });
+    });
 
     function formatRecharge(cell) {
         var d = cell.getRow().getData();
@@ -446,7 +631,7 @@ $(function() {
         ajaxResponse: function(url, params, response) {
             operators = response.operators || [];
             envelopes = response.envelopes || [];
-            return response.data;
+            return (response.data || []).map(normalizarLinhaGrid);
         },
         layout: 'fitDataFill',
         height: '520px',
@@ -464,7 +649,9 @@ $(function() {
             { title: 'Operadora', field: 'operator_id', width: 110,
               editor: 'select',
               editorParams: function() {
-                  return { values: Object.fromEntries(operators.map(function(o) { return [o.id, o.name]; })) };
+                  var vals = {};
+                  operators.forEach(function(o) { vals[String(o.id)] = o.name; });
+                  return { values: vals };
               },
               formatter: function(cell) { return cell.getData().operator_name; } },
             { title: 'Custódia', field: 'custody', width: 110,
@@ -475,7 +662,7 @@ $(function() {
               editor: 'select',
               editorParams: function() {
                   var vals = { '': '—' };
-                  envelopes.forEach(function(e) { vals[e.id] = e.label; });
+                  envelopes.forEach(function(e) { vals[String(e.id)] = e.label; });
                   return { values: vals };
               },
               editable: function(cell) { return cell.getData().custody === 'WITH_TI'; },
@@ -485,27 +672,23 @@ $(function() {
         ],
         cellEdited: function(cell) {
             var row = cell.getRow();
-            var d = row.getData();
-            if (!d.id) return;
+            if (!row.getData().id) return;
             var field = cell.getField();
-            var payload = {};
-            payload[field] = cell.getValue();
-            if (field === 'operator_id') payload.operator_id = parseInt(cell.getValue(), 10);
-            if (field === 'batch_id') payload.batch_id = cell.getValue() ? parseInt(cell.getValue(), 10) : null;
-            if (field === 'custody' && cell.getValue() === 'WITH_PERSON') {
-                var nome = prompt('Nome do titular:');
-                if (!nome) { row.update(d); return; }
-                payload.employee_name = nome;
+            var valorAntigo = cell.getOldValue();
+            var valorNovo = cell.getValue();
+
+            function snapshotLinha() {
+                var d = $.extend({}, row.getData());
+                d[field] = valorAntigo;
+                return d;
             }
-            if (field === 'custody' && cell.getValue() === 'WITH_TI' && !d.batch_id && envelopes.length) {
-                payload.batch_id = envelopes[0].id;
+
+            if (field === 'custody') {
+                if (valorNovo === valorAntigo) return;
+                abrirModalCustodia(row, snapshotLinha(), valorNovo);
+                return;
             }
-            patchChip(d.id, payload)
-                .then(function(updated) { row.update(updated); })
-                .catch(function(err) {
-                    alert(err.message);
-                    row.update(d);
-                });
+            salvarCelulaGrid(cell, row, snapshotLinha());
         },
     });
 
