@@ -2,6 +2,7 @@ from django.views.generic import TemplateView
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from django.db.models import Count
 from helpdesk.models import Ticket
+from helpdesk.ticket_access import filtrar_chamados_para_usuario
 
 class DashboardView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/dashboard.html'
@@ -10,8 +11,10 @@ class DashboardView(ModuloObrigatorioMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Analisando TODOS os tickets (arquivados e ativos)
-        tickets = Ticket.objects.filter(is_active=True)
+        tickets = filtrar_chamados_para_usuario(
+            Ticket.objects.filter(is_active=True),
+            self.request.user,
+        )
         
         context['total_tickets'] = tickets.count()
         context['total_archived'] = tickets.filter(is_archived=True).count()

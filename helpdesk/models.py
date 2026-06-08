@@ -52,6 +52,15 @@ class Ticket(models.Model):
         max_length=150, 
         help_text='Nome do solicitante (ex: vindo do WhatsApp).'
     )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_tickets',
+        help_text='Usuário que abriu o chamado no sistema.',
+    )
     
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL, 

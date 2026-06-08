@@ -1,6 +1,7 @@
 from django.views.generic import ListView
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from helpdesk.models import Ticket
+from helpdesk.ticket_access import filtrar_chamados_para_usuario
 
 class HistoryListView(ModuloObrigatorioMixin, ListView):
     modulo_obrigatorio = MODULO_HELPDESK
@@ -10,7 +11,10 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().filter(is_active=True).select_related('assigned_to').order_by('-created_at')
+        qs = filtrar_chamados_para_usuario(
+            super().get_queryset().filter(is_active=True),
+            self.request.user,
+        ).select_related('assigned_to', 'created_by').order_by('-created_at')
         
         # Recupera os filtros da QueryString
         status = self.request.GET.get('status')
