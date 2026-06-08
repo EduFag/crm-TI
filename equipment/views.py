@@ -2,11 +2,17 @@ from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, UpdateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+
+from core.permissions import MODULO_EQUIPMENT, ModuloObrigatorioMixin
 from .models import Equipment, EquipmentLog
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+
+class _EquipmentMixin(ModuloObrigatorioMixin):
+    modulo_obrigatorio = MODULO_EQUIPMENT
+
+
+class DashboardView(_EquipmentMixin, TemplateView):
     """ RF01: Dashboard com Métricas Consolidadas """
     template_name = 'equipment/dashboard.html'
 
@@ -27,7 +33,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class EquipmentCreateView(LoginRequiredMixin, CreateView):
+class EquipmentCreateView(_EquipmentMixin, CreateView):
     """ RF04: Cadastro de Novo Ativo """
     model = Equipment
     template_name = 'equipment/form.html'
@@ -51,7 +57,7 @@ class EquipmentCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, f"Equipamento {form.instance.tag} cadastrado com sucesso!")
         return response
 
-class EquipmentUpdateView(LoginRequiredMixin, UpdateView):
+class EquipmentUpdateView(_EquipmentMixin, UpdateView):
     """ Edição e Mudança de Status do Ativo """
     model = Equipment
     template_name = 'equipment/form.html'

@@ -1,10 +1,11 @@
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from django.db.models import Count
 from helpdesk.models import Ticket
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/dashboard.html'
+    modulo_obrigatorio = MODULO_HELPDESK
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

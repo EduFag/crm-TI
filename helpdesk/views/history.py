@@ -1,8 +1,9 @@
 from django.views.generic import ListView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from helpdesk.models import Ticket
 
-class HistoryListView(LoginRequiredMixin, ListView):
+class HistoryListView(ModuloObrigatorioMixin, ListView):
+    modulo_obrigatorio = MODULO_HELPDESK
     template_name = 'helpdesk/history.html'
     model = Ticket
     context_object_name = 'tickets'

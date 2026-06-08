@@ -4,7 +4,7 @@ Templates HTML do módulo **core**.
 
 ## Para que serve
 
-Interface de login, dashboard principal e herança de layout para o restante do CRM.
+Interface de login, dashboard, gestão de usuários e páginas de erro de permissão.
 
 ## Arquivos
 
@@ -12,6 +12,9 @@ Interface de login, dashboard principal e herança de layout para o restante do 
 |---------|--------|
 | `login.html` | Tela de autenticação (`LoginView`, rota `/login/`). |
 | `dashboard.html` | Home do sistema após login (rota `/`). |
+| `user_list.html` | Listagem de usuários (`/usuarios/`). |
+| `user_form.html` | Criação e edição de usuários. |
+| `sem_permissao.html` | Página exibida quando o usuário não tem acesso ao módulo. |
 
 ## Relacionado
 

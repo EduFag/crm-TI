@@ -1,11 +1,12 @@
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.models import Recharge, Chip
 from django.shortcuts import get_object_or_404
 
-class RechargeCreateView(LoginRequiredMixin, CreateView):
+class RechargeCreateView(ModuloObrigatorioMixin, CreateView):
     """Registra uma recarga (RF14, RF15)"""
+    modulo_obrigatorio = MODULO_CHIPS
     model = Recharge
     fields = ['chip', 'amount']
     template_name = 'chips/form_base.html'

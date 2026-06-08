@@ -2,10 +2,15 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.views.generic import View, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.models import Chip, ChipMovement
 
-class AssignmentView(LoginRequiredMixin, TemplateView):
+
+class _ChipsMixin(ModuloObrigatorioMixin):
+    modulo_obrigatorio = MODULO_CHIPS
+
+
+class AssignmentView(_ChipsMixin, TemplateView):
     """Tela dupla: Formulário de Atribuição (Esquerda) e Estoque (Direita) - RF08, RF09, RF10"""
     template_name = 'chips/assignment.html'
 
@@ -51,7 +56,7 @@ class AssignmentView(LoginRequiredMixin, TemplateView):
         messages.success(request, f"Chip {chip.line_number} atribuído com sucesso para {employee_name}!")
         return redirect('chips:dashboard')
 
-class ReturnChipView(LoginRequiredMixin, View):
+class ReturnChipView(_ChipsMixin, View):
     """Devolve um chip ao estoque (RF12)"""
     def post(self, request, pk):
         chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)

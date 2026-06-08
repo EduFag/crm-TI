@@ -30,6 +30,7 @@ CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashb
 | Prefixo | Módulo |
 |---------|--------|
 | `/` | `core` — dashboard e autenticação |
+| `/usuarios/` | `core` — gestão de usuários (ADMIN) |
 | `/admin/` | Django Admin |
 | `/helpdesk/` | Helpdesk |
 | `/chips/` | Chips |

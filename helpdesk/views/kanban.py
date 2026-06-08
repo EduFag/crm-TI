@@ -1,15 +1,15 @@
 import json
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import TemplateView, CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.decorators import login_required
+from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo
 from django.views.decorators.http import require_POST
 from django.urls import reverse_lazy
 from django.http import JsonResponse
 from helpdesk.models import Ticket, Comment
 
-class KanbanView(LoginRequiredMixin, TemplateView):
+class KanbanView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/kanban.html'
+    modulo_obrigatorio = MODULO_HELPDESK
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -27,14 +27,15 @@ class KanbanView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class TicketCreateView(LoginRequiredMixin, CreateView):
+class TicketCreateView(ModuloObrigatorioMixin, CreateView):
+    modulo_obrigatorio = MODULO_HELPDESK
     model = Ticket
     fields = ['title', 'description', 'priority', 'category', 'requester_name']
     template_name = 'helpdesk/ticket_form.html'
     success_url = reverse_lazy('helpdesk:kanban')
 
 
-@login_required
+@requer_modulo(MODULO_HELPDESK)
 @require_POST
 def ticket_update_status(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
@@ -58,14 +59,14 @@ def ticket_update_status(request, pk):
     return JsonResponse({'success': False, 'error': 'Status inválido'}, status=400)
 
 
-@login_required
+@requer_modulo(MODULO_HELPDESK)
 def ticket_drawer(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     return render(request, 'helpdesk/_drawer.html', {'ticket': ticket, 'comments': comments})
 
 
-@login_required
+@requer_modulo(MODULO_HELPDESK)
 @require_POST
 def ticket_add_comment(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)

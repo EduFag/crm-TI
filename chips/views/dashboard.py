@@ -1,9 +1,10 @@
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from django.db.models import Sum, Subquery, OuterRef
 from chips.models import Chip, ChipMovement, Recharge
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(ModuloObrigatorioMixin, TemplateView):
+    modulo_obrigatorio = MODULO_CHIPS
     template_name = 'chips/dashboard.html'
     
     def get_context_data(self, **kwargs):

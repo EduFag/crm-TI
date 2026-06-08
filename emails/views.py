@@ -2,11 +2,17 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, View, ListView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+
+from core.permissions import MODULO_EMAILS, ModuloObrigatorioMixin
 from emails.models import EmailAccount, EmailDomain
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+
+class _EmailsMixin(ModuloObrigatorioMixin):
+    modulo_obrigatorio = MODULO_EMAILS
+
+
+class DashboardView(_EmailsMixin, TemplateView):
     """Página Unificada: Métricas + Inventário + Filtros"""
     template_name = 'emails/dashboard.html'
 
@@ -23,7 +29,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class EmailAccountCreateView(LoginRequiredMixin, CreateView):
+class EmailAccountCreateView(_EmailsMixin, CreateView):
     """Cadastro de Novo E-mail (UX Melhorada com Dropdown de Domínio)"""
     model = EmailAccount
     fields = ['username', 'domain', 'employee_name', 'status']
@@ -34,7 +40,7 @@ class EmailAccountCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, f"E-mail {form.instance.address} cadastrado com sucesso!")
         return super().form_valid(form)
 
-class ResetPasswordView(LoginRequiredMixin, View):
+class ResetPasswordView(_EmailsMixin, View):
     """Ação: Reset de Senha"""
     def post(self, request, pk):
         account = get_object_or_404(EmailAccount, pk=pk)
@@ -43,7 +49,7 @@ class ResetPasswordView(LoginRequiredMixin, View):
         messages.success(request, f"Senha da conta {account.address} resetada. Uma notificação temporária foi gerada.")
         return redirect('emails:dashboard')
 
-class ToggleAccountStatusView(LoginRequiredMixin, View):
+class ToggleAccountStatusView(_EmailsMixin, View):
     """Ação: Bloquear/Desbloquear Conta"""
     def post(self, request, pk):
         account = get_object_or_404(EmailAccount, pk=pk)
@@ -60,12 +66,12 @@ class ToggleAccountStatusView(LoginRequiredMixin, View):
 # ===============================
 # Gestão de Domínios
 # ===============================
-class EmailDomainListView(LoginRequiredMixin, ListView):
+class EmailDomainListView(_EmailsMixin, ListView):
     model = EmailDomain
     template_name = 'emails/domain_list.html'
     context_object_name = 'domains'
 
-class EmailDomainCreateView(LoginRequiredMixin, CreateView):
+class EmailDomainCreateView(_EmailsMixin, CreateView):
     model = EmailDomain
     fields = ['name']
     template_name = 'emails/form_base.html'
