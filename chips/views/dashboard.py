@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, ProgrammingError
+from django.db import DatabaseError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -23,12 +23,17 @@ ABAS_VALIDAS = ('dashboard', 'assignment', 'inventory', 'operators', 'envelopes'
 
 
 def _auditoria_chips():
-    """Carrega logs de auditoria; retorna vazio se tabela ainda não existir."""
+    """Carrega logs de auditoria; retorna lista vazia se falhar."""
     try:
-        return logs_do_modulo(MODULO_CHIPS, limite=50)
-    except DatabaseError:
+        return list(logs_do_modulo(MODULO_CHIPS, limite=50))
+    except Exception:
         logger.exception('Falha ao carregar auditoria de chips.')
         return []
+
+
+def _listar(queryset):
+    """Força avaliação do queryset durante o contexto (erros aparecem aqui, não no template)."""
+    return list(queryset)
 
 
 class ChipsView(ModuloObrigatorioMixin, TemplateView):
@@ -50,18 +55,18 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             self._contexto_inventario(context)
             self._contexto_operadoras(context)
             self._contexto_envelopes(context)
-        except (DatabaseError, ProgrammingError):
-            logger.exception('Erro de banco ao carregar módulo chips.')
+        except Exception as exc:
+            logger.exception('Erro ao carregar módulo chips: %s', exc)
             context['schema_error'] = (
-                'O banco de dados precisa das migrations recentes. '
-                'Execute: python manage.py migrate chips core'
+                'Não foi possível carregar os dados de chips. '
+                'Verifique as migrations e os logs do servidor.'
             )
             self._contexto_fallback(context)
 
         return context
 
     def _contexto_fallback(self, context):
-        """Valores mínimos para a página não quebrar se o schema estiver desatualizado."""
+        """Valores mínimos para a página não quebrar."""
         context.setdefault('date_from', periodo_padrao()[0].isoformat())
         context.setdefault('date_to', periodo_padrao()[1].isoformat())
         context.setdefault('periodo_mes_atual_url', '?tab=dashboard')
@@ -156,36 +161,46 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         recharges_total = Recharge.objects.aggregate(total=Sum('amount'))['total']
         context['total_recharge_value'] = recharges_total if recharges_total else 0.00
 
-        context['history_logs'] = ChipMovement.objects.select_related('chip').filter(
-            timestamp__date__gte=date_from,
-            timestamp__date__lte=date_to,
-        ).order_by('-timestamp')[:100]
+        context['history_logs'] = _listar(
+            ChipMovement.objects.select_related('chip').filter(
+                timestamp__date__gte=date_from,
+                timestamp__date__lte=date_to,
+            ).order_by('-timestamp')[:100]
+        )
 
         context['audit_logs'] = _auditoria_chips()
         context['audit_titulo'] = 'Registro de auditoria de chips'
 
     def _contexto_assignment(self, context):
-        context['available_chips'] = Chip.objects.filter(
-            status=Chip.StatusChoices.AVAILABLE,
-            custody=Chip.CustodyChoices.WITH_TI,
-        ).select_related('operator')
-        context['in_use_chips'] = Chip.objects.filter(
-            custody=Chip.CustodyChoices.WITH_PERSON,
-        ).select_related('operator')
+        context['available_chips'] = _listar(
+            Chip.objects.filter(
+                status=Chip.StatusChoices.AVAILABLE,
+                custody=Chip.CustodyChoices.WITH_TI,
+            ).select_related('operator')
+        )
+        context['in_use_chips'] = _listar(
+            Chip.objects.filter(
+                custody=Chip.CustodyChoices.WITH_PERSON,
+            ).select_related('operator')
+        )
         context['assignment_form'] = AssignmentForm()
 
     def _contexto_inventario(self, context):
-        context['chips'] = Chip.objects.select_related('operator', 'batch').order_by('-created_at')
-        context['envelopes'] = Batch.objects.filter(
-            tipo=Batch.TipoChoices.ENVELOPE,
-            status=Batch.StatusChoices.OPEN,
-        ).order_by('identifier')
+        context['chips'] = _listar(
+            Chip.objects.select_related('operator', 'batch').order_by('-created_at')
+        )
+        context['envelopes'] = _listar(
+            Batch.objects.filter(
+                tipo=Batch.TipoChoices.ENVELOPE,
+                status=Batch.StatusChoices.OPEN,
+            ).order_by('identifier')
+        )
 
     def _contexto_operadoras(self, context):
-        context['operators'] = Operator.objects.all().order_by('name')
+        context['operators'] = _listar(Operator.objects.all().order_by('name'))
 
     def _contexto_envelopes(self, context):
-        context['batches'] = Batch.objects.all().order_by('-received_at')
+        context['batches'] = _listar(Batch.objects.all().order_by('-received_at'))
 
 
 class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):

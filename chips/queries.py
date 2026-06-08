@@ -38,7 +38,14 @@ def _para_data(valor):
     if not valor:
         return None
     if hasattr(valor, 'hour'):
-        return timezone.localtime(valor).date()
+        try:
+            return timezone.localtime(valor).date()
+        except (ValueError, TypeError):
+            # datetime ingênuo ou tipo inesperado
+            if hasattr(valor, 'date'):
+                return valor.date()
+    if hasattr(valor, 'isoformat') and hasattr(valor, 'year') and not hasattr(valor, 'hour'):
+        return valor
     return valor
 
 
