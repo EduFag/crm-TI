@@ -1,0 +1,7 @@
+{# Poll leve a cada 4s — só dispara refresh quando há alteração no banco #}
+<div id="helpdesk-poll"
+     hx-get="{% url 'helpdesk:poll' %}"
+     hx-trigger="every 4s"
+     hx-swap="none"
+     class="hidden"
+     aria-hidden="true"></div>

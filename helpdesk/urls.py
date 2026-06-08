@@ -14,7 +14,7 @@ urlpatterns = [
     path('history/', views.HistoryListView.as_view(), name='history'),
     
     # Real-Time e Partials via HTMX
-    path('sse/', views.sse_stream, name='sse_stream'),
+    path('poll/', views.poll_ticket_updates, name='poll'),
     path('kanban/board/', views.KanbanBoardPartialView.as_view(), name='kanban_board'),
     path('dashboard/metrics/', views.DashboardMetricsPartialView.as_view(), name='dashboard_metrics'),
     

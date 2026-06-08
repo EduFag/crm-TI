@@ -11,10 +11,11 @@ Telas completas e fragmentos reutilizáveis para Kanban dinâmico e drawer later
 | Arquivo | Função |
 |---------|--------|
 | `kanban.html` | Página principal do quadro Kanban (`/helpdesk/`). |
-| `_kanban_board.html` | Partial do board — atualizado via HTMX/SSE. |
+| `_kanban_board.html` | Partial do board — atualizado via HTMX quando o poll detecta mudança. |
+| `_poll.html` | Div oculta com `hx-trigger="every 4s"` — poll leve sem socket aberto. |
 | `_ticket_card.html` | Card individual de um chamado na coluna. |
 | `dashboard.html` | Dashboard de métricas (`/helpdesk/dashboard/`). |
-| `_dashboard_metrics.html` | Partial das métricas numéricas/gráficos. |
+| `_dashboard_metrics.html` | Partial das métricas — atualizado via poll HTMX. |
 | `history.html` | Histórico de chamados. |
 | `ticket_form.html` | Formulário de criação de ticket. |
 | `_drawer.html` | Painel lateral com detalhes do ticket selecionado. |

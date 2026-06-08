@@ -15,11 +15,12 @@
     <!-- Menu Navegação -->
     {% include "helpdesk/_nav.html" %}
 
-    <!-- Conexão SSE HTMX (Real-Time) -->
-    <div hx-ext="sse" sse-connect="{% url 'helpdesk:sse_stream' %}">
-        <div id="dashboard-metrics-container" hx-trigger="sse:ticket_updated" hx-get="{% url 'helpdesk:dashboard_metrics' %}" hx-swap="innerHTML">
-            {% include "helpdesk/_dashboard_metrics.html" %}
-        </div>
+    {% include "helpdesk/_poll.html" %}
+    <div id="dashboard-metrics-container"
+         hx-trigger="ticketUpdated from:#helpdesk-poll"
+         hx-get="{% url 'helpdesk:dashboard_metrics' %}"
+         hx-swap="innerHTML">
+        {% include "helpdesk/_dashboard_metrics.html" %}
     </div>
 </div>
 {% endblock %}

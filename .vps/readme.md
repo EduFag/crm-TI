@@ -38,7 +38,7 @@ sudo ln -sf /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**Código Python** (ex.: `helpdesk/views/sse.py`): só `git pull` + reload do Gunicorn:
+**Código Python** (ex.: `helpdesk/views/poll.py`): só `git pull` + reload do Gunicorn:
 
 ```bash
 cd /home/edufa/crm-TI && git pull

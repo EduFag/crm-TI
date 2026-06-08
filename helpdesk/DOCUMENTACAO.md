@@ -1,6 +1,6 @@
 # Documentação — `helpdesk/`
 
-App de **chamados de TI** com Kanban, métricas, histórico e atualização em tempo quase real (SSE + HTMX).
+App de **chamados de TI** com Kanban, métricas, histórico e atualização em tempo quase real (poll HTMX + partials).
 
 ## Para que serve
 
@@ -13,7 +13,7 @@ Registrar tickets (título, prioridade, categoria, solicitante), movê-los entre
 | `apps.py` | Configuração do app. |
 | `models.py` | `Ticket` (status Kanban, prioridade, arquivamento, `created_by`) e `Comment`. |
 | `ticket_access.py` | Filtro de chamados: USER vê apenas os próprios; ADMIN/MANAGER veem todos. |
-| `urls.py` | Rotas sob `/helpdesk/` (kanban, dashboard, histórico, SSE, partials). |
+| `urls.py` | Rotas sob `/helpdesk/` (kanban, dashboard, histórico, poll, partials). |
 | `admin.py` | Administração de tickets e comentários. |
 | `tests.py` | Testes automatizados. |
 | `views/` | Lógica de telas e APIs parciais. Ver `views/DOCUMENTACAO.md`. |

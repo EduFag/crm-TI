@@ -116,7 +116,7 @@ sudo systemctl restart crm-ti
 
 Causas comuns neste projeto:
 
-1. **SSE do helpdesk** (dashboard/kanban) mantém workers do Gunicorn ocupados. Com poucos workers, o restart espera essas conexões encerrarem.
+1. **Conexões longas** (ex.: SSE antigo no helpdesk) mantinham workers ocupados. O helpdesk usa **poll HTMX** (requisições curtas) desde a v2.
 2. **Sem `--preload`**, cada worker recarrega o Django inteiro após o restart (lento em VPS com pouca RAM).
 3. **Nginx** sem `proxy_connect_timeout` baixo deixa o navegador esperando minutos com o Gunicorn fora do ar.
 
