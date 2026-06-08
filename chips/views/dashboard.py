@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError
+from django.db import DatabaseError, ProgrammingError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -50,7 +50,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             self._contexto_inventario(context)
             self._contexto_operadoras(context)
             self._contexto_envelopes(context)
-        except DatabaseError:
+        except (DatabaseError, ProgrammingError):
             logger.exception('Erro de banco ao carregar módulo chips.')
             context['schema_error'] = (
                 'O banco de dados precisa das migrations recentes. '

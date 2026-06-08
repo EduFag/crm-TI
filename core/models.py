@@ -113,8 +113,8 @@ class RegistroAcao(models.Model):
         verbose_name = 'registro de ação'
         verbose_name_plural = 'registros de ação'
         indexes = [
-            models.Index(fields=['modulo', '-timestamp']),
-            models.Index(fields=['actor', '-timestamp']),
+            models.Index(fields=['modulo', '-timestamp'], name='core_regist_modulo__idx'),
+            models.Index(fields=['actor', '-timestamp'], name='core_regist_actor_i_idx'),
         ]
 
     def __str__(self) -> str:
