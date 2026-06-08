@@ -15,6 +15,7 @@ Registrar tickets (título, prioridade, categoria, solicitante), movê-los entre
 | Criar categorias | Não | Não | Sim |
 | Editar chamado | Não | Não | Sim |
 | Transferir técnico | Não | Não | Sim (ADMIN ativos) |
+| Mover cards no Kanban | Não | Não | Sim |
 
 Prioridade fica **null** até triagem pela TI. Gerente vê todos os chamados; equipe restringe apenas seleção de solicitante.
 

@@ -35,6 +35,11 @@ def usuario_pode_transferir_chamado(user) -> bool:
     return _eh_admin_ou_superuser(user)
 
 
+def usuario_pode_operar_kanban(user) -> bool:
+    """Somente ADMIN e superusuário podem mover cards e operar o fluxo do Kanban."""
+    return _eh_admin_ou_superuser(user)
+
+
 def usuarios_solicitantes_equipe(user) -> QuerySet:
     """Membros ativos da mesma equipe do gerente (inclui o próprio gerente)."""
     if not user or not user.is_authenticated:

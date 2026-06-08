@@ -13,6 +13,7 @@ from helpdesk.ticket_access import (
     usuario_pode_acessar_chamado,
     usuario_pode_editar_chamado,
     usuario_pode_gerenciar_categorias,
+    usuario_pode_operar_kanban,
     usuario_pode_transferir_chamado,
     usuario_pode_ver_quem_abriu_chamado,
     usuarios_tecnicos_para_transferencia,
@@ -96,7 +97,8 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         context['tickets_in_progress'] = tickets.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-created_at')
         context['tickets_pending'] = tickets.filter(status=Ticket.StatusChoices.PENDING).order_by('-created_at')
         context['tickets_resolved'] = tickets.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
-        
+        context['pode_operar_kanban'] = usuario_pode_operar_kanban(self.request.user)
+
         return context
 
 class TicketCreateView(ModuloObrigatorioMixin, View):
@@ -184,6 +186,9 @@ def ticket_category_create(request):
 @requer_modulo(MODULO_HELPDESK)
 @require_POST
 def ticket_update_status(request, pk):
+    if not usuario_pode_operar_kanban(request.user):
+        return JsonResponse({'success': False, 'error': 'Sem permissão para mover chamados'}, status=403)
+
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return JsonResponse({'success': False, 'error': 'Sem permissão'}, status=403)

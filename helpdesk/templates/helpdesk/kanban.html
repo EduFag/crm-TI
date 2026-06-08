@@ -25,6 +25,12 @@
     <!-- Navegação interna do módulo -->
     {% include "helpdesk/_nav.html" %}
 
+    {% if not pode_operar_kanban %}
+    <div class="mb-4 px-4 py-3 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600">
+        Modo visualização — apenas administradores podem mover chamados entre colunas.
+    </div>
+    {% endif %}
+
     <!-- Container Kanban -->
     <div class="flex-1 overflow-x-auto overflow-y-hidden pb-4">
         {% include "helpdesk/_poll.html" %}
@@ -45,6 +51,7 @@
 <div id="drawer-container"></div>
 
 <!-- JavaScript para o Drag and Drop do Kanban -->
+{% if pode_operar_kanban %}
 <script>
     document.body.addEventListener('closeCreateModal', function() {
         var modal = document.getElementById('modal-container');
@@ -114,4 +121,5 @@
         }
     });
 </script>
+{% endif %}
 {% endblock %}

@@ -1,5 +1,6 @@
-<div id="ticket-{{ ticket.id }}" draggable="true" ondragstart="drag(event)" ondragend="dragEnd(event)" 
-     class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing group"
+<div id="ticket-{{ ticket.id }}"
+     {% if pode_operar_kanban %}draggable="true" ondragstart="drag(event)" ondragend="dragEnd(event)"{% endif %}
+     class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group"
      hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-trigger="click" hx-target="#drawer-container" hx-swap="innerHTML">
     
     <!-- Cabeçalho do Card (Tags) -->

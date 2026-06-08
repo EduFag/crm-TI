@@ -24,5 +24,5 @@ Kanban interativo, dashboard de métricas, histórico filtrado, drawer de detalh
 | `ticket/<pk>/drawer/` | Detalhes + comentários |
 | `ticket/<pk>/edit/` | Edição completa (ADMIN/superuser) |
 | `ticket/<pk>/transfer/` | Transferência rápida de técnico |
-| `ticket/<pk>/update-status/` | Drag-and-drop Kanban |
+| `ticket/<pk>/update-status/` | Drag-and-drop Kanban (ADMIN/superuser) |
 | `ticket/<pk>/comment/` | Novo comentário |

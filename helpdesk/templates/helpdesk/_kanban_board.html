@@ -8,7 +8,7 @@
                 <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_new.count }}</span>
             </div>
         </div>
-        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="NEW" ondragover="allowDrop(event)" ondrop="drop(event)">
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="NEW"{% if pode_operar_kanban %} ondragover="allowDrop(event)" ondrop="drop(event)"{% endif %}>
             {% for ticket in tickets_new %}
                 {% include "helpdesk/_ticket_card.html" %}
             {% endfor %}
@@ -24,7 +24,7 @@
                 <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_in_progress.count }}</span>
             </div>
         </div>
-        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="IN_PROGRESS" ondragover="allowDrop(event)" ondrop="drop(event)">
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="IN_PROGRESS"{% if pode_operar_kanban %} ondragover="allowDrop(event)" ondrop="drop(event)"{% endif %}>
             {% for ticket in tickets_in_progress %}
                 {% include "helpdesk/_ticket_card.html" %}
             {% endfor %}
@@ -40,7 +40,7 @@
                 <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_pending.count }}</span>
             </div>
         </div>
-        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="PENDING" ondragover="allowDrop(event)" ondrop="drop(event)">
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="PENDING"{% if pode_operar_kanban %} ondragover="allowDrop(event)" ondrop="drop(event)"{% endif %}>
             {% for ticket in tickets_pending %}
                 {% include "helpdesk/_ticket_card.html" %}
             {% endfor %}
@@ -56,7 +56,7 @@
                 <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_resolved.count }}</span>
             </div>
         </div>
-        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="RESOLVED" ondragover="allowDrop(event)" ondrop="drop(event)">
+        <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="RESOLVED"{% if pode_operar_kanban %} ondragover="allowDrop(event)" ondrop="drop(event)"{% endif %}>
             {% for ticket in tickets_resolved %}
                 {% include "helpdesk/_ticket_card.html" %}
             {% endfor %}
