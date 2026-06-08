@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.safestring import mark_safe
 
 from core.models import CustomUser
 from helpdesk.models import Ticket, TicketCategory
@@ -57,6 +58,8 @@ class TicketCreateForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': 'Descreva o cenário, erros apresentados, prints...',
                 'class': INPUT_CLASS + ' resize-y',
+                'required': 'required',
+                'aria-required': 'true',
             }),
             'priority': forms.Select(attrs={'class': SELECT_CLASS}),
             'category': forms.Select(attrs={'class': SELECT_CLASS}),
@@ -78,6 +81,9 @@ class TicketCreateForm(forms.ModelForm):
 
         self._configurar_por_papel(nome_padrao)
         self.fields['description'].required = True
+        self.fields['description'].label = mark_safe(
+            'Descrição Detalhada <span class="text-red-500">*</span>'
+        )
 
     def clean_description(self):
         descricao = (self.cleaned_data.get('description') or '').strip()
@@ -226,7 +232,12 @@ class TicketUpdateForm(forms.ModelForm):
         fields = ['title', 'description', 'category', 'priority', 'status', 'assigned_to']
         widgets = {
             'title': forms.TextInput(attrs={'class': INPUT_CLASS}),
-            'description': forms.Textarea(attrs={'rows': 4, 'class': INPUT_CLASS + ' resize-y'}),
+            'description': forms.Textarea(attrs={
+                'rows': 4,
+                'class': INPUT_CLASS + ' resize-y',
+                'required': 'required',
+                'aria-required': 'true',
+            }),
             'category': forms.Select(attrs={'class': SELECT_CLASS}),
             'priority': forms.Select(attrs={'class': SELECT_CLASS}),
             'status': forms.Select(attrs={'class': SELECT_CLASS}),
@@ -242,6 +253,9 @@ class TicketUpdateForm(forms.ModelForm):
         self.fields['priority'].required = False
         self.fields['priority'].empty_label = 'Sem prioridade'
         self.fields['description'].required = True
+        self.fields['description'].label = mark_safe(
+            'Descrição <span class="text-red-500">*</span>'
+        )
         self.fields['requester_user'].label_from_instance = TicketCreateForm._rotulo_usuario
 
         if self.instance and self.instance.pk:
