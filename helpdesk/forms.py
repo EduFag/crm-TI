@@ -95,18 +95,18 @@ class TicketCreateForm(forms.ModelForm):
         if not self.user:
             return
 
-        role = getattr(self.user, 'role', CustomUser.RoleChoices.USER)
+        role = getattr(self.user, 'role', CustomUser.RoleChoices.STANDARD)
         if self.user.is_superuser:
             role = CustomUser.RoleChoices.ADMIN
 
-        if role == CustomUser.RoleChoices.USER:
+        if role == CustomUser.RoleChoices.STANDARD:
             self._remover_campo('tipo_solicitante')
             self._remover_campo('requester_name')
             self._remover_campo('requester_user')
             self._remover_campo('priority')
             return
 
-        if role == CustomUser.RoleChoices.MANAGER:
+        if role == CustomUser.RoleChoices.IT_USER:
             self._remover_campo('priority')
             self.fields['requester_user'].queryset = usuarios_solicitantes_equipe(self.user)
             self.fields['requester_user'].label_from_instance = self._rotulo_usuario
@@ -143,15 +143,15 @@ class TicketCreateForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        role = getattr(self.user, 'role', CustomUser.RoleChoices.USER)
+        role = getattr(self.user, 'role', CustomUser.RoleChoices.STANDARD)
 
-        if role == CustomUser.RoleChoices.USER and not self.user.is_superuser:
+        if role == CustomUser.RoleChoices.STANDARD and not self.user.is_superuser:
             cleaned['requester_name'] = self.user.get_full_name() or self.user.username
             cleaned['requester_user'] = self.user
             cleaned['priority'] = None
             return cleaned
 
-        if role == CustomUser.RoleChoices.MANAGER:
+        if role == CustomUser.RoleChoices.IT_USER:
             cleaned['priority'] = None
             if not self.user.equipe_id:
                 requester_name = (cleaned.get('requester_name') or '').strip()

@@ -1,6 +1,6 @@
 """
 Regras de visibilidade de chamados por papel do usuário.
-Usuário padrão (USER) vê apenas os chamados que ele próprio abriu ou onde é solicitante.
+Usuário padrão (STANDARD) vê apenas os chamados que ele próprio abriu ou onde é solicitante.
 """
 from django.db.models import Q, QuerySet
 
@@ -68,12 +68,12 @@ def usuario_ve_todos_chamados(user) -> bool:
         return True
     return user.role in (
         CustomUser.RoleChoices.ADMIN,
-        CustomUser.RoleChoices.MANAGER,
+        CustomUser.RoleChoices.IT_USER,
     )
 
 
 def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
-    """Restringe o queryset aos chamados do usuário quando o papel for USER."""
+    """Restringe o queryset aos chamados do usuário quando o papel for STANDARD."""
     if usuario_ve_todos_chamados(user):
         return queryset
     return queryset.filter(_filtro_chamados_proprios(user))
