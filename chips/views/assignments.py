@@ -27,7 +27,6 @@ class ReturnChipView(_ChipsMixin, View):
         envelope = get_object_or_404(
             Batch,
             pk=envelope_id,
-            tipo=Batch.TipoChoices.ENVELOPE,
         )
 
         try:

@@ -24,10 +24,12 @@ urlpatterns = [
     path('operators/<int:pk>/edit/', views.OperatorUpdateView.as_view(), name='operator_edit'),
     path('batches/create/', views.BatchCreateView.as_view(), name='batch_create'),
     path('batches/<int:pk>/edit/', views.BatchUpdateView.as_view(), name='batch_edit'),
+    path('batches/<int:pk>/delete/', views.batch_delete_view, name='batch_delete'),
     path('management/create/', views.ChipCreateView.as_view(), name='chip_create'),
     path('management/<int:pk>/edit/', views.ChipUpdateView.as_view(), name='chip_edit'),
     path('return/<int:pk>/', views.ReturnChipView.as_view(), name='return_chip'),
     path('recharge/new/', views.RechargeCreateView.as_view(), name='recharge_create'),
+    path('transfer/', views.ChipGeneralTransferView.as_view(), name='general_transfer'),
 
     # Rotas legadas → redirecionam para aba correspondente
     path('operators/', RedirectView.as_view(url='/chips/?tab=operators', permanent=False), name='operator_list'),

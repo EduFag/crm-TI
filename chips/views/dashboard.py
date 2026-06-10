@@ -19,7 +19,7 @@ from chips.services import entregar_chip, transferir_chip
 
 logger = logging.getLogger(__name__)
 
-ABAS_VALIDAS = ('dashboard', 'chips', 'operators', 'envelopes')
+ABAS_VALIDAS = ('chips', 'operators', 'envelopes')
 
 
 def _auditoria_chips():
@@ -43,12 +43,12 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        tab = self.request.GET.get('tab', 'dashboard')
+        tab = self.request.GET.get('tab', 'chips')
         # Abas antigas redirecionam para chips
-        if tab in ('assignment', 'inventory'):
+        if tab in ('assignment', 'inventory', 'dashboard'):
             tab = 'chips'
         if tab not in ABAS_VALIDAS:
-            tab = 'dashboard'
+            tab = 'chips'
         context['active_tab'] = tab
         context['schema_error'] = None
 
@@ -56,6 +56,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             self._contexto_dashboard(context)
             self._contexto_operadoras(context)
             self._contexto_envelopes(context)
+            self._contexto_chips(context)
         except Exception as exc:
             logger.exception('Erro ao carregar módulo chips: %s', exc)
             context['schema_error'] = (
@@ -70,8 +71,8 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         """Valores mínimos para a página não quebrar."""
         context.setdefault('date_from', periodo_padrao()[0].isoformat())
         context.setdefault('date_to', periodo_padrao()[1].isoformat())
-        context.setdefault('periodo_mes_atual_url', '?tab=dashboard')
-        context.setdefault('periodo_mes_anterior_url', '?tab=dashboard')
+        context.setdefault('periodo_mes_atual_url', '?tab=chips')
+        context.setdefault('periodo_mes_anterior_url', '?tab=chips')
         context.setdefault('total_chips', 0)
         context.setdefault('metric_available', 0)
         context.setdefault('metric_in_use', 0)
@@ -88,23 +89,32 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         context.setdefault('audit_titulo', 'Registro de auditoria de chips')
         context.setdefault('operators', [])
         context.setdefault('batches', [])
+        context.setdefault('chips', [])
         context.setdefault('chart_custodia', '{}')
         context.setdefault('chart_movimentacao', '{}')
 
+    def _contexto_chips(self, context):
+        from django.core.paginator import Paginator
+        from chips.queries import chips_com_anotacoes_operacionais, _calcular_ciclo
+        chips_qs = chips_com_anotacoes_operacionais(
+            Chip.objects.filter(is_active=True)
+        ).order_by('-created_at')
+
+        chips_page = self.request.GET.get('chips_page', 1)
+        paginator = Paginator(chips_qs, 15)
+        page_obj = paginator.get_page(chips_page)
+
+        # Para cada chip, calcula os dados de recarga e anexa ao objeto
+        for chip in page_obj.object_list:
+            due_at, days_to, status = _calcular_ciclo(chip)
+            chip.recharge_due_at = due_at
+            chip.days_to_recharge = days_to
+            chip.recharge_status = status
+
+        context['chips'] = page_obj
+
     def _contexto_dashboard(self, context):
-        date_from, date_to = resolver_periodo(self.request)
-        context['date_from'] = date_from.isoformat()
-        context['date_to'] = date_to.isoformat()
-
-        padrao_inicio, padrao_fim = periodo_padrao()
-        mes_ant_inicio, mes_ant_fim = periodo_mes_anterior()
-        context['periodo_mes_atual_url'] = (
-            f'?tab=dashboard&date_from={padrao_inicio.isoformat()}&date_to={padrao_fim.isoformat()}'
-        )
-        context['periodo_mes_anterior_url'] = (
-            f'?tab=dashboard&date_from={mes_ant_inicio.isoformat()}&date_to={mes_ant_fim.isoformat()}'
-        )
-
+        from django.core.paginator import Paginator
         context['total_chips'] = Chip.objects.filter(is_active=True).count()
         context['metric_available'] = Chip.objects.filter(
             custody=Chip.CustodyChoices.WITH_TI,
@@ -113,32 +123,11 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         context['metric_in_use'] = Chip.objects.filter(
             custody=Chip.CustodyChoices.WITH_PERSON,
         ).count()
-
-        movs = ChipMovement.objects.filter(
-            timestamp__date__gte=date_from,
-            timestamp__date__lte=date_to,
-        )
-        context['period_deliveries'] = movs.filter(
-            action=ChipMovement.ActionChoices.DELIVERY,
+        context['metric_blocked_canceled'] = Chip.objects.filter(
+            status__in=[Chip.StatusChoices.BLOCKED, Chip.StatusChoices.CANCELED]
         ).count()
-        context['period_transfers'] = movs.filter(
-            action=ChipMovement.ActionChoices.TRANSFER,
-        ).count()
-        context['period_returns'] = movs.filter(
-            action=ChipMovement.ActionChoices.RETURN,
-        ).count()
-
-        recargas_periodo = Recharge.objects.filter(
-            timestamp__date__gte=date_from,
-            timestamp__date__lte=date_to,
-        )
-        agg = recargas_periodo.aggregate(qtd=Count('id'), total=Sum('amount'))
-        context['period_recharges_count'] = agg['qtd'] or 0
-        context['period_recharges_total'] = agg['total'] or 0
-
-        context['period_blocks'] = Chip.objects.filter(
-            last_blocked_at__date__gte=date_from,
-            last_blocked_at__date__lte=date_to,
+        context['metric_lost'] = Chip.objects.filter(
+            status=Chip.StatusChoices.LOST
         ).count()
 
         hoje = timezone.localdate()
@@ -156,43 +145,32 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
                 vencendo += 1
         context['recharge_due_soon'] = vencendo
 
-        recharges_total = Recharge.objects.aggregate(total=Sum('amount'))['total']
-        context['total_recharge_value'] = recharges_total if recharges_total else 0.00
+        recent_movs = ChipMovement.objects.all().select_related(
+            'chip', 'chip__operator', 'registered_by', 'employee_user'
+        ).order_by('-timestamp')
+        
+        movs_line = self.request.GET.get('movs_line', '').strip()
+        if movs_line:
+            recent_movs = recent_movs.filter(chip__line_number__icontains=movs_line)
+            context['movs_line'] = movs_line
 
-        context['history_logs'] = _listar(
-            ChipMovement.objects.select_related('chip').filter(
-                timestamp__date__gte=date_from,
-                timestamp__date__lte=date_to,
-            ).order_by('-timestamp')[:100]
-        )
-
-        context['audit_logs'] = _auditoria_chips()
-        context['audit_titulo'] = 'Registro de auditoria de chips'
-
-        outros = max(
-            context['total_chips'] - context['metric_available'] - context['metric_in_use'],
-            0,
-        )
-        context['chart_custodia'] = json.dumps({
-            'labels': ['Na TI', 'Callcenter', 'Outros'],
-            'values': [context['metric_available'], context['metric_in_use'], outros],
-        })
-        context['chart_movimentacao'] = json.dumps({
-            'labels': ['Entregas', 'Transferências', 'Devoluções', 'Recargas', 'Bloqueios'],
-            'values': [
-                context['period_deliveries'],
-                context['period_transfers'],
-                context['period_returns'],
-                context['period_recharges_count'],
-                context['period_blocks'],
-            ],
-        })
+        movs_page = self.request.GET.get('movs_page', 1)
+        paginator = Paginator(recent_movs, 15)
+        context['recent_movements'] = paginator.get_page(movs_page)
 
     def _contexto_operadoras(self, context):
-        context['operators'] = _listar(Operator.objects.all().order_by('name'))
+        from django.core.paginator import Paginator
+        operators_qs = Operator.objects.all().order_by('name')
+        operators_page = self.request.GET.get('operators_page', 1)
+        paginator = Paginator(operators_qs, 15)
+        context['operators'] = paginator.get_page(operators_page)
 
     def _contexto_envelopes(self, context):
-        context['batches'] = _listar(Batch.objects.all().order_by('-received_at'))
+        from django.core.paginator import Paginator
+        batches_qs = Batch.objects.all().order_by('-received_at')
+        envelopes_page = self.request.GET.get('envelopes_page', 1)
+        paginator = Paginator(batches_qs, 15)
+        context['batches'] = paginator.get_page(envelopes_page)
 
 
 class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):

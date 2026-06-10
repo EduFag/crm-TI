@@ -1,23 +1,104 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Sistema TI{% endblock %}
+{% block title %}Início - Sistema TI{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-between mb-8">
-    <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h2>
+    <div>
+        <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a), {{ user.first_name|default:user.username }}</h2>
+        <p class="text-sm text-slate-500 mt-1">Acesso rápido aos módulos do sistema.</p>
+    </div>
 </div>
 
-<!-- Empty State / Welcome Card -->
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
-    <div class="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6">
-        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-        </svg>
-    </div>
-    <h3 class="text-2xl font-semibold text-slate-800 mb-3">Bem-vindo ao seu novo espaço de trabalho</h3>
-    <p class="text-slate-500 max-w-lg text-lg">
-        O módulo de <strong class="text-slate-700">Helpdesk</strong> será desenvolvido em breve. 
-        Este é o início de um sistema moderno e produtivo.
-    </p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    {% if 'helpdesk' in modulos_permitidos %}
+    <a href="{% url 'helpdesk:kanban' %}" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Helpdesk</h3>
+        <p class="text-sm text-slate-500">Gestão de chamados e suporte.</p>
+    </a>
+    {% endif %}
+
+    {% if 'chips' in modulos_permitidos %}
+    <a href="/chips/" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Gestão de Chips</h3>
+        <p class="text-sm text-slate-500">Controle de linhas e recargas.</p>
+    </a>
+    {% endif %}
+
+    {% if 'emails' in modulos_permitidos %}
+    <a href="/emails/" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Controle de E-mails</h3>
+        <p class="text-sm text-slate-500">Gestão de contas corporativas.</p>
+    </a>
+    {% endif %}
+
+    {% if 'equipment' in modulos_permitidos %}
+    <a href="/equipment/" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Controle de Ativos</h3>
+        <p class="text-sm text-slate-500">Gestão de equipamentos.</p>
+    </a>
+    {% endif %}
+
+    {% if 'discador' in modulos_permitidos %}
+    <a href="{% url 'discador:dashboard' %}" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Discador 3C Plus</h3>
+        <p class="text-sm text-slate-500">Integração e higienização.</p>
+    </a>
+    {% endif %}
+
+    {% if 'gestao_usuarios' in modulos_permitidos %}
+    <a href="{% url 'user_list' %}" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Gestão de Usuários</h3>
+        <p class="text-sm text-slate-500">Controle de acessos e permissões.</p>
+    </a>
+    <a href="{% url 'equipe_list' %}" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Gestão de Equipes</h3>
+        <p class="text-sm text-slate-500">Organização de equipes de trabalho.</p>
+    </a>
+    <a href="{% url 'auditoria' %}" class="group block p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-800 mb-1">Auditoria Global</h3>
+        <p class="text-sm text-slate-500">Histórico de ações no sistema.</p>
+    </a>
+    {% endif %}
 </div>
 {% endblock %}

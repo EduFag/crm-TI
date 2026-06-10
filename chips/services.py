@@ -85,9 +85,6 @@ def devolver_para_ti(chip, *, envelope, actor):
     if chip.custody != Chip.CustodyChoices.WITH_PERSON:
         raise ValidationError('Somente chips em uso podem ser devolvidos.')
 
-    if envelope.tipo != Batch.TipoChoices.ENVELOPE:
-        raise ValidationError('Selecione um envelope válido.')
-
     anterior = _titular_atual(chip)
     nome_anterior = anterior.employee_name if anterior else 'Desconhecido'
 

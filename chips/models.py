@@ -9,8 +9,8 @@ class Operator(models.Model):
         ACTIVE = 'ACTIVE', 'Ativa'
         INACTIVE = 'INACTIVE', 'Inativa'
 
-    name = models.CharField(max_length=100, unique=True, help_text="Nome da operadora (Ex: Claro, Vivo)")
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
+    name = models.CharField("Nome", max_length=100, unique=True, help_text="Nome da operadora (Ex: Claro, Vivo)")
+    status = models.CharField("Status", max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
 
     def __str__(self):
         return self.name
@@ -18,39 +18,20 @@ class Operator(models.Model):
 
 class Batch(models.Model):
     """Cadastro de Lotes / Envelopes físicos na TI (RF06, RF07)"""
-    class StatusChoices(models.TextChoices):
-        OPEN = 'OPEN', 'Aberto'
-        CLOSED = 'CLOSED', 'Fechado'
-
-    class TipoChoices(models.TextChoices):
-        LOTE = 'LOTE', 'Lote'
-        ENVELOPE = 'ENVELOPE', 'Envelope'
-
-    identifier = models.CharField(max_length=100, unique=True, help_text="Identificador do Lote/Saquinho")
-    tipo = models.CharField(
-        max_length=20,
-        choices=TipoChoices.choices,
-        default=TipoChoices.ENVELOPE,
-        help_text='Lote de recebimento ou envelope físico na TI.',
-    )
-    nome = models.CharField(max_length=150, blank=True, help_text='Nome escrito no envelope.')
-    setor = models.CharField(max_length=100, blank=True, help_text='Setor escrito no envelope.')
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.OPEN)
+    nome = models.CharField("Nome no Envelope", max_length=150, blank=True, help_text='Nome escrito no envelope.')
     received_at = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        if self.tipo == self.TipoChoices.ENVELOPE and self.nome:
+        if self.nome:
             return f"Envelope {self.nome}"
-        return f"Lote {self.identifier}"
+        return f"Envelope #{self.id}"
 
     @property
     def label(self):
         """Rótulo para selects no grid."""
-        partes = [self.identifier]
+        partes = [f"#{self.id}"]
         if self.nome:
             partes.append(self.nome)
-        if self.setor:
-            partes.append(f"({self.setor})")
         return ' — '.join(partes)
 
 
@@ -76,19 +57,21 @@ class Chip(models.Model):
         WITH_TI = 'WITH_TI', 'Na TI'
         WITH_PERSON = 'WITH_PERSON', 'Com pessoa'
 
-    line_number = models.CharField(max_length=20, unique=True, help_text="Número da Linha com DDD")
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.AVAILABLE)
+    line_number = models.CharField("Número da Linha", max_length=20, unique=True, help_text="Número da Linha com DDD")
+    status = models.CharField("Status", max_length=20, choices=StatusChoices.choices, default=StatusChoices.AVAILABLE)
     custody = models.CharField(
+        "Custódia",
         max_length=20,
         choices=CustodyChoices.choices,
         default=CustodyChoices.WITH_TI,
         help_text='Onde o chip está fisicamente agora.',
     )
-    technology = models.CharField(max_length=20, choices=TechChoices.choices, default=TechChoices.PHYSICAL)
-    fixed_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Custo Fixo do Plano")
-    iccid = models.CharField(max_length=50, unique=True, blank=True, null=True, help_text="ICCID (Número de série do chip)")
-    plan_type = models.CharField(max_length=20, choices=PlanChoices.choices, default=PlanChoices.CONTROL)
+    technology = models.CharField("Tecnologia", max_length=20, choices=TechChoices.choices, default=TechChoices.PHYSICAL)
+    fixed_cost = models.DecimalField("Custo Fixo", max_digits=10, decimal_places=2, default=0.00, help_text="Custo Fixo do Plano")
+    iccid = models.CharField("ICCID", max_length=50, unique=True, blank=True, null=True, help_text="ICCID (Número de série do chip)")
+    plan_type = models.CharField("Tipo de Plano", max_length=20, choices=PlanChoices.choices, default=PlanChoices.CONTROL)
     activated_at = models.DateField(
+        "Data de Ativação",
         null=True,
         blank=True,
         help_text='Data de ativação no callcenter (primeira entrega).',
@@ -99,8 +82,8 @@ class Chip(models.Model):
         help_text='Data do último bloqueio da linha.',
     )
 
-    operator = models.ForeignKey(Operator, on_delete=models.PROTECT, related_name='chips')
-    batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name='chips')
+    operator = models.ForeignKey(Operator, on_delete=models.PROTECT, related_name='chips', verbose_name="Operadora")
+    batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name='chips', verbose_name="Envelope")
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -156,8 +139,8 @@ class ChipMovement(models.Model):
 
 class Recharge(models.Model):
     """Log financeiro e histórico de recargas (RF14)"""
-    chip = models.ForeignKey(Chip, on_delete=models.CASCADE, related_name='recharges')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    chip = models.ForeignKey(Chip, on_delete=models.CASCADE, related_name='recharges', verbose_name="Chip")
+    amount = models.DecimalField("Valor", max_digits=10, decimal_places=2)
     timestamp = models.DateTimeField(auto_now_add=True)
     registered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
 

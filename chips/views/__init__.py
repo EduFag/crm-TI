@@ -6,6 +6,8 @@ from .management import (
     BatchUpdateView,
     ChipCreateView,
     ChipUpdateView,
+    ChipGeneralTransferView,
+    batch_delete_view,
 )
 from .assignments import ReturnChipView
 from .recharges import RechargeCreateView

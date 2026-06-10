@@ -18,17 +18,23 @@ def _ultima_entrega_subquery():
     ).order_by('-timestamp')
 
 
+def _ultimo_movimento_subquery():
+    return ChipMovement.objects.filter(chip=OuterRef('pk')).order_by('-timestamp')
+
+
 def chips_com_anotacoes_operacionais(queryset=None):
     """Anota chips com titular, recargas e datas do ciclo."""
     qs = queryset if queryset is not None else Chip.objects.all()
 
     ultima_entrega = _ultima_entrega_subquery()
+    ultimo_movimento = _ultimo_movimento_subquery()
     ultima_recarga = Recharge.objects.filter(chip=OuterRef('pk')).order_by('-timestamp')
 
     return qs.select_related('operator', 'batch').annotate(
         employee_name=Subquery(ultima_entrega.values('employee_name')[:1]),
         employee_user_id=Subquery(ultima_entrega.values('employee_user_id')[:1]),
         last_delivery_at=Subquery(ultima_entrega.values('timestamp')[:1]),
+        last_movement_at=Subquery(ultimo_movimento.values('timestamp')[:1]),
         last_recharge_at=Subquery(ultima_recarga.values('timestamp')[:1]),
     )
 

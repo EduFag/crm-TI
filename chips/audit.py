@@ -40,10 +40,11 @@ def log_operadora_criada(operator, actor):
 
 
 def log_lote_criado(batch, actor):
+    name_str = batch.nome or f"#{batch.id}"
     return registrar_acao(
         modulo=MODULO_CHIPS,
         acao=RegistroAcao.AcaoChoices.CREATED,
-        descricao=f'Lote "{batch.identifier}" cadastrado.',
+        descricao=f'Envelope "{name_str}" cadastrado.',
         actor=actor,
         obj=batch,
     )

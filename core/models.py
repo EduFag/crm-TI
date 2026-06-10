@@ -1,8 +1,23 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.conf import settings
+
+
+class CustomUserManager(UserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'ADMIN')
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self._create_user(username, email, password, **extra_fields)
 
 
 class Equipe(models.Model):
@@ -30,13 +45,13 @@ class CustomUser(AbstractUser):
     
     class RoleChoices(models.TextChoices):
         ADMIN = 'ADMIN', 'Administrador'
-        MANAGER = 'MANAGER', 'Gerente'
-        USER = 'USER', 'Usuário Padrão'
+        IT_USER = 'IT_USER', 'Usuário TI'
+        STANDARD = 'STANDARD', 'Usuário Padrão'
 
     role = models.CharField(
         max_length=20,
         choices=RoleChoices.choices,
-        default=RoleChoices.USER,
+        default=RoleChoices.STANDARD,
         help_text='Papel do usuário no sistema (define permissões de acesso).'
     )
     equipe = models.ForeignKey(
@@ -47,6 +62,8 @@ class CustomUser(AbstractUser):
         related_name='membros',
         help_text='Equipe do usuário (opcional; atribuída pelo administrador).',
     )
+
+    objects = CustomUserManager()
 
     # Controle de auditoria
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')

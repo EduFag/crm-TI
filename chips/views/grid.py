@@ -13,6 +13,7 @@ from chips.services import (
     criar_chip_operacional,
     devolver_para_ti,
     transferir_chip,
+    entregar_chip,
 )
 
 
@@ -32,10 +33,7 @@ class ChipGridDataView(_JsonChipsMixin, View):
         )
         envelopes = [
             {'id': b.id, 'label': b.label}
-            for b in Batch.objects.filter(
-                tipo=Batch.TipoChoices.ENVELOPE,
-                status=Batch.StatusChoices.OPEN,
-            ).order_by('identifier')
+            for b in Batch.objects.all().order_by('id')
         ]
         return JsonResponse({
             'data': data,
@@ -105,12 +103,20 @@ class ChipTransferView(_JsonChipsMixin, View):
             return JsonResponse({'errors': form.errors}, status=400)
 
         try:
-            row = transferir_chip(
-                chip,
-                novo_nome=form.cleaned_data['employee_name'],
-                novo_user=form.cleaned_data.get('employee_user'),
-                actor=request.user,
-            )
+            if chip.custody == Chip.CustodyChoices.WITH_TI:
+                row = entregar_chip(
+                    chip,
+                    employee_name=form.cleaned_data['employee_name'],
+                    employee_user=form.cleaned_data.get('employee_user'),
+                    actor=request.user,
+                )
+            else:
+                row = transferir_chip(
+                    chip,
+                    novo_nome=form.cleaned_data['employee_name'],
+                    novo_user=form.cleaned_data.get('employee_user'),
+                    actor=request.user,
+                )
         except ValidationError as exc:
             return JsonResponse({'error': str(exc)}, status=400)
 

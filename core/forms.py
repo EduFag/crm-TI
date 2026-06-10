@@ -11,6 +11,10 @@ class EquipeForm(forms.ModelForm):
     class Meta:
         model = Equipe
         fields = ('name', 'is_active')
+        labels = {
+            'name': 'Nome da Equipe',
+            'is_active': 'Ativa',
+        }
 
 
 class CustomUserCreateForm(UserCreationForm):
@@ -19,6 +23,15 @@ class CustomUserCreateForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = CustomUser
         fields = ('username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active')
+        labels = {
+            'username': 'Nome de Usuário',
+            'email': 'E-mail',
+            'first_name': 'Nome',
+            'last_name': 'Sobrenome',
+            'role': 'Tipo de Usuário',
+            'equipe': 'Equipe',
+            'is_active': 'Ativo',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -40,6 +53,15 @@ class CustomUserUpdateForm(forms.ModelForm):
     class Meta:
         model = CustomUser
         fields = ('username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active')
+        labels = {
+            'username': 'Nome de Usuário',
+            'email': 'E-mail',
+            'first_name': 'Nome',
+            'last_name': 'Sobrenome',
+            'role': 'Tipo de Usuário',
+            'equipe': 'Equipe',
+            'is_active': 'Ativo',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

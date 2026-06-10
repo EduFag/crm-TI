@@ -98,12 +98,31 @@ class TransferForm(TipoTitularFormMixin):
         return cleaned
 
 
+class GeneralTransferForm(TipoTitularFormMixin):
+    chip = forms.ModelChoiceField(
+        queryset=Chip.objects.filter(
+            custody=Chip.CustodyChoices.WITH_TI,
+            status__in=[Chip.StatusChoices.AVAILABLE, Chip.StatusChoices.BLOCKED]
+        ).order_by('line_number'),
+        label="Linha (Chip Disponível)",
+        empty_label="Selecione a linha disponível",
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors:
+            return cleaned
+        nome, usuario = self.clean_titular()
+        if nome:
+            cleaned['employee_name'] = nome
+            cleaned['employee_user'] = usuario
+        return cleaned
+
+
 class ReturnToTiForm(forms.Form):
     envelope = forms.ModelChoiceField(
-        queryset=Batch.objects.filter(
-            tipo=Batch.TipoChoices.ENVELOPE,
-            status=Batch.StatusChoices.OPEN,
-        ).order_by('identifier'),
+        queryset=Batch.objects.all().order_by('id'),
         label='Envelope na TI',
         empty_label='Selecione o envelope',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
@@ -165,10 +184,7 @@ class ChipGridCreateForm(forms.Form):
         widget=forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
     )
     batch = forms.ModelChoiceField(
-        queryset=Batch.objects.filter(
-            tipo=Batch.TipoChoices.ENVELOPE,
-            status=Batch.StatusChoices.OPEN,
-        ).order_by('identifier'),
+        queryset=Batch.objects.all().order_by('id'),
         required=False,
         label='Envelope na TI',
         empty_label='Selecione o envelope',

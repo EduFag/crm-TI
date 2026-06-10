@@ -32,9 +32,9 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 
 | Papel | Módulos |
 |-------|---------|
-| USER | helpdesk |
-| MANAGER | helpdesk, chips, emails, equipment |
-| ADMIN | todos + gestao_usuarios + discador |
+| STANDARD | helpdesk |
+| IT_USER | helpdesk, chips, emails, equipment, discador |
+| ADMIN | todos (inclui gestao_usuarios e auditoria) |
 
 Superusuários ignoram restrições. Cadastro de usuários e equipes é somente por ADMIN (sem auto-registro público).
 

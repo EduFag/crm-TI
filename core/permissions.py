@@ -30,12 +30,13 @@ TODOS_MODULOS = frozenset({
 
 # Matriz role → módulos permitidos
 MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
-    CustomUser.RoleChoices.USER: frozenset({MODULO_HELPDESK}),
-    CustomUser.RoleChoices.MANAGER: frozenset({
+    CustomUser.RoleChoices.STANDARD: frozenset({MODULO_HELPDESK}),
+    CustomUser.RoleChoices.IT_USER: frozenset({
         MODULO_HELPDESK,
         MODULO_CHIPS,
         MODULO_EMAILS,
         MODULO_EQUIPMENT,
+        MODULO_DISCADOR,
     }),
     CustomUser.RoleChoices.ADMIN: TODOS_MODULOS,
 }
@@ -47,7 +48,7 @@ def usuario_pode_acessar_modulo(user, modulo: str) -> bool:
         return False
     if user.is_superuser:
         return True
-    role = getattr(user, 'role', CustomUser.RoleChoices.USER)
+    role = getattr(user, 'role', CustomUser.RoleChoices.STANDARD)
     modulos = MODULOS_POR_ROLE.get(role, frozenset())
     return modulo in modulos
 
@@ -58,7 +59,7 @@ def modulos_permitidos_para_usuario(user) -> list[str]:
         return []
     if user.is_superuser:
         return sorted(TODOS_MODULOS)
-    role = getattr(user, 'role', CustomUser.RoleChoices.USER)
+    role = getattr(user, 'role', CustomUser.RoleChoices.STANDARD)
     return sorted(MODULOS_POR_ROLE.get(role, frozenset()))
 
 

@@ -81,15 +81,10 @@ class ToggleAccountStatusView(_EmailsMixin, View):
 # ===============================
 # Gestão de Domínios
 # ===============================
-class EmailDomainListView(_EmailsMixin, ListView):
-    model = EmailDomain
-    template_name = 'emails/domain_list.html'
-    context_object_name = 'domains'
-
 class EmailDomainCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     model = EmailDomain
     fields = ['name']
-    list_url_name = 'emails:domain_list'
+    list_url_name = 'emails:dashboard'
     modal_title = 'Novo Domínio'
     modal_subtitle = 'Adicione um domínio corporativo autorizado (ex: empresa.com.br).'
     modal_submit_label = 'Salvar'
@@ -105,3 +100,11 @@ class EmailDomainCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
         log_dominio_criado(self.object, self.request.user)
         messages.success(self.request, f"Domínio @{form.instance.name} adicionado ao catálogo!")
         return self.htmx_redirect_response()
+
+    def htmx_redirect_response(self, url_name=None):
+        from django.urls import reverse
+        from django.http import HttpResponse
+        url = reverse('emails:dashboard') + '?tab=domains'
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = url
+        return response
