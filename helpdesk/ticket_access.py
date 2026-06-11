@@ -26,8 +26,12 @@ def usuario_pode_definir_prioridade(user) -> bool:
 
 
 def usuario_pode_editar_chamado(user) -> bool:
-    """Somente ADMIN e superusuário podem editar chamados."""
-    return _eh_admin_ou_superuser(user)
+    """Administradores e usuários de TI podem editar chamados. Restrito para STANDARD."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
 
 
 def usuario_pode_transferir_chamado(user) -> bool:
