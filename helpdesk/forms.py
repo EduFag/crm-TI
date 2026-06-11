@@ -106,18 +106,7 @@ class TicketCreateForm(forms.ModelForm):
             self._remover_campo('priority')
             return
 
-        if role == CustomUser.RoleChoices.IT_USER:
-            self._remover_campo('priority')
-            self.fields['requester_user'].queryset = usuarios_solicitantes_equipe(self.user)
-            self.fields['requester_user'].label_from_instance = self._rotulo_usuario
-            if not self.is_bound and nome_padrao:
-                self.fields['requester_name'].initial = nome_padrao
-            if not self.user.equipe_id:
-                self._remover_campo('tipo_solicitante')
-                self._remover_campo('requester_user')
-            return
-
-        # ADMIN ou superuser
+        # ADMIN, IT_USER ou superuser
         self.fields['requester_user'].queryset = CustomUser.objects.filter(
             is_active=True,
         ).order_by('first_name', 'last_name', 'username')
@@ -150,17 +139,6 @@ class TicketCreateForm(forms.ModelForm):
             cleaned['requester_user'] = self.user
             cleaned['priority'] = None
             return cleaned
-
-        if role == CustomUser.RoleChoices.IT_USER:
-            cleaned['priority'] = None
-            if not self.user.equipe_id:
-                requester_name = (cleaned.get('requester_name') or '').strip()
-                if not requester_name:
-                    self.add_error('requester_name', 'Informe o nome do solicitante.')
-                else:
-                    cleaned['requester_name'] = requester_name
-                    cleaned['requester_user'] = None
-                return cleaned
 
         tipo = cleaned.get('tipo_solicitante')
         requester_name = (cleaned.get('requester_name') or '').strip()
