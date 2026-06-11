@@ -36,8 +36,12 @@ def usuario_pode_transferir_chamado(user) -> bool:
 
 
 def usuario_pode_operar_kanban(user) -> bool:
-    """Somente ADMIN e superusuário podem mover cards e operar o fluxo do Kanban."""
-    return _eh_admin_ou_superuser(user)
+    """Administradores e usuários de TI podem mover cards e operar o fluxo do Kanban. Restrito para STANDARD."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
 
 
 def usuarios_solicitantes_equipe(user) -> QuerySet:
