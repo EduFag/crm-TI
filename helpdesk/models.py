@@ -98,7 +98,7 @@ class Ticket(models.Model):
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
     @classmethod
-    def archive_old_resolved_tickets(cls, days=7):
+    def archive_old_resolved_tickets(cls, days=2):
         """
         Arquiva tickets que estão no status RESOLVED há mais de 'days' dias.
         """
@@ -108,6 +108,16 @@ class Ticket(models.Model):
             is_archived=False,
             updated_at__lt=cutoff_date
         ).update(is_archived=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            try:
+                old_status = Ticket.objects.only('status').get(pk=self.pk).status
+                if old_status != self.status:
+                    self.is_archived = False
+            except Ticket.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"[{self.get_status_display()}] {self.title} - {self.requester_name}"

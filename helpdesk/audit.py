@@ -77,3 +77,14 @@ def log_comentario(ticket, actor, texto):
         actor=actor,
         obj=ticket,
     )
+
+
+def log_chamado_excluido(ticket, actor):
+    autor = actor.get_full_name() or actor.username if actor else 'Sistema'
+    return registrar_acao(
+        modulo=MODULO_HELPDESK,
+        acao=RegistroAcao.AcaoChoices.DEACTIVATED,
+        descricao=f'Chamado "{ticket.title}" excluído por {autor}.',
+        actor=actor,
+        obj=ticket,
+    )

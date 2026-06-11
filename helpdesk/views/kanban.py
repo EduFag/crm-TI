@@ -15,6 +15,7 @@ from helpdesk.audit import (
     log_edicao,
     log_status_alterado,
     log_transferencia,
+    log_chamado_excluido,
 )
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
@@ -25,6 +26,7 @@ from helpdesk.ticket_access import (
     usuario_pode_transferir_chamado,
     usuario_pode_ver_quem_abriu_chamado,
     usuarios_tecnicos_para_transferencia,
+    usuario_pode_excluir_chamado,
 )
 
 
@@ -102,6 +104,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
         'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
         'pode_editar': pode_editar,
+        'pode_excluir': usuario_pode_excluir_chamado(request.user),
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
         'edit_form': edit_form or (TicketUpdateForm(instance=ticket) if pode_editar else None),
@@ -116,7 +119,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         
         # Aplica a regra de arquivar resolvidos antigos antes de carregar o kanban
-        Ticket.archive_old_resolved_tickets(days=7)
+        Ticket.archive_old_resolved_tickets(days=2)
         
         # Apenas tickets ativos e NÃO arquivados no Kanban
         tickets = filtrar_chamados_para_usuario(
@@ -383,3 +386,21 @@ def ticket_add_comment(request, pk):
 class KanbanBoardPartialView(KanbanView):
     """Retorna apenas o HTML do quadro para ser injetado via HTMX no evento SSE."""
     template_name = 'helpdesk/_kanban_board.html'
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_delete(request, pk):
+    if not usuario_pode_excluir_chamado(request.user):
+        return HttpResponseForbidden('Sem permissão para excluir chamados.')
+    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    ticket.is_active = False
+    ticket.save()
+    log_chamado_excluido(ticket, request.user)
+    
+    if request.headers.get('HX-Request'):
+        response = HttpResponse("")
+        response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+        return response
+        
+    return redirect('helpdesk:kanban')

@@ -39,6 +39,11 @@ def usuario_pode_transferir_chamado(user) -> bool:
     return _eh_admin_ou_superuser(user)
 
 
+def usuario_pode_excluir_chamado(user) -> bool:
+    """Administradores e usuários de TI podem excluir chamados. Restrito para STANDARD."""
+    return _eh_admin_ou_superuser(user)
+
+
 def usuario_pode_operar_kanban(user) -> bool:
     """Administradores e usuários de TI podem mover cards e operar o fluxo do Kanban. Restrito para STANDARD."""
     if not user or not user.is_authenticated:
