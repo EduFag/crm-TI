@@ -12,7 +12,7 @@ def _eh_admin_ou_superuser(user) -> bool:
         return False
     if user.is_superuser:
         return True
-    return user.role == CustomUser.RoleChoices.ADMIN
+    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
 
 
 def usuario_pode_gerenciar_categorias(user) -> bool:
@@ -61,10 +61,10 @@ def usuarios_solicitantes_equipe(user) -> QuerySet:
 
 
 def usuarios_tecnicos_para_transferencia() -> QuerySet:
-    """Técnicos disponíveis para transferência: usuários ADMIN ativos."""
+    """Técnicos disponíveis para transferência: usuários ADMIN e IT_USER ativos."""
     return CustomUser.objects.filter(
         is_active=True,
-        role=CustomUser.RoleChoices.ADMIN,
+        role__in=[CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER],
     ).order_by('first_name', 'last_name', 'username')
 
 
