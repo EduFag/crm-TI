@@ -101,7 +101,6 @@ class TransferForm(TipoTitularFormMixin):
 class GeneralTransferForm(TipoTitularFormMixin):
     chip = forms.ModelChoiceField(
         queryset=Chip.objects.filter(
-            custody=Chip.CustodyChoices.WITH_TI,
             status__in=[Chip.StatusChoices.AVAILABLE, Chip.StatusChoices.BLOCKED]
         ).order_by('line_number'),
         label="Linha (Chip Disponível)",
@@ -135,7 +134,8 @@ class ChipGridCreateForm(forms.Form):
         label='Número da linha',
         widget=forms.TextInput(attrs={
             'class': INPUT_CLASS,
-            'placeholder': 'Ex: 11999998888',
+            'placeholder': 'Ex: (11) 99999-8888',
+            'data-mask': '(00) 00000-0000',
         }),
     )
     operator = forms.ModelChoiceField(
@@ -144,12 +144,7 @@ class ChipGridCreateForm(forms.Form):
         empty_label='Selecione a operadora',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
-    custody = forms.ChoiceField(
-        choices=Chip.CustodyChoices.choices,
-        initial=Chip.CustodyChoices.WITH_PERSON,
-        label='Custódia',
-        widget=forms.Select(attrs={'class': SELECT_CLASS}),
-    )
+
     tipo_titular = forms.ChoiceField(
         choices=[
             (TipoTitularFormMixin.TIPO_TEXTO, 'Nome livre'),
@@ -193,18 +188,27 @@ class ChipGridCreateForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        custody = cleaned.get('custody')
-        if custody == Chip.CustodyChoices.WITH_PERSON:
-            tipo = cleaned.get('tipo_titular', TipoTitularFormMixin.TIPO_TEXTO)
-            if tipo == TipoTitularFormMixin.TIPO_USUARIO:
-                user = cleaned.get('employee_user')
-                if not user:
-                    self.add_error('employee_user', 'Selecione o titular.')
-                else:
-                    cleaned['employee_name'] = user.get_full_name() or user.username
-            elif not (cleaned.get('employee_name') or '').strip():
-                self.add_error('employee_name', 'Informe o titular.')
-        elif custody == Chip.CustodyChoices.WITH_TI:
-            if not cleaned.get('batch'):
-                self.add_error('batch', 'Selecione o envelope na TI.')
+        tipo_titular = cleaned.get('tipo_titular')
+
+        # Se houver nome/usuario preenchido, consideramos "Em Uso", senão é para a TI.
+        nome = cleaned.get('employee_name')
+        usuario = cleaned.get('employee_user')
+
+        # Se for tipo usuario, preenche o nome com base no usuario
+        if tipo_titular == TipoTitularFormMixin.TIPO_USUARIO and usuario:
+            cleaned['employee_name'] = usuario.get_full_name() or usuario.username
+            nome = cleaned['employee_name']
+
+        # Se houver nome/usuario preenchido, não precisa de envelope.
+        # Senão (vai ficar na TI), precisa de envelope.
+        if not nome and not cleaned.get('batch'):
+            self.add_error('batch', 'Selecione o envelope para chips na TI.')
+
+        # Remove os erros de titular caso tenha selecionado ir para TI
+        if not nome:
+            if 'employee_name' in self.errors:
+                del self.errors['employee_name']
+            if 'employee_user' in self.errors:
+                del self.errors['employee_user']
+
         return cleaned

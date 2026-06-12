@@ -60,9 +60,7 @@ class ChipGridCreateView(_JsonChipsMixin, View):
         try:
             row = criar_chip_operacional(
                 line_number=cleaned['line_number'],
-                operator=cleaned['operator'],
-                custody=cleaned['custody'],
-                employee_name=cleaned.get('employee_name', ''),
+                employee_name=cleaned.get('employee_name') or '',
                 employee_user=cleaned.get('employee_user'),
                 activated_at=cleaned.get('activated_at'),
                 batch=cleaned.get('batch'),
@@ -97,13 +95,13 @@ class ChipTransferView(_JsonChipsMixin, View):
     """POST /chips/api/grid/<pk>/transfer/ — transferência de posse."""
 
     def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk)
+        chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)
         form = TransferForm(request.POST)
         if not form.is_valid():
             return JsonResponse({'errors': form.errors}, status=400)
 
         try:
-            if chip.custody == Chip.CustodyChoices.WITH_TI:
+            if chip.status == Chip.StatusChoices.AVAILABLE:
                 row = entregar_chip(
                     chip,
                     employee_name=form.cleaned_data['employee_name'],
@@ -133,7 +131,7 @@ class ChipReturnView(_JsonChipsMixin, View):
             return JsonResponse({'errors': form.errors}, status=400)
 
         try:
-            row = devolver_para_ti(chip, envelope=form.cleaned_data['envelope'], actor=request.user)
+            row = devolver_para_ti(chip, actor=request.user)
         except ValidationError as exc:
             return JsonResponse({'error': str(exc)}, status=400)
 
@@ -151,10 +149,7 @@ class ChipGridCreateModalView(ModuloObrigatorioMixin, View):
         has_operators = Operator.objects.filter(
             status=Operator.StatusChoices.ACTIVE,
         ).exists()
-        has_envelopes = Batch.objects.filter(
-            tipo=Batch.TipoChoices.ENVELOPE,
-            status=Batch.StatusChoices.OPEN,
-        ).exists()
+        has_envelopes = Batch.objects.exists()
         return render(request, self.template_name, {
             'form': form,
             'has_operators': has_operators,

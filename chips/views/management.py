@@ -79,7 +79,7 @@ class BatchCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
 class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
     model = Chip
     fields = [
-        'line_number', 'operator', 'status', 'technology', 'fixed_cost', 'iccid',
+        'line_number', 'operator', 'status', 'technology', 'iccid',
         'batch', 'activated_at',
     ]
     chips_tab = 'chips'
@@ -91,9 +91,14 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        from django import forms
         if 'activated_at' in form.fields:
-            from django import forms
             form.fields['activated_at'].widget = forms.DateInput(attrs={'type': 'date'})
+        if 'line_number' in form.fields:
+            form.fields['line_number'].widget.attrs.update({
+                'data-mask': '(00) 00000-0000',
+                'placeholder': '(11) 98888-7777',
+            })
         return form
 
     def form_valid(self, form):
@@ -105,7 +110,7 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
 class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
     model = Chip
     fields = [
-        'line_number', 'operator', 'status', 'technology', 'fixed_cost', 'iccid',
+        'line_number', 'operator', 'status', 'technology', 'iccid',
         'batch', 'activated_at',
     ]
     chips_tab = 'chips'
@@ -115,9 +120,14 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        from django import forms
         if 'activated_at' in form.fields:
-            from django import forms
             form.fields['activated_at'].widget = forms.DateInput(attrs={'type': 'date'})
+        if 'line_number' in form.fields:
+            form.fields['line_number'].widget.attrs.update({
+                'data-mask': '(00) 00000-0000',
+                'placeholder': '(11) 98888-7777',
+            })
         return form
 
     def get_modal_title(self):

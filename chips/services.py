@@ -36,16 +36,14 @@ def entregar_chip(
     activated_at=None,
 ):
     """Entrega chip disponível na TI para uma pessoa."""
-    if chip.custody != Chip.CustodyChoices.WITH_TI:
-        raise ValidationError('Somente chips na TI podem ser entregues.')
+    if chip.status != Chip.StatusChoices.AVAILABLE:
+        raise ValidationError('Somente chips disponíveis na TI podem ser entregues.')
 
     hoje = activated_at or timezone.localdate()
     if not chip.activated_at:
         chip.activated_at = hoje
 
-    chip.custody = Chip.CustodyChoices.WITH_PERSON
     chip.status = Chip.StatusChoices.IN_USE
-    chip.batch = None
     chip.save()
 
     ChipMovement.objects.create(
@@ -62,7 +60,7 @@ def entregar_chip(
 @transaction.atomic
 def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
     """Transfere posse sem alterar activated_at nem ciclo de recarga."""
-    if chip.custody != Chip.CustodyChoices.WITH_PERSON:
+    if chip.status != Chip.StatusChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser transferidos.')
 
     anterior = _titular_atual(chip)
@@ -80,9 +78,9 @@ def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
 
 
 @transaction.atomic
-def devolver_para_ti(chip, *, envelope, actor):
+def devolver_para_ti(chip, *, actor):
     """Devolve chip da rua para envelope na TI."""
-    if chip.custody != Chip.CustodyChoices.WITH_PERSON:
+    if chip.status != Chip.StatusChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser devolvidos.')
 
     anterior = _titular_atual(chip)
@@ -97,9 +95,7 @@ def devolver_para_ti(chip, *, envelope, actor):
     )
     log_devolucao(chip, nome_anterior, actor)
 
-    chip.custody = Chip.CustodyChoices.WITH_TI
     chip.status = Chip.StatusChoices.AVAILABLE
-    chip.batch = envelope
     chip.save()
     return _chip_grid(chip.pk)
 
@@ -118,7 +114,6 @@ def criar_chip_operacional(
     *,
     line_number,
     operator,
-    custody,
     employee_name='',
     employee_user=None,
     activated_at=None,
@@ -129,21 +124,16 @@ def criar_chip_operacional(
     chip = Chip.objects.create(
         line_number=line_number.strip(),
         operator=operator,
-        custody=custody,
-        batch=batch if custody == Chip.CustodyChoices.WITH_TI else None,
-        status=(
-            Chip.StatusChoices.AVAILABLE
-            if custody == Chip.CustodyChoices.WITH_TI
-            else Chip.StatusChoices.IN_USE
-        ),
+        batch=batch,
+        status=Chip.StatusChoices.IN_USE if employee_name.strip() else Chip.StatusChoices.AVAILABLE,
         activated_at=(
             activated_at or timezone.localdate()
-            if custody == Chip.CustodyChoices.WITH_PERSON
+            if employee_name.strip()
             else None
         ),
     )
 
-    if custody == Chip.CustodyChoices.WITH_PERSON:
+    if employee_name.strip():
         ChipMovement.objects.create(
             chip=chip,
             employee_name=employee_name,
@@ -181,49 +171,12 @@ def atualizar_chip_grid(chip, *, dados, actor):
         chip.activated_at = _parse_data_grid(dados.get('activated_at'))
         alterou = True
 
-    custody_nova = dados.get('custody')
-    if custody_nova and custody_nova != chip.custody:
-        if custody_nova == Chip.CustodyChoices.WITH_TI:
-            batch_id = _inteiro_opcional(dados.get('batch_id'))
-            if not batch_id:
-                raise ValidationError('Selecione o envelope para chips na TI.')
-            envelope = Batch.objects.get(pk=batch_id)
-            if chip.custody == Chip.CustodyChoices.WITH_PERSON:
-                devolver_para_ti(chip, envelope=envelope, actor=actor)
-            else:
-                chip.custody = Chip.CustodyChoices.WITH_TI
-                chip.status = Chip.StatusChoices.AVAILABLE
-                chip.batch = envelope
-                chip.save()
-        elif custody_nova == Chip.CustodyChoices.WITH_PERSON:
-            nome = (dados.get('employee_name') or '').strip()
-            if not nome:
-                raise ValidationError('Informe o titular para entregar o chip.')
-            user = None
-            user_id = _inteiro_opcional(dados.get('employee_user_id'))
-            if user_id:
-                user = CustomUser.objects.filter(pk=user_id).first()
-            if chip.custody == Chip.CustodyChoices.WITH_TI:
-                if alterou:
-                    chip.save()
-                entregar_chip(
-                    chip,
-                    employee_name=nome,
-                    employee_user=user,
-                    actor=actor,
-                    activated_at=chip.activated_at,
-                )
-            else:
-                transferir_chip(chip, novo_nome=nome, novo_user=user, actor=actor)
-        chip.refresh_from_db()
-        log_chip_atualizado(chip, actor, antes)
-        return _chip_grid(chip.pk)
 
-    if 'batch_id' in dados and chip.custody == Chip.CustodyChoices.WITH_TI:
+    if 'batch_id' in dados:
         chip.batch_id = _inteiro_opcional(dados.get('batch_id'))
         alterou = True
 
-    if 'employee_name' in dados and chip.custody == Chip.CustodyChoices.WITH_PERSON:
+    if 'employee_name' in dados and chip.status == Chip.StatusChoices.IN_USE:
         nome = (dados.get('employee_name') or '').strip()
         if nome:
             atual = _titular_atual(chip)

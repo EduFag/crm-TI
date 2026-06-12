@@ -22,8 +22,8 @@ def log_chip_atualizado(chip, actor, antes):
         obj_antes=antes,
         obj_depois=chip,
         campos=[
-            'line_number', 'status', 'custody', 'technology', 'fixed_cost',
-            'iccid', 'plan_type', 'operator', 'batch', 'activated_at',
+            'line_number', 'status', 'technology',
+            'iccid', 'plan_type', 'operator_id', 'batch_id', 'activated_at',
         ],
         descricao_prefixo=f'Chip {chip.line_number} atualizado.',
     )

@@ -88,40 +88,37 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         context.setdefault('audit_logs', [])
         context.setdefault('audit_titulo', 'Registro de auditoria de chips')
         context.setdefault('operators', [])
+        context.setdefault('operators_filter', [])
         context.setdefault('batches', [])
+        context.setdefault('all_batches', [])
         context.setdefault('chips', [])
         context.setdefault('chart_custodia', '{}')
         context.setdefault('chart_movimentacao', '{}')
 
     def _contexto_chips(self, context):
-        from django.core.paginator import Paginator
         from chips.queries import chips_com_anotacoes_operacionais, _calcular_ciclo
         chips_qs = chips_com_anotacoes_operacionais(
             Chip.objects.filter(is_active=True)
         ).order_by('-created_at')
 
-        chips_page = self.request.GET.get('chips_page', 1)
-        paginator = Paginator(chips_qs, 15)
-        page_obj = paginator.get_page(chips_page)
-
-        # Para cada chip, calcula os dados de recarga e anexa ao objeto
-        for chip in page_obj.object_list:
+        # Lista completa para o filtro client-side funcionar em todo o inventário
+        chips_list = list(chips_qs)
+        for chip in chips_list:
             due_at, days_to, status = _calcular_ciclo(chip)
             chip.recharge_due_at = due_at
             chip.days_to_recharge = days_to
             chip.recharge_status = status
 
-        context['chips'] = page_obj
+        context['chips'] = chips_list
 
     def _contexto_dashboard(self, context):
         from django.core.paginator import Paginator
         context['total_chips'] = Chip.objects.filter(is_active=True).count()
         context['metric_available'] = Chip.objects.filter(
-            custody=Chip.CustodyChoices.WITH_TI,
             status=Chip.StatusChoices.AVAILABLE,
         ).count()
         context['metric_in_use'] = Chip.objects.filter(
-            custody=Chip.CustodyChoices.WITH_PERSON,
+            status=Chip.StatusChoices.IN_USE,
         ).count()
         context['metric_blocked_canceled'] = Chip.objects.filter(
             status__in=[Chip.StatusChoices.BLOCKED, Chip.StatusChoices.CANCELED]
@@ -134,7 +131,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         limite = hoje + timedelta(days=30)
         vencendo = 0
         for chip in chips_com_anotacoes_operacionais(
-            Chip.objects.filter(custody=Chip.CustodyChoices.WITH_PERSON)
+            Chip.objects.filter(status=Chip.StatusChoices.IN_USE)
         ):
             cycle_start = None
             if chip.last_recharge_at:
@@ -164,6 +161,9 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         operators_page = self.request.GET.get('operators_page', 1)
         paginator = Paginator(operators_qs, 15)
         context['operators'] = paginator.get_page(operators_page)
+        context['operators_filter'] = list(
+            Operator.objects.all().order_by('name').values('id', 'name')
+        )
 
     def _contexto_envelopes(self, context):
         from django.core.paginator import Paginator
@@ -171,6 +171,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         envelopes_page = self.request.GET.get('envelopes_page', 1)
         paginator = Paginator(batches_qs, 15)
         context['batches'] = paginator.get_page(envelopes_page)
+        context['all_batches'] = list(Batch.objects.all().order_by('id'))
 
 
 class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
@@ -189,7 +190,7 @@ class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
         usuario = form.cleaned_data.get('employee_user')
 
         try:
-            if chip.custody == Chip.CustodyChoices.WITH_PERSON:
+            if chip.status == Chip.StatusChoices.IN_USE:
                 transferir_chip(chip, novo_nome=nome, novo_user=usuario, actor=request.user)
                 messages.success(request, f'Chip {chip.line_number} transferido para {nome}.')
             else:

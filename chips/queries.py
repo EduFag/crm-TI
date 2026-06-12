@@ -60,7 +60,6 @@ def chips_operacionais():
     return chips_com_anotacoes_operacionais(
         Chip.objects.filter(
             is_active=True,
-            custody__in=[Chip.CustodyChoices.WITH_TI, Chip.CustodyChoices.WITH_PERSON],
         ).exclude(status=Chip.StatusChoices.CANCELED)
     )
 
@@ -114,8 +113,6 @@ def chip_para_grid_dict(chip):
         ),
         'operator_id': chip.operator_id,
         'operator_name': chip.operator.name,
-        'custody': chip.custody,
-        'custody_display': chip.get_custody_display(),
         'batch_id': chip.batch_id,
         'envelope_label': envelope_label,
         'status': chip.status,

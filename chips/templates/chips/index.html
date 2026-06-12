@@ -148,7 +148,7 @@
                 <select id="filter-chip-operator" onchange="filterChips()"
                         class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                     <option value="">Qualquer Operadora</option>
-                    {% for op in operators %}
+                    {% for op in operators_filter %}
                         <option value="{{ op.id }}">{{ op.name }}</option>
                     {% endfor %}
                 </select>
@@ -231,7 +231,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
                             </button>
                             {% endif %}
-                            {% if chip.custody == 'WITH_PERSON' %}
+                            {% if chip.status == 'IN_USE' %}
                             <button type="button" title="Devolver TI"
                                     onclick="devolverChip({{ chip.id }}, '{{ chip.line_number }}')"
                                     class="text-orange-600 hover:text-orange-700 px-1 transition-colors">
@@ -252,17 +252,8 @@
                     {% endfor %}
                 </tbody>
             </table>
-            <!-- Pagination Chips -->
             <div class="flex justify-between items-center px-6 py-3 border-t border-slate-200 bg-slate-50">
-                <span class="text-xs text-slate-500">Página {{ chips.number }} de {{ chips.paginator.num_pages }}</span>
-                <div class="flex gap-1">
-                    {% if chips.has_previous %}
-                    <a href="?tab=chips&chips_page={{ chips.previous_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
-                    {% endif %}
-                    {% if chips.has_next %}
-                    <a href="?tab=chips&chips_page={{ chips.next_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
-                    {% endif %}
-                </div>
+                <span class="text-xs text-slate-500">{{ chips|length }} chip(s) no inventário</span>
             </div>
         </div>
 
@@ -503,24 +494,16 @@ $(function() {
 
     /* ---- Gestão de Chips (Tabela padrão) ---- */
     var envelopes = [
-        {% for env in batches %}
-            {% if env.status == 'OPEN' and env.tipo == 'ENVELOPE' %}
-                { id: {{ env.id }}, label: "{{ env.label|escapejs }}" },
-            {% endif %}
+        {% for env in all_batches %}
+            { id: {{ env.id }}, label: "{{ env.label|escapejs }}" },
         {% endfor %}
     ];
 
     function devolverChip(id, line) {
-        if (!envelopes.length) { alert('Cadastre um envelope aberto na aba Envelopes.'); return; }
-        var opts = envelopes.map(function(env, i) { return (i + 1) + ': ' + env.label; }).join('\n');
-        var esc = prompt('Devolver linha ' + line + '\nSelecione o envelope na TI:\n' + opts, '1');
-        if (!esc) return;
-        var env = envelopes[parseInt(esc, 10) - 1];
-        if (!env) return;
+        if (!confirm('Deseja realmente devolver a linha ' + line + ' para a TI?')) return;
 
         var form = document.getElementById('devolver-form');
         form.action = '/chips/return/' + id + '/';
-        document.getElementById('devolver-envelope-id').value = env.id;
         form.submit();
     }
     window.devolverChip = devolverChip;
@@ -529,7 +512,6 @@ $(function() {
         var textInput = ($('#filter-chip-text').val() || '').toLowerCase();
         var opInput = $('#filter-chip-operator').val();
         var statusInput = $('#filter-chip-status').val();
-
         $('#chips-tbody tr').each(function() {
             var $row = $(this);
             if ($row.find('td').length === 1) return;

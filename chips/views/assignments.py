@@ -16,22 +16,12 @@ class ReturnChipView(_ChipsMixin, View):
     """Devolve um chip ao estoque na TI (RF12)."""
 
     def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk, custody=Chip.CustodyChoices.WITH_PERSON)
-        envelope_id = request.POST.get('envelope_id')
+        chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)
         tab = request.POST.get('tab', 'chips')
 
-        if not envelope_id:
-            messages.error(request, 'Selecione o envelope na TI.')
-            return redirect(f'/chips/?tab={tab}')
-
-        envelope = get_object_or_404(
-            Batch,
-            pk=envelope_id,
-        )
-
         try:
-            devolver_para_ti(chip, envelope=envelope, actor=request.user)
-            messages.success(request, f'Chip {chip.line_number} retornado ao envelope {envelope.label}.')
+            devolver_para_ti(chip, actor=request.user)
+            messages.success(request, f'Chip {chip.line_number} retornado para TI.')
         except ValidationError as exc:
             messages.error(request, str(exc))
 

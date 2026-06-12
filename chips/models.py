@@ -53,21 +53,9 @@ class Chip(models.Model):
         POSTPAID = 'POSTPAID', 'Pós-pago'
         CONTROL = 'CONTROL', 'Controle'
 
-    class CustodyChoices(models.TextChoices):
-        WITH_TI = 'WITH_TI', 'Na TI'
-        WITH_PERSON = 'WITH_PERSON', 'Com pessoa'
-
     line_number = models.CharField("Número da Linha", max_length=20, unique=True, help_text="Número da Linha com DDD")
     status = models.CharField("Status", max_length=20, choices=StatusChoices.choices, default=StatusChoices.AVAILABLE)
-    custody = models.CharField(
-        "Custódia",
-        max_length=20,
-        choices=CustodyChoices.choices,
-        default=CustodyChoices.WITH_TI,
-        help_text='Onde o chip está fisicamente agora.',
-    )
     technology = models.CharField("Tecnologia", max_length=20, choices=TechChoices.choices, default=TechChoices.PHYSICAL)
-    fixed_cost = models.DecimalField("Custo Fixo", max_digits=10, decimal_places=2, default=0.00, help_text="Custo Fixo do Plano")
     iccid = models.CharField("ICCID", max_length=50, unique=True, blank=True, null=True, help_text="ICCID (Número de série do chip)")
     plan_type = models.CharField("Tipo de Plano", max_length=20, choices=PlanChoices.choices, default=PlanChoices.CONTROL)
     activated_at = models.DateField(
@@ -93,22 +81,12 @@ class Chip(models.Model):
         return f"{self.line_number} - {self.operator.name}"
 
     def clean(self):
-        if self.custody == self.CustodyChoices.WITH_TI:
-            if self.status not in (self.StatusChoices.AVAILABLE, self.StatusChoices.BLOCKED):
-                raise ValidationError({'status': 'Chip na TI deve estar Disponível ou Bloqueado.'})
+        if self.status == self.StatusChoices.AVAILABLE:
             if not self.batch_id:
-                raise ValidationError({'batch': 'Informe o envelope quando o chip estiver na TI.'})
-        elif self.custody == self.CustodyChoices.WITH_PERSON:
-            if self.status != self.StatusChoices.IN_USE:
-                raise ValidationError({'status': 'Chip com pessoa deve estar Em Uso.'})
+                raise ValidationError({'batch': 'Informe o envelope quando o chip estiver disponível na TI.'})
+        # Removidas validações baseadas em custody.
 
     def save(self, *args, **kwargs):
-        # Sincroniza status com custódia quando não bloqueado/cancelado/perdido
-        if self.custody == self.CustodyChoices.WITH_TI and self.status == self.StatusChoices.IN_USE:
-            self.status = self.StatusChoices.AVAILABLE
-        elif self.custody == self.CustodyChoices.WITH_PERSON:
-            self.status = self.StatusChoices.IN_USE
-            self.batch = None
         super().save(*args, **kwargs)
 
 
