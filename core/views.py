@@ -47,7 +47,7 @@ class UserListView(ModuloObrigatorioMixin, ListView):
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
 
     def get_queryset(self):
-        return CustomUser.objects.select_related('equipe').order_by('-is_active', 'username')
+        return CustomUser.objects.prefetch_related('equipes').order_by('-is_active', 'username')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -103,7 +103,7 @@ class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
             actor=self.request.user,
             obj_antes=antes,
             obj_depois=self.object,
-            campos=['username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_active', 'is_staff'],
+            campos=['username', 'email', 'first_name', 'last_name', 'role', 'equipes', 'is_active', 'is_staff'],
             descricao_prefixo=f'Usuário "{self.object.username}" atualizado.',
         )
         messages.success(self.request, f'Usuário "{form.instance.username}" atualizado com sucesso.')

@@ -313,6 +313,7 @@ def ticket_finalize(request, pk):
     if not ticket.assigned_to:
         ticket.assigned_to = request.user
         
+    ticket.unread_by_user = True
     ticket.save()
     
     if status_anterior != Ticket.StatusChoices.RESOLVED:
@@ -335,6 +336,19 @@ def ticket_drawer(request, pk):
     )
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
+        
+    is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
+    changed = False
+    if is_ti and ticket.unread_by_tech:
+        ticket.unread_by_tech = False
+        changed = True
+    elif not is_ti and ticket.unread_by_user:
+        ticket.unread_by_user = False
+        changed = True
+        
+    if changed:
+        ticket.save(update_fields=['unread_by_tech', 'unread_by_user'])
+        
     return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
 
 
@@ -366,6 +380,10 @@ def ticket_edit(request, pk):
         metadata = _metadata_alteracao_ticket(antes, depois)
         if metadata:
             log_edicao(depois, request.user, metadata, '; '.join(mensagens))
+            
+        ticket.unread_by_user = True
+        ticket.save(update_fields=['unread_by_user'])
+        
         ticket.refresh_from_db()
         response = render(
             request,
@@ -420,6 +438,8 @@ def ticket_transfer(request, pk):
         _nome_usuario(anterior),
         _nome_usuario(tecnico),
     )
+    ticket.unread_by_user = True
+    ticket.save(update_fields=['unread_by_user'])
     ticket.refresh_from_db()
     response = render(
         request,
@@ -440,6 +460,14 @@ def ticket_add_comment(request, pk):
     if text:
         Comment.objects.create(ticket=ticket, author=request.user, text=text)
         log_comentario(ticket, request.user, text)
+        
+        is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
+        if is_ti:
+            ticket.unread_by_user = True
+        else:
+            ticket.unread_by_tech = True
+        ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'updated_at'])
+        
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     return render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
 

@@ -55,13 +55,11 @@ class CustomUser(AbstractUser):
         default=RoleChoices.STANDARD,
         help_text='Papel do usuário no sistema (define permissões de acesso).'
     )
-    equipe = models.ForeignKey(
+    equipes = models.ManyToManyField(
         Equipe,
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
         related_name='membros',
-        help_text='Equipe do usuário (opcional; atribuída pelo administrador).',
+        help_text='Equipes do usuário (opcional; atribuída pelo administrador).',
     )
 
     objects = CustomUserManager()

@@ -57,7 +57,7 @@ class TicketCreateForm(forms.ModelForm):
 
     class Meta:
         model = Ticket
-        fields = ['title', 'description', 'priority', 'category', 'specific_category']
+        fields = ['title', 'description', 'priority', 'category', 'specific_category', 'equipe']
         widgets = {
             'title': forms.TextInput(attrs={
                 'placeholder': 'Resumo curto da solicitação',
@@ -73,6 +73,7 @@ class TicketCreateForm(forms.ModelForm):
             'priority': forms.Select(attrs={'class': SELECT_CLASS}),
             'category': forms.Select(attrs={'class': SELECT_CLASS}),
             'specific_category': forms.Select(attrs={'class': SELECT_CLASS}),
+            'equipe': forms.Select(attrs={'class': SELECT_CLASS}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -110,11 +111,20 @@ class TicketCreateForm(forms.ModelForm):
         if not self.user:
             return
 
+        from core.models import Equipe
         role = getattr(self.user, 'role', CustomUser.RoleChoices.STANDARD)
         if self.user.is_superuser:
             role = CustomUser.RoleChoices.ADMIN
 
         if role == CustomUser.RoleChoices.STANDARD:
+            equipes_ativas = self.user.equipes.filter(is_active=True).order_by('name')
+            self.fields['equipe'].queryset = equipes_ativas
+            if equipes_ativas.count() <= 1:
+                self._remover_campo('equipe')
+            else:
+                self.fields['equipe'].empty_label = 'Selecione a equipe'
+                self.fields['equipe'].required = True
+
             self._remover_campo('tipo_solicitante')
             self._remover_campo('requester_name')
             self._remover_campo('requester_user')
@@ -123,6 +133,11 @@ class TicketCreateForm(forms.ModelForm):
             return
 
         # ADMIN, IT_USER ou superuser
+        if 'equipe' in self.fields:
+            self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
+            self.fields['equipe'].empty_label = 'Selecione a equipe'
+            self.fields['equipe'].required = False
+
         self.fields['requester_user'].queryset = CustomUser.objects.filter(
             is_active=True,
         ).order_by('first_name', 'last_name', 'username')
@@ -188,6 +203,12 @@ class TicketCreateForm(forms.ModelForm):
             ticket.priority = None
         if created_by is not None:
             ticket.created_by = created_by
+            
+        if not ticket.equipe_id and self.user:
+            equipes = self.user.equipes.filter(is_active=True)
+            if equipes.count() == 1:
+                ticket.equipe = equipes.first()
+                
         if commit:
             ticket.save()
             attachment_file = self.cleaned_data.get('attachment')

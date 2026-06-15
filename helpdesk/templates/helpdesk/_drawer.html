@@ -94,6 +94,12 @@
                     {% endif %}
                 </span>
             </div>
+            {% if ticket.equipe %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Equipe / Setor</span>
+                <span class="font-medium text-slate-800">{{ ticket.equipe.name }}</span>
+            </div>
+            {% endif %}
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Prioridade</span>
                 <span class="font-medium text-slate-800">{% if ticket.priority %}{{ ticket.get_priority_display }}{% else %}Não definida{% endif %}</span>

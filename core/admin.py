@@ -21,19 +21,23 @@ class CustomUserAdmin(UserAdmin):
     
     # Adicionando os novos campos na visualização e edição do painel admin
     fieldsets = UserAdmin.fieldsets + (
-        ('Informações Adicionais (RBAC)', {'fields': ('role', 'equipe')}),
+        ('Informações Adicionais (RBAC)', {'fields': ('role', 'equipes')}),
         ('Auditoria', {'fields': ('created_at', 'updated_at')}),
     )
     
     # Adicionando os novos campos na tela de criação de usuário pelo painel admin
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Informações Adicionais (RBAC)', {'fields': ('role', 'equipe')}),
+        ('Informações Adicionais (RBAC)', {'fields': ('role', 'equipes')}),
     )
     
-    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'equipe', 'is_staff', 'is_active', 'created_at')
-    list_filter = ('role', 'equipe', 'is_staff', 'is_superuser', 'is_active')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'get_equipes', 'is_staff', 'is_active', 'created_at')
+    list_filter = ('role', 'equipes', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     readonly_fields = ('created_at', 'updated_at')
+
+    @admin.display(description='Equipes')
+    def get_equipes(self, obj):
+        return ", ".join([e.name for e in obj.equipes.all()])
 
 
 @admin.register(RegistroAcao)

@@ -62,12 +62,12 @@ def usuarios_solicitantes_equipe(user) -> QuerySet:
     """Membros ativos da mesma equipe do gerente (inclui o próprio gerente)."""
     if not user or not user.is_authenticated:
         return CustomUser.objects.none()
-    if not user.equipe_id:
+    if not user.equipes.exists():
         return CustomUser.objects.filter(pk=user.pk, is_active=True)
     return CustomUser.objects.filter(
         is_active=True,
-        equipe_id=user.equipe_id,
-    ).order_by('first_name', 'last_name', 'username')
+        equipes__in=user.equipes.all(),
+    ).distinct().order_by('first_name', 'last_name', 'username')
 
 
 def usuarios_tecnicos_para_transferencia() -> QuerySet:
@@ -106,11 +106,15 @@ def usuario_pode_acessar_chamado(user, ticket) -> bool:
     if ticket.requester_user_id == user.pk:
         return True
         
-    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR and user.equipe_id:
-        if ticket.created_by_id and getattr(ticket.created_by, 'equipe_id', None) == user.equipe_id:
-            return True
-        if ticket.requester_user_id and getattr(ticket.requester_user, 'equipe_id', None) == user.equipe_id:
-            return True
+    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
+        equipes_user = user.equipes.all()
+        if equipes_user.exists():
+            if ticket.equipe_id and ticket.equipe_id in [e.id for e in equipes_user]:
+                return True
+            if ticket.created_by_id and ticket.created_by.equipes.filter(id__in=equipes_user).exists():
+                return True
+            if ticket.requester_user_id and ticket.requester_user.equipes.filter(id__in=equipes_user).exists():
+                return True
             
     if ticket.created_by_id is not None:
         return False
@@ -149,6 +153,8 @@ def _filtro_chamados_proprios(user) -> Q:
         | Q(created_by__isnull=True, requester_name__iexact=nome)
         | Q(created_by__isnull=True, requester_name__iexact=user.username)
     )
-    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR and user.equipe_id:
-        q = q | Q(created_by__equipe_id=user.equipe_id) | Q(requester_user__equipe_id=user.equipe_id)
+    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
+        equipes_user = user.equipes.all()
+        if equipes_user.exists():
+            q = q | Q(equipe__in=equipes_user) | Q(created_by__equipes__in=equipes_user) | Q(requester_user__equipes__in=equipes_user)
     return q

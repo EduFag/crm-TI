@@ -36,7 +36,7 @@
                     <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Nome</th>
                     <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">E-mail</th>
                     <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Papel</th>
-                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Equipe</th>
+                    <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Equipes</th>
                     <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
                     <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações</th>
                 </tr>
@@ -52,7 +52,13 @@
                             {{ usuario.get_role_display }}
                         </span>
                     </td>
-                    <td class="px-6 py-4 text-slate-600">{{ usuario.equipe.name|default:"—" }}</td>
+                    <td class="px-6 py-4 text-slate-600">
+                        {% for eq in usuario.equipes.all %}
+                            {{ eq.name }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            —
+                        {% endfor %}
+                    </td>
                     <td class="px-6 py-4">
                         {% if usuario.is_active %}
                         <span class="text-green-600 font-medium">Ativo</span>

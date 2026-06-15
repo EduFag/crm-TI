@@ -82,6 +82,15 @@ class Ticket(models.Model):
         help_text='Categoria específica definida pela TI.',
     )
     
+    equipe = models.ForeignKey(
+        'core.Equipe',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tickets',
+        help_text='Equipe/Setor de contexto para este chamado.'
+    )
+    
     requester_name = models.CharField(
         max_length=150, 
         help_text='Nome do solicitante (ex: vindo do WhatsApp).'
@@ -116,6 +125,9 @@ class Ticket(models.Model):
     
     is_rejected = models.BooleanField(default=False, help_text='Indica se o chamado foi recusado pelo técnico.')
     rejection_reason = models.TextField(null=True, blank=True, help_text='Motivo da recusa do chamado.')
+    
+    unread_by_tech = models.BooleanField(default=False, help_text='Possui interações não lidas pela TI.')
+    unread_by_user = models.BooleanField(default=False, help_text='Possui interações não lidas pelo usuário.')
     
     # Soft delete, arquivamento e timestamps
     is_active = models.BooleanField(default=True, help_text='Indica se o registro está ativo (Soft delete).')
