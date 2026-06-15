@@ -1,13 +1,18 @@
 from django.views.generic import TemplateView
 from core.audit import logs_do_modulo
-from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
+from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, resposta_sem_permissao
 from django.db.models import Count
 from helpdesk.models import Ticket
-from helpdesk.ticket_access import filtrar_chamados_para_usuario
+from helpdesk.ticket_access import filtrar_chamados_para_usuario, usuario_pode_acessar_dashboard_e_historico
 
 class DashboardView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/dashboard.html'
     modulo_obrigatorio = MODULO_HELPDESK
+    
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_pode_acessar_dashboard_e_historico(request.user):
+            return resposta_sem_permissao(request)
+        return super().dispatch(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

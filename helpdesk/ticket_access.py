@@ -15,6 +15,11 @@ def _eh_admin_ou_superuser(user) -> bool:
     return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
 
 
+def usuario_pode_acessar_dashboard_e_historico(user) -> bool:
+    """Apenas ADMIN e IT_USER podem acessar dashboard e histórico."""
+    return _eh_admin_ou_superuser(user)
+
+
 def usuario_pode_gerenciar_categorias(user) -> bool:
     """ADMIN e superusuário podem criar categorias no modal de novo chamado."""
     return _eh_admin_ou_superuser(user)
@@ -100,6 +105,13 @@ def usuario_pode_acessar_chamado(user, ticket) -> bool:
         return True
     if ticket.requester_user_id == user.pk:
         return True
+        
+    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR and user.equipe_id:
+        if ticket.created_by_id and getattr(ticket.created_by, 'equipe_id', None) == user.equipe_id:
+            return True
+        if ticket.requester_user_id and getattr(ticket.requester_user, 'equipe_id', None) == user.equipe_id:
+            return True
+            
     if ticket.created_by_id is not None:
         return False
     nome = (user.get_full_name() or user.username).strip().lower()
@@ -110,9 +122,11 @@ def usuario_pode_acessar_chamado(user, ticket) -> bool:
 def usuario_pode_ver_quem_abriu_chamado(user, ticket) -> bool:
     """
     Solicitante vinculado por FK só vê quem abriu o chamado se for ele mesmo.
-    Quem abriu e perfis ADMIN/MANAGER sempre veem.
+    Quem abriu e perfis avançados sempre veem.
     """
     if usuario_ve_todos_chamados(user):
+        return True
+    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
         return True
     if ticket.created_by_id == user.pk:
         return True
@@ -126,12 +140,15 @@ def usuario_pode_ver_quem_abriu_chamado(user, ticket) -> bool:
 def _filtro_chamados_proprios(user) -> Q:
     """
     Chamados criados pelo usuário logado ou onde ele é solicitante vinculado.
-    Inclui legado sem created_by, vinculado pelo nome do solicitante.
+    Se for SUPERVISOR, inclui chamados de toda a sua equipe.
     """
     nome = (user.get_full_name() or user.username).strip()
-    return (
+    q = (
         Q(created_by=user)
         | Q(requester_user=user)
         | Q(created_by__isnull=True, requester_name__iexact=nome)
         | Q(created_by__isnull=True, requester_name__iexact=user.username)
     )
+    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR and user.equipe_id:
+        q = q | Q(created_by__equipe_id=user.equipe_id) | Q(requester_user__equipe_id=user.equipe_id)
+    return q

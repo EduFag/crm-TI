@@ -16,6 +16,7 @@ from helpdesk.audit import (
     log_status_alterado,
     log_transferencia,
     log_chamado_excluido,
+    log_chamado_recusado,
 )
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
@@ -118,8 +119,8 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Aplica a regra de arquivar resolvidos antigos antes de carregar o kanban
-        Ticket.archive_old_resolved_tickets(days=2)
+        # Aplica a regra de arquivar antigos antes de carregar o kanban
+        Ticket.archive_old_tickets(days_resolved=2, hours_rejected=24)
         
         # Apenas tickets ativos e NÃO arquivados no Kanban
         tickets = filtrar_chamados_para_usuario(
@@ -159,6 +160,7 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
     def post(self, request):
         form = TicketCreateForm(
             request.POST,
+            request.FILES,
             user=request.user,
             nome_solicitante_padrao=self._nome_padrao(request),
         )
@@ -264,6 +266,64 @@ def ticket_update_status(request, pk):
             )
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'error': 'Status inválido'}, status=400)
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_finalize(request, pk):
+    if not usuario_pode_operar_kanban(request.user):
+        return JsonResponse({'success': False, 'error': 'Sem permissão para mover chamados'}, status=403)
+
+    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return JsonResponse({'success': False, 'error': 'Sem permissão'}, status=403)
+        
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        reason = data.get('reason')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Payload inválido'}, status=400)
+        
+    if not reason:
+        return JsonResponse({'success': False, 'error': 'Observação / Motivo é obrigatório'}, status=400)
+        
+    status_anterior = ticket.status
+    ticket.status = Ticket.StatusChoices.RESOLVED
+    
+    if action == 'reject':
+        ticket.is_rejected = True
+        ticket.rejection_reason = reason
+        log_chamado_recusado(ticket, request.user, reason)
+        Comment.objects.create(
+            ticket=ticket, 
+            author=request.user, 
+            text=f"Chamado recusado.\nMotivo: {reason}"
+        )
+    else:
+        ticket.is_rejected = False
+        # Remove a recusa anterior caso seja re-resolvido
+        ticket.rejection_reason = ""
+        Comment.objects.create(
+            ticket=ticket, 
+            author=request.user, 
+            text=f"Chamado finalizado.\nObservação: {reason}"
+        )
+        
+    if not ticket.assigned_to:
+        ticket.assigned_to = request.user
+        
+    ticket.save()
+    
+    if status_anterior != Ticket.StatusChoices.RESOLVED:
+        log_status_alterado(
+            ticket,
+            request.user,
+            _rotulo_status(status_anterior),
+            _rotulo_status(Ticket.StatusChoices.RESOLVED),
+        )
+        
+    return JsonResponse({'success': True})
 
 
 @requer_modulo(MODULO_HELPDESK)
@@ -404,3 +464,20 @@ def ticket_delete(request, pk):
         return response
         
     return redirect('helpdesk:kanban')
+
+
+
+
+
+@requer_modulo(MODULO_HELPDESK)
+def ticket_attachments(request, pk):
+    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão para visualizar este chamado.')
+        
+    attachments = ticket.attachments.all().order_by('-created_at')
+    
+    return render(request, 'helpdesk/_attachments_modal.html', {
+        'ticket': ticket,
+        'attachments': attachments
+    })

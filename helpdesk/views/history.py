@@ -1,7 +1,8 @@
 from django.views.generic import ListView
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin
 from helpdesk.models import Ticket, TicketCategory
-from helpdesk.ticket_access import filtrar_chamados_para_usuario
+from helpdesk.ticket_access import filtrar_chamados_para_usuario, usuario_pode_acessar_dashboard_e_historico
+from core.permissions import resposta_sem_permissao
 
 class HistoryListView(ModuloObrigatorioMixin, ListView):
     modulo_obrigatorio = MODULO_HELPDESK
@@ -9,6 +10,11 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
     model = Ticket
     context_object_name = 'tickets'
     paginate_by = 20
+
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_pode_acessar_dashboard_e_historico(request.user):
+            return resposta_sem_permissao(request)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         qs = filtrar_chamados_para_usuario(

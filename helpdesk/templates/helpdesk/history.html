@@ -10,6 +10,28 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
             <p class="text-sm text-slate-500 mt-1">Busque e filtre o histórico completo de chamados.</p>
         </div>
+        <div class="flex items-center gap-2">
+            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:categories' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium border border-slate-300 transition-colors shadow-sm">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Categorias
+            </button>
+            {% endif %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Novo Chamado
+            </button>
+        </div>
     </div>
     
     {% include "helpdesk/_nav.html" %}
@@ -99,15 +121,18 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 text-slate-600">
-                        {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username|default:"—" }}
+                        {% if ticket.assigned_to %}
+                            {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}
+                        {% else %}
+                            —
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 text-slate-500">
                         {{ ticket.updated_at|date:"d/m/Y H:i" }}
                     </td>
                     <td class="px-6 py-4">
-                        <!-- Botão que abre o HTMX Drawer igual ao Kanban -->
-                        <button hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-target="#drawer-container" hx-swap="innerHTML" class="text-blue-600 hover:text-blue-800 text-xs font-semibold uppercase tracking-wider">
-                            Visualizar
+                        <button hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-target="#drawer-container" hx-swap="innerHTML" title="Visualizar Chamado" class="text-blue-600 hover:text-blue-800 p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                         </button>
                     </td>
                 </tr>
@@ -122,5 +147,6 @@
     
     <!-- Drawer container para a tabela também -->
     <div id="drawer-container"></div>
+    <div id="modal-container"></div>
 </div>
 {% endblock %}

@@ -1,10 +1,17 @@
 from django.contrib import admin
 
-from helpdesk.models import Comment, Ticket, TicketCategory
+from helpdesk.models import Comment, Ticket, TicketCategory, TicketSpecificCategory
 
 
 @admin.register(TicketCategory)
 class TicketCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name',)
+
+
+@admin.register(TicketSpecificCategory)
+class TicketSpecificCategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('name',)

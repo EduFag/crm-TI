@@ -88,3 +88,13 @@ def log_chamado_excluido(ticket, actor):
         actor=actor,
         obj=ticket,
     )
+
+
+def log_chamado_recusado(ticket, actor, motivo):
+    return registrar_acao(
+        modulo=MODULO_HELPDESK,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=f'Chamado "{ticket.title}" recusado. Motivo: {motivo}',
+        actor=actor,
+        obj=ticket,
+    )

@@ -36,18 +36,31 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Categoria</label>
                 {{ form.category }}
             </div>
+            {% if form.specific_category %}
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Categoria Específica</label>
+                {{ form.specific_category }}
+            </div>
+            {% else %}
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
                 {{ form.status }}
             </div>
+            {% endif %}
         </div>
 
         <div class="grid grid-cols-2 gap-3">
+            {% if form.specific_category %}
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                {{ form.status }}
+            </div>
+            {% endif %}
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Prioridade</label>
                 {{ form.priority }}
             </div>
-            <div>
+            <div class="{% if not form.specific_category %}col-span-1{% else %}col-span-2{% endif %}">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Técnico responsável</label>
                 {{ form.assigned_to }}
             </div>

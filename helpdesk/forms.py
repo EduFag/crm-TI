@@ -45,10 +45,19 @@ class TicketCreateForm(forms.ModelForm):
         empty_label='Selecione um usuário',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
+    attachment = forms.FileField(
+        required=False,
+        label='Anexar Imagem (Opcional)',
+        help_text='Apenas JPEG, PNG ou WEBP. Máx: 5MB.',
+        widget=forms.ClearableFileInput(attrs={
+            'class': 'w-full text-sm p-2 border border-slate-300 rounded-lg bg-white',
+            'accept': 'image/png, image/jpeg, image/webp'
+        })
+    )
 
     class Meta:
         model = Ticket
-        fields = ['title', 'description', 'priority', 'category']
+        fields = ['title', 'description', 'priority', 'category', 'specific_category']
         widgets = {
             'title': forms.TextInput(attrs={
                 'placeholder': 'Resumo curto da solicitação',
@@ -63,6 +72,7 @@ class TicketCreateForm(forms.ModelForm):
             }),
             'priority': forms.Select(attrs={'class': SELECT_CLASS}),
             'category': forms.Select(attrs={'class': SELECT_CLASS}),
+            'specific_category': forms.Select(attrs={'class': SELECT_CLASS}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -71,7 +81,12 @@ class TicketCreateForm(forms.ModelForm):
         categoria_inicial = kwargs.pop('categoria_inicial', None)
         super().__init__(*args, **kwargs)
 
+        from helpdesk.models import TicketSpecificCategory
         self.fields['category'].queryset = TicketCategory.objects.filter(is_active=True).order_by('name')
+        self.fields['specific_category'].queryset = TicketSpecificCategory.objects.filter(is_active=True).order_by('name')
+        self.fields['specific_category'].required = False
+        self.fields['specific_category'].empty_label = 'Sem categoria específica'
+        
         if not self.is_bound and categoria_inicial:
             self.fields['category'].initial = categoria_inicial
         elif not self.is_bound:
@@ -104,6 +119,7 @@ class TicketCreateForm(forms.ModelForm):
             self._remover_campo('requester_name')
             self._remover_campo('requester_user')
             self._remover_campo('priority')
+            self._remover_campo('specific_category')
             return
 
         # ADMIN, IT_USER ou superuser
@@ -174,6 +190,14 @@ class TicketCreateForm(forms.ModelForm):
             ticket.created_by = created_by
         if commit:
             ticket.save()
+            attachment_file = self.cleaned_data.get('attachment')
+            if attachment_file:
+                from helpdesk.models import TicketAttachment
+                TicketAttachment.objects.create(
+                    ticket=ticket,
+                    file_name=attachment_file.name,
+                    file=attachment_file
+                )
         return ticket
 
 
@@ -207,7 +231,7 @@ class TicketUpdateForm(forms.ModelForm):
 
     class Meta:
         model = Ticket
-        fields = ['title', 'description', 'category', 'priority', 'status', 'assigned_to']
+        fields = ['title', 'description', 'category', 'specific_category', 'priority', 'status', 'assigned_to']
         widgets = {
             'title': forms.TextInput(attrs={'class': INPUT_CLASS}),
             'description': forms.Textarea(attrs={
@@ -217,6 +241,7 @@ class TicketUpdateForm(forms.ModelForm):
                 'aria-required': 'true',
             }),
             'category': forms.Select(attrs={'class': SELECT_CLASS}),
+            'specific_category': forms.Select(attrs={'class': SELECT_CLASS}),
             'priority': forms.Select(attrs={'class': SELECT_CLASS}),
             'status': forms.Select(attrs={'class': SELECT_CLASS}),
             'assigned_to': forms.Select(attrs={'class': SELECT_CLASS}),
@@ -224,7 +249,11 @@ class TicketUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from helpdesk.models import TicketSpecificCategory
         self.fields['category'].queryset = TicketCategory.objects.filter(is_active=True).order_by('name')
+        self.fields['specific_category'].queryset = TicketSpecificCategory.objects.filter(is_active=True).order_by('name')
+        self.fields['specific_category'].required = False
+        self.fields['specific_category'].empty_label = 'Nenhuma'
         self.fields['assigned_to'].queryset = usuarios_tecnicos_para_transferencia()
         self.fields['assigned_to'].required = False
         self.fields['assigned_to'].empty_label = 'Não atribuído'

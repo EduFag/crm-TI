@@ -31,6 +31,7 @@ TODOS_MODULOS = frozenset({
 # Matriz role → módulos permitidos
 MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
     CustomUser.RoleChoices.STANDARD: frozenset({MODULO_HELPDESK}),
+    CustomUser.RoleChoices.SUPERVISOR: frozenset({MODULO_HELPDESK}),
     CustomUser.RoleChoices.IT_USER: frozenset({
         MODULO_HELPDESK,
         MODULO_CHIPS,

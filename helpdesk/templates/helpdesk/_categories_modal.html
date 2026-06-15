@@ -1,0 +1,56 @@
+<!-- Modal Container para Categorias -->
+<div id="modal-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-100 opacity-100 overflow-hidden">
+        
+        <!-- Cabeçalho -->
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900 tracking-tight">Gerenciar Categorias</h3>
+                <p class="text-xs text-slate-500 mt-1">Configure as categorias gerais (usuários) e específicas (TI).</p>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600 transition-colors bg-white hover:bg-slate-100 p-2 rounded-full" onclick="document.getElementById('modal-container').innerHTML = ''">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Corpo -->
+        <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Categorias Gerais -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[60vh]">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-sm">Categorias Gerais</h3>
+                    </div>
+                    <div class="p-4 border-b border-slate-100">
+                        <form hx-post="{% url 'helpdesk:category_create_action' 'general' %}" hx-target="#list-general" class="flex gap-2" onsubmit="setTimeout(() => this.reset(), 50)">
+                            {% csrf_token %}
+                            <input type="text" name="name" placeholder="Nova categoria..." required class="flex-1 text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Adicionar</button>
+                        </form>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-0" id="list-general">
+                        {% include "helpdesk/_category_list.html" with categories=general_categories type="general" %}
+                    </div>
+                </div>
+
+                <!-- Categorias Específicas -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[60vh]">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-sm">Categorias Específicas</h3>
+                    </div>
+                    <div class="p-4 border-b border-slate-100">
+                        <form hx-post="{% url 'helpdesk:category_create_action' 'specific' %}" hx-target="#list-specific" class="flex gap-2" onsubmit="setTimeout(() => this.reset(), 50)">
+                            {% csrf_token %}
+                            <input type="text" name="name" placeholder="Nova categoria específica..." required class="flex-1 text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Adicionar</button>
+                        </form>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-0" id="list-specific">
+                        {% include "helpdesk/_category_list.html" with categories=specific_categories type="specific" %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
