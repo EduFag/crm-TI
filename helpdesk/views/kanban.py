@@ -469,9 +469,13 @@ def ticket_add_comment(request, pk):
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para comentar neste chamado.')
     text = request.POST.get('text', '').strip()
-    if text:
-        Comment.objects.create(ticket=ticket, author=request.user, text=text)
-        log_comentario(ticket, request.user, text)
+    attachment = request.FILES.get('attachment')
+    if text or attachment:
+        Comment.objects.create(ticket=ticket, author=request.user, text=text, attachment=attachment)
+        if text:
+            log_comentario(ticket, request.user, text)
+        else:
+            log_comentario(ticket, request.user, 'Anexou uma imagem.')
         
         is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
         if is_ti:
@@ -515,7 +519,20 @@ def ticket_attachments(request, pk):
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para visualizar este chamado.')
         
-    attachments = ticket.attachments.all().order_by('-created_at')
+    attachments = []
+    comment_id = request.GET.get('comment_id')
+    if comment_id:
+        from helpdesk.models import Comment
+        comment = get_object_or_404(Comment, pk=comment_id, ticket=ticket)
+        class MockAttachment:
+            def __init__(self, file, created_at):
+                self.file = file
+                self.file_name = file.name.split('/')[-1] if file and file.name else 'anexo_comentario'
+                self.created_at = created_at
+        if comment.attachment:
+            attachments = [MockAttachment(comment.attachment, comment.created_at)]
+    else:
+        attachments = ticket.attachments.all().order_by('-created_at')
     
     return render(request, 'helpdesk/_attachments_modal.html', {
         'ticket': ticket,

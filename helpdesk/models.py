@@ -210,6 +210,13 @@ class Comment(models.Model):
         help_text='Usuário que fez o comentário (ou None se for do sistema).'
     )
     text = models.TextField(help_text='Texto do comentário ou atualização do histórico.')
+    attachment = models.FileField(
+        upload_to=attachment_upload_path, 
+        validators=[validate_image_attachment], 
+        null=True, 
+        blank=True, 
+        help_text='Imagem anexada ao comentário.'
+    )
     
     # Soft delete e timestamps
     is_active = models.BooleanField(default=True)
