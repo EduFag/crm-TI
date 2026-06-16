@@ -98,6 +98,48 @@
     </div>
 </div>
 
+<!-- Modal Triagem (Oculto inicialmente) -->
+<div id="triage-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <h3 class="text-lg font-bold text-slate-900 tracking-tight">Triagem Inicial</h3>
+            <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeTriageModal()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form id="triage-form" class="p-6 flex flex-col gap-5">
+            <input type="hidden" id="triage-ticket-id" name="ticket_id">
+            <input type="hidden" id="triage-new-status" name="new_status">
+            
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Prioridade</label>
+                <select name="priority" id="triage-priority" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sem prioridade (triagem posterior)</option>
+                    <option value="LOW">Baixa</option>
+                    <option value="MEDIUM">Média</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Categoria Específica</label>
+                <select name="specific_category" id="triage-specific-category" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Nenhuma / Não se aplica</option>
+                    {% for cat in specific_categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" onclick="closeTriageModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">Salvar e Mover</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- JavaScript para o Drag and Drop do Kanban -->
 {% if pode_operar_kanban %}
 <script>
@@ -135,6 +177,7 @@
         
         let ticketId = ticketIdRaw.split('-')[1];
         let newStatus = targetColumn.getAttribute('data-status');
+        let oldStatus = lastDraggedCardParent.getAttribute('data-status');
         
         let card = document.getElementById(ticketIdRaw);
         if (card) {
@@ -142,6 +185,11 @@
             
             if (newStatus === 'RESOLVED') {
                 openFinalizeModal(ticketId, card, lastDraggedCardParent);
+                return;
+            }
+
+            if (oldStatus === 'NEW' && newStatus !== 'NEW') {
+                openTriageModal(ticketId, newStatus, card, lastDraggedCardParent);
                 return;
             }
             
@@ -194,13 +242,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const form = document.getElementById('finalize-form');
-        if (form) {
-            form.addEventListener('submit', function(e) {
+        const finalizeForm = document.getElementById('finalize-form');
+        if (finalizeForm) {
+            finalizeForm.addEventListener('submit', function(e) {
                 e.preventDefault();
                 const ticketId = document.getElementById('finalize-ticket-id').value;
-                const action = form.elements['action'].value;
-                const reason = form.elements['reason'].value;
+                const action = finalizeForm.elements['action'].value;
+                const reason = finalizeForm.elements['reason'].value;
                 
                 fetch(`/helpdesk/ticket/${ticketId}/finalize/`, {
                     method: 'POST',
@@ -218,11 +266,7 @@
                             parentToRevert.appendChild(currentCardToRevert);
                         }
                     }
-                    const modal = document.getElementById('finalize-modal');
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
-                    currentCardToRevert = null;
-                    parentToRevert = null;
+                    closeFinalizeModal();
                 })
                 .catch(error => {
                     console.error('Erro:', error);
@@ -230,7 +274,72 @@
                 });
             });
         }
+
+        const triageForm = document.getElementById('triage-form');
+        if (triageForm) {
+            triageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const ticketId = document.getElementById('triage-ticket-id').value;
+                const newStatus = document.getElementById('triage-new-status').value;
+                const priority = triageForm.elements['priority'].value;
+                const specificCategory = triageForm.elements['specific_category'].value;
+                
+                fetch(`/helpdesk/ticket/${ticketId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ 
+                        status: newStatus,
+                        priority: priority,
+                        specific_category: specificCategory
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(!data.success) {
+                        console.error("Falha ao realizar triagem");
+                        if (currentCardToRevert && parentToRevert) {
+                            parentToRevert.appendChild(currentCardToRevert);
+                        }
+                    }
+                    closeTriageModal();
+                    // Renderiza novamento o HTMX polling para atualizar os cartões
+                    document.body.dispatchEvent(new Event('ticketUpdated'));
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    closeTriageModal();
+                });
+            });
+        }
     });
+
+    function openTriageModal(ticketId, newStatus, card, oldParent) {
+        document.getElementById('triage-ticket-id').value = ticketId;
+        document.getElementById('triage-new-status').value = newStatus;
+        
+        currentCardToRevert = card;
+        parentToRevert = oldParent;
+        
+        const modal = document.getElementById('triage-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeTriageModal() {
+        const modal = document.getElementById('triage-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        
+        if (currentCardToRevert && parentToRevert && modal.classList.contains('hidden')) {
+            // Se fechou sem sucesso/cancelou, reverte
+            parentToRevert.appendChild(currentCardToRevert);
+        }
+        currentCardToRevert = null;
+        parentToRevert = null;
+    }
 </script>
 {% endif %}
 {% endblock %}

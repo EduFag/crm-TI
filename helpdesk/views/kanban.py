@@ -99,16 +99,16 @@ def _metadata_alteracao_ticket(antes, depois):
 
 
 def _contexto_drawer(request, ticket, edit_form=None):
-    pode_editar = usuario_pode_editar_chamado(request.user)
+    pode_editar = usuario_pode_editar_chamado(request.user, ticket)
     return {
         'ticket': ticket,
         'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
         'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
         'pode_editar': pode_editar,
-        'pode_excluir': usuario_pode_excluir_chamado(request.user),
+        'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
-        'edit_form': edit_form or (TicketUpdateForm(instance=ticket) if pode_editar else None),
+        'edit_form': edit_form or (TicketUpdateForm(instance=ticket, user=request.user) if pode_editar else None),
         'mostrar_edicao': edit_form is not None,
     }
 
@@ -133,6 +133,9 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         context['tickets_pending'] = tickets.filter(status=Ticket.StatusChoices.PENDING).order_by('-created_at')
         context['tickets_resolved'] = tickets.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
         context['pode_operar_kanban'] = usuario_pode_operar_kanban(self.request.user)
+
+        from helpdesk.models import TicketSpecificCategory
+        context['specific_categories'] = TicketSpecificCategory.objects.filter(is_active=True).order_by('name')
 
         return context
 
@@ -244,6 +247,15 @@ def ticket_update_status(request, pk):
     if new_status in dict(Ticket.StatusChoices.choices):
         status_anterior = ticket.status
         ticket.status = new_status
+        
+        priority = data.get('priority')
+        if priority is not None:
+            ticket.priority = priority or None
+            
+        specific_category_id = data.get('specific_category')
+        if specific_category_id is not None:
+            ticket.specific_category_id = specific_category_id if specific_category_id else None
+            
         if not ticket.assigned_to and new_status != Ticket.StatusChoices.NEW:
             ticket.assigned_to = request.user
             Comment.objects.create(
@@ -354,24 +366,24 @@ def ticket_drawer(request, pk):
 
 @requer_modulo(MODULO_HELPDESK)
 def ticket_edit(request, pk):
-    """Exibe ou salva edição de chamado (somente ADMIN/superuser)."""
+    """Exibe ou salva edição de chamado."""
     ticket = get_object_or_404(
         Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category'),
         pk=pk,
         is_active=True,
     )
-    if not usuario_pode_editar_chamado(request.user):
+    if not usuario_pode_editar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para editar chamados.')
 
     if request.method == 'GET':
         return render(
             request,
             'helpdesk/_drawer.html',
-            _contexto_drawer(request, ticket, edit_form=TicketUpdateForm(instance=ticket)),
+            _contexto_drawer(request, ticket, edit_form=TicketUpdateForm(instance=ticket, user=request.user)),
         )
 
     antes = Ticket.objects.select_related('assigned_to', 'category').get(pk=ticket.pk)
-    form = TicketUpdateForm(request.POST, instance=ticket)
+    form = TicketUpdateForm(request.POST, instance=ticket, user=request.user)
     if form.is_valid():
         depois = form.save()
         mensagens = gerar_comentarios_alteracao(antes, depois)
@@ -479,9 +491,9 @@ class KanbanBoardPartialView(KanbanView):
 @requer_modulo(MODULO_HELPDESK)
 @require_POST
 def ticket_delete(request, pk):
-    if not usuario_pode_excluir_chamado(request.user):
-        return HttpResponseForbidden('Sem permissão para excluir chamados.')
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    if not usuario_pode_excluir_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão para excluir chamados.')
     ticket.is_active = False
     ticket.save()
     log_chamado_excluido(ticket, request.user)

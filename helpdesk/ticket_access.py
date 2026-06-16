@@ -30,13 +30,15 @@ def usuario_pode_definir_prioridade(user) -> bool:
     return _eh_admin_ou_superuser(user)
 
 
-def usuario_pode_editar_chamado(user) -> bool:
-    """Administradores e usuários de TI podem editar chamados. Restrito para STANDARD."""
+def usuario_pode_editar_chamado(user, ticket=None) -> bool:
+    """Administradores e usuários de TI podem editar qualquer chamado. STANDARD e SUPERVISOR apenas os que têm acesso."""
     if not user or not user.is_authenticated:
         return False
-    if user.is_superuser:
+    if user.is_superuser or user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER):
         return True
-    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
+    if ticket:
+        return usuario_pode_acessar_chamado(user, ticket)
+    return True
 
 
 def usuario_pode_transferir_chamado(user) -> bool:
@@ -44,9 +46,15 @@ def usuario_pode_transferir_chamado(user) -> bool:
     return _eh_admin_ou_superuser(user)
 
 
-def usuario_pode_excluir_chamado(user) -> bool:
-    """Administradores e usuários de TI podem excluir chamados. Restrito para STANDARD."""
-    return _eh_admin_ou_superuser(user)
+def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
+    """Administradores e usuários de TI podem excluir qualquer chamado. STANDARD e SUPERVISOR apenas os que têm acesso."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser or user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER):
+        return True
+    if ticket:
+        return usuario_pode_acessar_chamado(user, ticket)
+    return True
 
 
 def usuario_pode_operar_kanban(user) -> bool:

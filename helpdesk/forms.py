@@ -14,11 +14,15 @@ INPUT_CLASS = 'w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:out
 SELECT_CLASS = 'w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition-colors'
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
 class TicketCreateForm(forms.ModelForm):
     """Formulário de criação de chamado com campos condicionais por papel do usuário."""
 
     TIPO_TEXTO = 'texto'
     TIPO_USUARIO = 'usuario'
+    TIPO_EU = 'eu'
 
     tipo_solicitante = forms.ChoiceField(
         choices=[
@@ -43,15 +47,16 @@ class TicketCreateForm(forms.ModelForm):
         required=False,
         label='Usuário solicitante',
         empty_label='Selecione um usuário',
-        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+        widget=forms.Select(attrs={'class': SELECT_CLASS + ' searchable-select'}),
     )
     attachment = forms.FileField(
         required=False,
         label='Anexar Imagem (Opcional)',
-        help_text='Apenas JPEG, PNG ou WEBP. Máx: 5MB.',
-        widget=forms.ClearableFileInput(attrs={
+        help_text='Apenas JPEG, PNG ou WEBP. Máx: 5MB por imagem. Limite de 4 imagens.',
+        widget=MultipleFileInput(attrs={
             'class': 'w-full text-sm p-2 border border-slate-300 rounded-lg bg-white',
-            'accept': 'image/png, image/jpeg, image/webp'
+            'accept': 'image/png, image/jpeg, image/webp',
+            'multiple': True
         })
     )
 
@@ -132,23 +137,42 @@ class TicketCreateForm(forms.ModelForm):
             self._remover_campo('specific_category')
             return
 
-        # ADMIN, IT_USER ou superuser
-        if 'equipe' in self.fields:
-            self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
-            self.fields['equipe'].empty_label = 'Selecione a equipe'
-            self.fields['equipe'].required = False
+        if role == CustomUser.RoleChoices.SUPERVISOR:
+            self.fields['tipo_solicitante'].choices = [
+                (self.TIPO_EU, 'Eu mesmo(a)'),
+                (self.TIPO_USUARIO, 'Usuário da Equipe/Sistema'),
+            ]
+            self.fields['tipo_solicitante'].initial = self.TIPO_EU
+            self._remover_campo('requester_name')
+            self._remover_campo('priority')
+            self._remover_campo('specific_category')
+            
+            equipes_ativas = self.user.equipes.filter(is_active=True).order_by('name')
+            self.fields['equipe'].queryset = equipes_ativas
+            if equipes_ativas.count() <= 1:
+                self._remover_campo('equipe')
+            else:
+                self.fields['equipe'].empty_label = 'Selecione a equipe'
+                self.fields['equipe'].required = True
+        else:
+            # ADMIN, IT_USER ou superuser
+            if 'equipe' in self.fields:
+                self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
+                self.fields['equipe'].empty_label = 'Selecione a equipe'
+                self.fields['equipe'].required = False
+            
+            if not self.is_bound and nome_padrao:
+                self.fields['requester_name'].initial = nome_padrao
+            if not usuario_pode_definir_prioridade(self.user):
+                self._remover_campo('priority')
+            else:
+                self.fields['priority'].required = False
+                self.fields['priority'].empty_label = 'Sem prioridade (triagem posterior)'
 
         self.fields['requester_user'].queryset = CustomUser.objects.filter(
             is_active=True,
         ).order_by('first_name', 'last_name', 'username')
         self.fields['requester_user'].label_from_instance = self._rotulo_usuario
-        if not self.is_bound and nome_padrao:
-            self.fields['requester_name'].initial = nome_padrao
-        if not usuario_pode_definir_prioridade(self.user):
-            self._remover_campo('priority')
-        else:
-            self.fields['priority'].required = False
-            self.fields['priority'].empty_label = 'Sem prioridade (triagem posterior)'
 
     def _remover_campo(self, nome):
         if nome in self.fields:
@@ -183,6 +207,9 @@ class TicketCreateForm(forms.ModelForm):
                     requester_user.get_full_name() or requester_user.username
                 )
                 cleaned['requester_user'] = requester_user
+        elif tipo == self.TIPO_EU:
+            cleaned['requester_name'] = self.user.get_full_name() or self.user.username
+            cleaned['requester_user'] = self.user
         else:
             if not requester_name:
                 self.add_error('requester_name', 'Informe o nome do solicitante.')
@@ -211,14 +238,27 @@ class TicketCreateForm(forms.ModelForm):
                 
         if commit:
             ticket.save()
-            attachment_file = self.cleaned_data.get('attachment')
-            if attachment_file:
-                from helpdesk.models import TicketAttachment
-                TicketAttachment.objects.create(
-                    ticket=ticket,
-                    file_name=attachment_file.name,
-                    file=attachment_file
-                )
+            # Precisamos usar request.FILES no lugar de cleaned_data para multiplos, mas se não tivermos a request, tentamos pegar de data
+            # Porém self.files é um MultiValueDict
+            if hasattr(self, 'files') and 'attachment' in self.files:
+                attachment_files = self.files.getlist('attachment')[:4] # Limita a 4 arquivos
+                if attachment_files:
+                    from helpdesk.models import TicketAttachment
+                    for attachment_file in attachment_files:
+                        TicketAttachment.objects.create(
+                            ticket=ticket,
+                            file_name=attachment_file.name,
+                            file=attachment_file
+                        )
+            else:
+                attachment_file = self.cleaned_data.get('attachment')
+                if attachment_file:
+                    from helpdesk.models import TicketAttachment
+                    TicketAttachment.objects.create(
+                        ticket=ticket,
+                        file_name=attachment_file.name,
+                        file=attachment_file
+                    )
         return ticket
 
 
@@ -268,7 +308,8 @@ class TicketUpdateForm(forms.ModelForm):
             'assigned_to': forms.Select(attrs={'class': SELECT_CLASS}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
         from helpdesk.models import TicketSpecificCategory
         self.fields['category'].queryset = TicketCategory.objects.filter(is_active=True).order_by('name')
@@ -293,6 +334,20 @@ class TicketUpdateForm(forms.ModelForm):
             else:
                 self.fields['tipo_solicitante'].initial = self.TIPO_TEXTO
                 self.fields['requester_name'].initial = self.instance.requester_name
+
+        role = getattr(self.user, 'role', CustomUser.RoleChoices.STANDARD) if self.user else CustomUser.RoleChoices.STANDARD
+        if self.user and self.user.is_superuser:
+            role = CustomUser.RoleChoices.ADMIN
+
+        if role in (CustomUser.RoleChoices.STANDARD, CustomUser.RoleChoices.SUPERVISOR):
+            self._remover_campo('priority')
+            self._remover_campo('status')
+            self._remover_campo('assigned_to')
+            self._remover_campo('specific_category')
+
+    def _remover_campo(self, nome):
+        if nome in self.fields:
+            del self.fields[nome]
 
     def clean_description(self):
         descricao = (self.cleaned_data.get('description') or '').strip()
