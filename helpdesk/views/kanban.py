@@ -128,7 +128,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
             self.request.user,
         ).select_related('assigned_to', 'created_by', 'requester_user', 'category')
         
-        context['tickets_new'] = tickets.filter(status=Ticket.StatusChoices.NEW).order_by('-created_at')
+        context['tickets_new'] = tickets.filter(status=Ticket.StatusChoices.NEW).order_by('created_at')
         context['tickets_in_progress'] = tickets.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-created_at')
         context['tickets_pending'] = tickets.filter(status=Ticket.StatusChoices.PENDING).order_by('-created_at')
         context['tickets_resolved'] = tickets.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
