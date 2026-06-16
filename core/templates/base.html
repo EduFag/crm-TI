@@ -172,8 +172,7 @@
                     {{ user.username|make_list|first|upper }}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-slate-900 truncate">{{ user.get_full_name|default:user.username
-                        }}</p>
+                    <p class="text-sm font-semibold text-slate-900 truncate">{{ user.get_full_name|default:user.username }}</p>
                     <p class="text-xs text-slate-500 truncate">{{ user.get_role_display|default:"Usuário" }}</p>
                 </div>
             </div>

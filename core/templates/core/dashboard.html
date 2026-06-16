@@ -5,8 +5,7 @@
 {% block content %}
 <div class="flex items-center justify-between mb-8">
     <div>
-        <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a), {{
-            user.first_name|default:user.username }}</h2>
+        <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a), {{ user.first_name|default:user.username }}</h2>
         <p class="text-sm text-slate-500 mt-1">Acesso rápido aos módulos do sistema.</p>
     </div>
 </div>
