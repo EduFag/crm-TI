@@ -38,22 +38,32 @@
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    {% include "core/_sidebar_styles.html" %}
+    <script>
+        try {
+            if (localStorage.getItem('sidebar-collapsed') === '1') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        } catch (e) { }
+    </script>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 flex h-screen overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col">
+    <aside id="app-sidebar"
+        class="relative shrink-0 bg-white border-r border-slate-200 flex flex-col z-30">
         <!-- Logo -->
-        <div class="h-16 flex items-center px-6 border-b border-slate-100">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">
+        <div class="h-16 flex items-center px-6 border-b border-slate-100 sidebar-logo-wrap">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                     </svg>
                 </div>
-                <span class="font-bold text-lg text-slate-900 tracking-tight">Sistema TI</span>
+                <span class="sidebar-hide-collapsed font-bold text-lg text-slate-900 tracking-tight">Sistema TI</span>
             </div>
         </div>
 
@@ -61,29 +71,38 @@
 
         <!-- Área do Usuário -->
         <div class="p-4 border-t border-slate-200 bg-white">
-            <div class="flex items-center gap-3 mb-3">
+            <div class="flex items-center gap-3 mb-3 sidebar-user-wrap">
                 <div
-                    class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100">
+                    class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100 shrink-0"
+                    title="{{ user.get_full_name|default:user.username }}">
                     {{ user.username|make_list|first|upper }}
                 </div>
-                <div class="flex-1 min-w-0">
+                <div class="flex-1 min-w-0 sidebar-hide-collapsed">
                     <p class="text-sm font-semibold text-slate-900 truncate">{{ user.get_full_name|default:user.username }}</p>
                     <p class="text-xs text-slate-500 truncate">{{ user.get_role_display|default:"Usuário" }}</p>
                 </div>
             </div>
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
-                <button type="submit"
+                <button type="submit" title="Sair do Sistema"
                     class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 font-medium bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
                         </path>
                     </svg>
-                    Sair do Sistema
+                    <span class="sidebar-hide-collapsed">Sair do Sistema</span>
                 </button>
             </form>
         </div>
+
+        <!-- Botão recolher/expandir -->
+        <button type="button" id="sidebar-toggle" title="Recolher menu"
+            class="absolute -right-3 top-[4.5rem] z-40 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <svg id="sidebar-toggle-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
     </aside>
 
     <!-- Main Content -->
@@ -140,6 +159,46 @@
             var modal = document.getElementById('modal-container');
             if (modal) modal.innerHTML = '';
         });
+
+        // Menu lateral recolhível
+        (function () {
+            var sidebar = document.getElementById('app-sidebar');
+            var toggle = document.getElementById('sidebar-toggle');
+            var root = document.documentElement;
+            if (!sidebar || !toggle) return;
+
+            var storageKey = 'sidebar-collapsed';
+
+            function menuRecolhido() {
+                return root.classList.contains('sidebar-collapsed');
+            }
+
+            function aplicarEstado(recolhido) {
+                root.classList.toggle('sidebar-collapsed', recolhido);
+                toggle.title = recolhido ? 'Expandir menu' : 'Recolher menu';
+                if (recolhido) {
+                    sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (grupo) {
+                        grupo.removeAttribute('open');
+                    });
+                }
+            }
+
+            toggle.addEventListener('click', function () {
+                var recolhido = !menuRecolhido();
+                aplicarEstado(recolhido);
+                try {
+                    localStorage.setItem(storageKey, recolhido ? '1' : '0');
+                } catch (e) { }
+            });
+
+            sidebar.querySelectorAll('.sidebar-group-trigger').forEach(function (trigger) {
+                trigger.addEventListener('click', function (event) {
+                    if (menuRecolhido()) {
+                        event.preventDefault();
+                    }
+                });
+            });
+        })();
     </script>
 </body>
 
