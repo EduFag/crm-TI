@@ -34,6 +34,7 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ('role', 'equipes', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('equipes',)
 
     @admin.display(description='Equipes')
     def get_equipes(self, obj):
