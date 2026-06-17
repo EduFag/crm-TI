@@ -227,12 +227,22 @@ USE_I18N = True
 USE_TZ = True
 
 
+def _normalizar_static_url(url: str) -> str:
+    """Garante URL absoluta (/static/) para o admin não gerar caminhos sob /admin/login/."""
+    url = (url or '/static/').strip()
+    if not url.startswith('/'):
+        url = f'/{url}'
+    if not url.endswith('/'):
+        url = f'{url}/'
+    return url
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 # Barra inicial obrigatória: sem ela o admin gera URLs relativas (/admin/login/static/...)
-# e o CSS não carrega em páginas aninhadas como /admin/login/.
-STATIC_URL = os.environ.get('DJANGO_STATIC_URL', '/static/')
+# e o Django trata esses caminhos como rotas do admin → 403 para usuários sem is_staff.
+STATIC_URL = _normalizar_static_url(os.environ.get('DJANGO_STATIC_URL', '/static/'))
 STATIC_ROOT = BASE_DIR / os.environ.get('DJANGO_STATIC_ROOT', 'staticfiles')
 
 # Custom User Model

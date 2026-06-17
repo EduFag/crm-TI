@@ -16,6 +16,7 @@ server {
 
     location /static/ {
         alias /home/edufa/crm-TI/staticfiles/;
+        # Após collectstatic: chown edufa:www-data + chmod 755 em staticfiles e /home/edufa
     }
 
     location /media/ {

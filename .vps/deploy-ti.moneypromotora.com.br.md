@@ -61,6 +61,10 @@ pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py collectstatic --noinput
+# Nginx (usuário www-data) precisa ler staticfiles e todos os diretórios pais:
+sudo chown -R edufa:www-data staticfiles
+sudo chmod -R 755 staticfiles
+sudo chmod 755 /home/edufa /home/edufa/crm-TI
 ```
 
 ---
@@ -221,6 +225,28 @@ DJANGO_ALLOWED_HOSTS=ti.moneypromotora.com.br,127.0.0.1,localhost
 ```
 
 Após mudar `.env`: `sudo systemctl restart crm-ti`
+
+---
+
+## 8. Admin sem CSS / 403 em `/static/admin/css/*.css`
+
+**Não é o RBAC do projeto** (`requer_modulo`, `ModuloObrigatorioMixin`, etc.) — esses decorators só protegem views dos apps (`/`, `/helpdesk/`, …). O admin usa templates padrão do Django e aponta para `/static/admin/...`.
+
+Confirme no HTML da página (`Inspecionar → Network`):
+
+| URL no HTML | Causa do 403 | Correção |
+|-------------|--------------|----------|
+| `/static/admin/css/base.css` | **Nginx** não consegue ler `staticfiles/` (permissão ou `collectstatic` não rodou) | Comandos da seção 3 + `sudo nginx -t && sudo systemctl reload nginx` |
+| `/admin/login/static/admin/css/base.css` | `DJANGO_STATIC_URL` sem barra inicial no `.env` | `DJANGO_STATIC_URL=/static/` e `sudo systemctl restart crm-ti` |
+
+Teste no servidor:
+
+```bash
+curl -sI https://ti.moneypromotora.com.br/static/admin/css/base.css
+# Esperado: HTTP/1.1 200 OK
+# Se 403: permissão em staticfiles ou pasta inexistente após collectstatic
+ls -la /home/edufa/crm-TI/staticfiles/admin/css/base.css
+```
 
 ---
 
