@@ -2,7 +2,7 @@ from django import forms
 from django.utils.safestring import mark_safe
 
 from core.models import CustomUser
-from helpdesk.models import Ticket, TicketCategory
+from helpdesk.models import Ticket, TicketCategory, validate_image_attachment
 from helpdesk.ticket_access import (
     usuario_pode_definir_prioridade,
     usuarios_solicitantes_equipe,
@@ -16,6 +16,21 @@ SELECT_CLASS = 'w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ou
 
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = single_file_clean(data, initial)
+        return result
+
 
 class TicketCreateForm(forms.ModelForm):
     """Formulário de criação de chamado com campos condicionais por papel do usuário."""
@@ -49,10 +64,11 @@ class TicketCreateForm(forms.ModelForm):
         empty_label='Selecione um usuário',
         widget=forms.Select(attrs={'class': SELECT_CLASS + ' searchable-select'}),
     )
-    attachment = forms.FileField(
+    attachment = MultipleFileField(
         required=False,
         label='Anexar Imagem (Opcional)',
         help_text='Apenas JPEG, PNG ou WEBP. Máx: 5MB por imagem. Limite de 4 imagens.',
+        validators=[validate_image_attachment],
         widget=MultipleFileInput(attrs={
             'class': 'w-full text-sm p-2 border border-slate-300 rounded-lg bg-white',
             'accept': 'image/png, image/jpeg, image/webp',
@@ -238,22 +254,13 @@ class TicketCreateForm(forms.ModelForm):
                 
         if commit:
             ticket.save()
-            # Precisamos usar request.FILES no lugar de cleaned_data para multiplos, mas se não tivermos a request, tentamos pegar de data
-            # Porém self.files é um MultiValueDict
-            if hasattr(self, 'files') and 'attachment' in self.files:
-                attachment_files = self.files.getlist('attachment')[:4] # Limita a 4 arquivos
-                if attachment_files:
-                    from helpdesk.models import TicketAttachment
-                    for attachment_file in attachment_files:
-                        TicketAttachment.objects.create(
-                            ticket=ticket,
-                            file_name=attachment_file.name,
-                            file=attachment_file
-                        )
-            else:
-                attachment_file = self.cleaned_data.get('attachment')
-                if attachment_file:
-                    from helpdesk.models import TicketAttachment
+            attachments = self.cleaned_data.get('attachment')
+            if attachments:
+                if not isinstance(attachments, list):
+                    attachments = [attachments]
+                
+                from helpdesk.models import TicketAttachment
+                for attachment_file in attachments[:4]:
                     TicketAttachment.objects.create(
                         ticket=ticket,
                         file_name=attachment_file.name,

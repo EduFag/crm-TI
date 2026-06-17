@@ -47,7 +47,7 @@
     <div class="flex-1 overflow-x-auto overflow-y-hidden pb-4">
         {% include "helpdesk/_poll.html" %}
         <div id="kanban-board-container"
-             hx-trigger="ticketUpdated from:#helpdesk-poll"
+             hx-trigger="ticketUpdated from:body"
              hx-get="{% url 'helpdesk:kanban_board' %}"
              hx-swap="innerHTML"
              class="h-full">
@@ -143,6 +143,7 @@
 <!-- JavaScript para o Drag and Drop do Kanban -->
 {% if pode_operar_kanban %}
 <script>
+    const currentUserId = {{ request.user.id }};
     let lastDraggedCardParent = null;
     let currentCardToRevert = null;
     let parentToRevert = null;
@@ -204,7 +205,9 @@
             })
             .then(response => response.json())
             .then(data => {
-                if(!data.success) {
+                if(data.success) {
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
+                } else {
                     console.error("Falha ao atualizar status");
                 }
             })
@@ -260,13 +263,14 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if(!data.success) {
+                    if(data.success) {
+                        currentCardToRevert = null;
+                        parentToRevert = null;
+                    } else {
                         console.error("Falha ao finalizar chamado");
-                        if (currentCardToRevert && parentToRevert) {
-                            parentToRevert.appendChild(currentCardToRevert);
-                        }
                     }
                     closeFinalizeModal();
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
                 })
                 .catch(error => {
                     console.error('Erro:', error);
@@ -298,15 +302,14 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if(!data.success) {
+                    if(data.success) {
+                        currentCardToRevert = null;
+                        parentToRevert = null;
+                    } else {
                         console.error("Falha ao realizar triagem");
-                        if (currentCardToRevert && parentToRevert) {
-                            parentToRevert.appendChild(currentCardToRevert);
-                        }
                     }
                     closeTriageModal();
-                    // Renderiza novamento o HTMX polling para atualizar os cartões
-                    document.body.dispatchEvent(new Event('ticketUpdated'));
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
                 })
                 .catch(error => {
                     console.error('Erro:', error);

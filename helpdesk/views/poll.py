@@ -29,5 +29,25 @@ def poll_ticket_updates(request):
     request.session.modified = True
 
     if tem_mudanca:
-        return HttpResponse(status=200, headers={'HX-Trigger': 'ticketUpdated'})
+        import json
+        from django.contrib.contenttypes.models import ContentType
+        from core.models import RegistroAcao
+        
+        ticket_ct = ContentType.objects.get_for_model(Ticket)
+        latest_log = RegistroAcao.objects.filter(
+            modulo=RegistroAcao.ModuloChoices.HELPDESK,
+            timestamp__gt=since,
+            content_type=ticket_ct
+        ).order_by('-timestamp').first()
+        
+        actor_id = latest_log.actor_id if latest_log else None
+        acao = latest_log.acao if latest_log else 'UPDATED'
+        
+        trigger_data = {
+            'ticketUpdated': {
+                'actor_id': actor_id,
+                'acao': acao
+            }
+        }
+        return HttpResponse(status=200, headers={'HX-Trigger': json.dumps(trigger_data)})
     return HttpResponse(status=204)

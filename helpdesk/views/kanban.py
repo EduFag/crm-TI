@@ -359,7 +359,10 @@ def ticket_drawer(request, pk):
         changed = True
         
     if changed:
-        ticket.save(update_fields=['unread_by_tech', 'unread_by_user'])
+        ticket.save(update_fields=['unread_by_tech', 'unread_by_user', 'updated_at'])
+        response = render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
+        response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+        return response
         
     return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
 
@@ -451,7 +454,7 @@ def ticket_transfer(request, pk):
         _nome_usuario(tecnico),
     )
     ticket.unread_by_user = True
-    ticket.save(update_fields=['unread_by_user'])
+    ticket.save(update_fields=['unread_by_user', 'updated_at'])
     ticket.refresh_from_db()
     response = render(
         request,
@@ -471,6 +474,13 @@ def ticket_add_comment(request, pk):
     text = request.POST.get('text', '').strip()
     attachment = request.FILES.get('attachment')
     if text or attachment:
+        if attachment:
+            from django.core.exceptions import ValidationError
+            from helpdesk.models import validate_image_attachment
+            try:
+                validate_image_attachment(attachment)
+            except ValidationError as e:
+                return HttpResponse(e.messages[0], status=400)
         Comment.objects.create(ticket=ticket, author=request.user, text=text, attachment=attachment)
         if text:
             log_comentario(ticket, request.user, text)
@@ -485,7 +495,9 @@ def ticket_add_comment(request, pk):
         ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'updated_at'])
         
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    return render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
 
 class KanbanBoardPartialView(KanbanView):
     """Retorna apenas o HTML do quadro para ser injetado via HTMX no evento SSE."""
