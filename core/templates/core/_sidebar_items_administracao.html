@@ -1,0 +1,8 @@
+{% if 'gestao_usuarios' in modulos_permitidos %}
+{% url 'user_list' as usuarios_url %}
+{% url 'equipe_list' as equipes_url %}
+{% url 'auditoria' as auditoria_url %}
+{% include "core/_sidebar_nav_link.html" with url=usuarios_url label="Usuários" active=menu_usuarios_ativo %}
+{% include "core/_sidebar_nav_link.html" with url=equipes_url label="Equipes" active=menu_equipes_ativo %}
+{% include "core/_sidebar_nav_link.html" with url=auditoria_url label="Auditoria Global" active=menu_auditoria_ativo %}
+{% endif %}

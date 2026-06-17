@@ -1,0 +1,16 @@
+{% if 'chips' in modulos_permitidos %}
+{% url 'chips:dashboard' as chips_url %}
+{% include "core/_sidebar_nav_link.html" with url=chips_url label="Chips" active=menu_chips_ativo %}
+{% endif %}
+{% if 'emails' in modulos_permitidos %}
+{% url 'emails:dashboard' as emails_url %}
+{% include "core/_sidebar_nav_link.html" with url=emails_url label="E-mails" active=menu_emails_ativo %}
+{% endif %}
+{% if 'equipment' in modulos_permitidos %}
+{% url 'equipment:dashboard' as equipment_url %}
+{% include "core/_sidebar_nav_link.html" with url=equipment_url label="Ativos" active=menu_equipment_ativo %}
+{% endif %}
+{% if 'discador' in modulos_permitidos %}
+{% url 'discador:dashboard' as discador_url %}
+{% include "core/_sidebar_nav_link.html" with url=discador_url label="Discador 3C Plus" active=menu_discador_ativo %}
+{% endif %}

@@ -1,0 +1,4 @@
+{% if 'helpdesk' in modulos_permitidos %}
+{% url 'helpdesk:kanban' as helpdesk_url %}
+{% include "core/_sidebar_nav_link.html" with url=helpdesk_url label="Helpdesk" active=menu_helpdesk_ativo %}
+{% endif %}
