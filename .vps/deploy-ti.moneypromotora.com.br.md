@@ -21,7 +21,7 @@ DJANGO_ALLOWED_HOSTS=ti.moneypromotora.com.br,127.0.0.1,localhost
 DJANGO_CSRF_TRUSTED_ORIGINS=https://ti.moneypromotora.com.br
 DJANGO_LANGUAGE_CODE=pt-br
 DJANGO_TIME_ZONE=America/Sao_Paulo
-DJANGO_STATIC_URL=static/
+DJANGO_STATIC_URL=/static/
 DJANGO_STATIC_ROOT=staticfiles
 
 DB_ENGINE=postgresql
