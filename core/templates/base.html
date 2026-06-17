@@ -183,6 +183,14 @@
                 }
             }
 
+            function fecharOutrosGrupos(grupoAtivo) {
+                sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (outro) {
+                    if (outro !== grupoAtivo) {
+                        outro.removeAttribute('open');
+                    }
+                });
+            }
+
             toggle.addEventListener('click', function () {
                 var recolhido = !menuRecolhido();
                 aplicarEstado(recolhido);
@@ -204,11 +212,16 @@
                         localStorage.setItem(storageKey, '0');
                     } catch (e) { }
 
-                    sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (outro) {
-                        if (outro !== grupo) {
-                            outro.removeAttribute('open');
-                        }
-                    });
+                    fecharOutrosGrupos(grupo);
+                    grupo.setAttribute('open', '');
+                });
+            });
+
+            // Accordion: só uma categoria aberta por vez
+            sidebar.querySelectorAll('.sidebar-group').forEach(function (grupo) {
+                grupo.addEventListener('toggle', function () {
+                    if (!grupo.open || menuRecolhido()) return;
+                    fecharOutrosGrupos(grupo);
                     grupo.setAttribute('open', '');
                 });
             });
