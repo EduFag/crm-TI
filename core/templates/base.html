@@ -54,26 +54,33 @@
     <!-- Sidebar -->
     <aside id="app-sidebar"
         class="relative shrink-0 bg-white border-r border-slate-200 flex flex-col z-30">
-        <!-- Logo -->
-        <div class="h-16 flex items-center px-6 border-b border-slate-100 sidebar-logo-wrap">
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Logo & Toggle Header (Spacious scale) -->
+        <div class="h-20 flex items-center justify-between px-6 border-b border-slate-100 sidebar-logo-wrap gap-2">
+            <div class="flex items-center gap-3.5 min-w-0 sidebar-hide-collapsed">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold shrink-0 shadow-md shadow-blue-500/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                     </svg>
                 </div>
-                <span class="sidebar-hide-collapsed font-bold text-lg text-slate-900 tracking-tight">Sistema TI</span>
+                <span class="font-bold text-xl text-slate-900 tracking-tight">Sistema TI</span>
             </div>
+            <!-- Botão recolher/expandir colocado de forma elegante no header -->
+            <button type="button" id="sidebar-toggle" title="Recolher menu"
+                class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 transition-all focus:outline-none shrink-0 shadow-sm">
+                <svg id="sidebar-toggle-icon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12H12m-8.25 5.25h16.5" />
+                </svg>
+            </button>
         </div>
 
         {% include "core/_sidebar.html" %}
 
-        <!-- Área do Usuário -->
-        <div class="p-4 border-t border-slate-200 bg-white">
-            <div class="flex items-center gap-3 mb-3 sidebar-user-wrap">
+        <!-- Área do Usuário (Spacious scale) -->
+        <div class="p-6 border-t border-slate-200 bg-white">
+            <div class="flex items-center gap-3.5 mb-4 sidebar-user-wrap">
                 <div
-                    class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100 shrink-0"
+                    class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100 shrink-0 text-lg shadow-sm"
                     title="{{ user.get_full_name|default:user.username }}">
                     {{ user.username|make_list|first|upper }}
                 </div>
@@ -85,8 +92,8 @@
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
                 <button type="submit" title="Sair do Sistema"
-                    class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 font-medium bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-red-600 font-semibold bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
                         </path>
@@ -95,21 +102,13 @@
                 </button>
             </form>
         </div>
-
-        <!-- Botão recolher/expandir -->
-        <button type="button" id="sidebar-toggle" title="Recolher menu"
-            class="absolute -right-3 top-[4.5rem] z-40 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all focus:outline-none focus:ring-2 focus:ring-blue-200">
-            <svg id="sidebar-toggle-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
-            </svg>
-        </button>
     </aside>
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-screen overflow-hidden">
 
-        <!-- Header -->
-        <header class="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-8">
+        <!-- Header (Aligned height with logo wrap) -->
+        <header class="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8">
             <div class="flex-1 max-w-xl">
                 <!-- Busca (Placeholder) -->
                 <div class="relative group">
@@ -119,7 +118,7 @@
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                     <input type="text" placeholder="Pesquisar..."
-                        class="w-full pl-10 pr-4 py-2 border-none bg-slate-50 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 rounded-lg text-sm transition-all">
+                        class="w-full pl-10 pr-4 py-2.5 border-none bg-slate-50 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 rounded-xl text-sm transition-all">
                 </div>
             </div>
 
@@ -176,19 +175,6 @@
             function aplicarEstado(recolhido) {
                 root.classList.toggle('sidebar-collapsed', recolhido);
                 toggle.title = recolhido ? 'Expandir menu' : 'Recolher menu';
-                if (recolhido) {
-                    sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (grupo) {
-                        grupo.removeAttribute('open');
-                    });
-                }
-            }
-
-            function fecharOutrosGrupos(grupoAtivo) {
-                sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (outro) {
-                    if (outro !== grupoAtivo) {
-                        outro.removeAttribute('open');
-                    }
-                });
             }
 
             toggle.addEventListener('click', function () {
@@ -197,33 +183,6 @@
                 try {
                     localStorage.setItem(storageKey, recolhido ? '1' : '0');
                 } catch (e) { }
-            });
-
-            sidebar.querySelectorAll('.sidebar-group-trigger').forEach(function (trigger) {
-                trigger.addEventListener('click', function (event) {
-                    if (!menuRecolhido()) return;
-
-                    event.preventDefault();
-                    var grupo = trigger.closest('.sidebar-group');
-                    if (!grupo) return;
-
-                    aplicarEstado(false);
-                    try {
-                        localStorage.setItem(storageKey, '0');
-                    } catch (e) { }
-
-                    fecharOutrosGrupos(grupo);
-                    grupo.setAttribute('open', '');
-                });
-            });
-
-            // Accordion: só uma categoria aberta por vez
-            sidebar.querySelectorAll('.sidebar-group').forEach(function (grupo) {
-                grupo.addEventListener('toggle', function () {
-                    if (!grupo.open || menuRecolhido()) return;
-                    fecharOutrosGrupos(grupo);
-                    grupo.setAttribute('open', '');
-                });
             });
         })();
     </script>

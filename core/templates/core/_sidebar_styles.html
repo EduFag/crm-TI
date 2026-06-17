@@ -1,11 +1,14 @@
 <style>
+    /* Estilos base da Sidebar (Escala Ampliada - Sem Colapso de Módulos) */
     #app-sidebar {
-        width: 16rem;
+        width: 18.5rem; /* Ampliado para 296px */
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #ffffff;
+        border-right: 1px solid rgba(226, 232, 240, 0.8);
     }
 
     html.sidebar-collapsed #app-sidebar {
-        width: 4.5rem;
+        width: 5.5rem; /* Ampliado para 88px */
     }
 
     #app-sidebar .sidebar-hide-collapsed {
@@ -20,6 +23,7 @@
         pointer-events: none;
     }
 
+    /* Ajuste de logo e cabeçalho no estado colapsado */
     html.sidebar-collapsed #app-sidebar .sidebar-logo-wrap {
         justify-content: center;
         padding-left: 0;
@@ -31,102 +35,53 @@
     }
 
     html.sidebar-collapsed #app-sidebar .sidebar-nav-scroll {
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 
     html.sidebar-collapsed #app-sidebar .sidebar-nav-item {
         justify-content: center;
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
+        padding-left: 0.875rem;
+        padding-right: 0.875rem;
     }
 
-    html.sidebar-collapsed #app-sidebar .sidebar-group>summary {
-        justify-content: center;
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
+    /* Efeitos de item ativo SUAVE (Sem Liquid Glass) */
+    .sidebar-nav-link-active {
+        background: rgba(37, 99, 235, 0.05) !important;
+        color: #2563eb !important; /* text-blue-600 */
+        font-weight: 600 !important;
+        border-radius: 0.5rem !important;
     }
 
-    html.sidebar-collapsed #app-sidebar .sidebar-group-items {
-        display: none !important;
+    /* Garantia de cor para ícone ativo */
+    .sidebar-nav-link-active .sidebar-nav-icon {
+        color: #2563eb !important;
     }
 
-    html:not(.sidebar-collapsed) #app-sidebar .sidebar-flyout {
-        display: none !important;
+    /* Espaçamentos, transições e fontes */
+    .sidebar-nav-item, .sidebar-nav-link {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent;
+        font-size: 1rem; /* 16px */
+        padding: 0.75rem 1rem !important;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        border-radius: 0.5rem;
     }
 
-    html.sidebar-collapsed #app-sidebar .sidebar-flyout {
-        display: none;
-        position: absolute;
-        left: calc(100% + 0.5rem);
-        top: 0;
-        min-width: 12rem;
-        padding: 0.375rem;
-        background: white;
-        border: 1px solid rgb(226 232 240);
-        border-radius: 0.75rem;
-        box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.08);
-        z-index: 50;
+    /* Tamanho padronizado e maior para os ícones */
+    .sidebar-nav-icon svg {
+        width: 1.625rem !important; /* 26px */
+        height: 1.625rem !important; /* 26px */
     }
 
-    html.sidebar-collapsed #app-sidebar .sidebar-flyout::before {
-        content: '';
-        position: absolute;
-        left: -0.5rem;
-        top: 0;
-        width: 0.5rem;
-        height: 100%;
-    }
-
-    html.sidebar-collapsed #app-sidebar .sidebar-group:hover .sidebar-flyout,
-    html.sidebar-collapsed #app-sidebar .sidebar-group:focus-within .sidebar-flyout {
-        display: block;
-    }
-
-    html.sidebar-collapsed #app-sidebar .sidebar-flyout-title {
-        display: block;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.6875rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: rgb(148 163 184);
-    }
-
-    html.sidebar-collapsed #app-sidebar .sidebar-nav-dot {
-        display: none;
-    }
-
-    html.sidebar-collapsed #app-sidebar .sidebar-flyout .sidebar-nav-link {
-        padding-left: 0.75rem;
-    }
-
+    /* Rotação do ícone colapsar/expandir */
     html.sidebar-collapsed #sidebar-toggle-icon {
         transform: rotate(180deg);
     }
 
     #sidebar-toggle-icon {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .sidebar-group>summary {
-        list-style: none;
-    }
-
-    .sidebar-group>summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .sidebar-group[open]>summary .sidebar-group-chevron {
-        transform: rotate(180deg);
-    }
-
-    .sidebar-group[open]>summary {
-        background-color: rgb(248 250 252);
-        color: rgb(15 23 42);
-    }
-
-    html.sidebar-collapsed #app-sidebar .sidebar-group[open]>summary {
-        background-color: transparent;
     }
 </style>
