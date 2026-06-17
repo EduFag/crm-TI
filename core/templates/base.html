@@ -193,9 +193,23 @@
 
             sidebar.querySelectorAll('.sidebar-group-trigger').forEach(function (trigger) {
                 trigger.addEventListener('click', function (event) {
-                    if (menuRecolhido()) {
-                        event.preventDefault();
-                    }
+                    if (!menuRecolhido()) return;
+
+                    event.preventDefault();
+                    var grupo = trigger.closest('.sidebar-group');
+                    if (!grupo) return;
+
+                    aplicarEstado(false);
+                    try {
+                        localStorage.setItem(storageKey, '0');
+                    } catch (e) { }
+
+                    sidebar.querySelectorAll('.sidebar-group[open]').forEach(function (outro) {
+                        if (outro !== grupo) {
+                            outro.removeAttribute('open');
+                        }
+                    });
+                    grupo.setAttribute('open', '');
                 });
             });
         })();
