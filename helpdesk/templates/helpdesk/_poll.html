@@ -28,10 +28,10 @@
                 audioComentario.play().catch(function(e) {
                     console.log("Audio play prevented (comentario):", e);
                 });
-            } else if (detail.acao === 'STATUS_CHANGED') {
+            } else if (detail.acao === 'STATUS_CHANGED' || detail.acao === 'CREATED') {
                 audioAtualizacao.currentTime = 0;
                 audioAtualizacao.play().catch(function(e) {
-                    console.log("Audio play prevented (atualizacao):", e);
+                    console.log("Audio play prevented (atualizacao/criado):", e);
                 });
             }
         });

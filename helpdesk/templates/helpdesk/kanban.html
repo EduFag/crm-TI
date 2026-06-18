@@ -189,10 +189,7 @@
                 return;
             }
 
-            if (oldStatus === 'NEW' && newStatus !== 'NEW') {
-                openTriageModal(ticketId, newStatus, card, lastDraggedCardParent);
-                return;
-            }
+
             
             // Avisa o backend
             fetch(`/helpdesk/ticket/${ticketId}/update-status/`, {
@@ -318,6 +315,19 @@
             });
         }
     });
+
+    function openTriageWithoutMove(ticketId, event) {
+        if(event) event.stopPropagation(); // Evita que clique no card para abrir o drawer
+        document.getElementById('triage-ticket-id').value = ticketId;
+        document.getElementById('triage-new-status').value = 'NEW';
+        
+        currentCardToRevert = null;
+        parentToRevert = null;
+        
+        const modal = document.getElementById('triage-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
 
     function openTriageModal(ticketId, newStatus, card, oldParent) {
         document.getElementById('triage-ticket-id').value = ticketId;

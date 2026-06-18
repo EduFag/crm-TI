@@ -2,6 +2,7 @@ import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
+from django.db.models import Case, When, IntegerField, Value
 from core.models import CustomUser
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo
 from django.views.decorators.http import require_POST
@@ -128,10 +129,21 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
             self.request.user,
         ).select_related('assigned_to', 'created_by', 'requester_user', 'category')
         
-        context['tickets_new'] = tickets.filter(status=Ticket.StatusChoices.NEW).order_by('created_at')
-        context['tickets_in_progress'] = tickets.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-created_at')
-        context['tickets_pending'] = tickets.filter(status=Ticket.StatusChoices.PENDING).order_by('-created_at')
-        context['tickets_resolved'] = tickets.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
+        priority_ordering = Case(
+            When(priority='URGENT', then=Value(4)),
+            When(priority='HIGH', then=Value(3)),
+            When(priority='MEDIUM', then=Value(2)),
+            When(priority='LOW', then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField()
+        )
+        
+        tickets_annotated = tickets.annotate(priority_order=priority_ordering)
+        
+        context['tickets_new'] = tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
+        context['tickets_in_progress'] = tickets_annotated.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-priority_order', '-created_at')
+        context['tickets_pending'] = tickets_annotated.filter(status=Ticket.StatusChoices.PENDING).order_by('-priority_order', '-created_at')
+        context['tickets_resolved'] = tickets_annotated.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
         context['pode_operar_kanban'] = usuario_pode_operar_kanban(self.request.user)
 
         from helpdesk.models import TicketSpecificCategory
