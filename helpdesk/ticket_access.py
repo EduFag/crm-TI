@@ -102,7 +102,7 @@ def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
     """Restringe o queryset aos chamados do usuário quando o papel for STANDARD."""
     if usuario_ve_todos_chamados(user):
         return queryset
-    return queryset.filter(_filtro_chamados_proprios(user))
+    return queryset.filter(_filtro_chamados_proprios(user)).distinct()
 
 
 def usuario_pode_acessar_chamado(user, ticket) -> bool:
