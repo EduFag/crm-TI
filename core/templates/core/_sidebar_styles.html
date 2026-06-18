@@ -1,14 +1,14 @@
 <style>
-    /* Estilos base da Sidebar (Escala Ampliada - Sem Colapso de Módulos) */
+    /* Estilos base da Sidebar (Escala Ampliada) */
     #app-sidebar {
-        width: 18.5rem; /* Ampliado para 296px */
+        width: 18.5rem; /* 296px quando aberto */
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         background: #ffffff;
         border-right: 1px solid rgba(226, 232, 240, 0.8);
     }
 
     html.sidebar-collapsed #app-sidebar {
-        width: 5.5rem; /* Ampliado para 88px */
+        width: 5.5rem; /* 88px quando retraído */
     }
 
     #app-sidebar .sidebar-hide-collapsed {
@@ -34,32 +34,48 @@
         justify-content: center;
     }
 
+    /* Ajuste do container de scroll no estado colapsado (evita que a scrollbar cubra os ícones) */
     html.sidebar-collapsed #app-sidebar .sidebar-nav-scroll {
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
+        padding-left: 0.6rem;
+        padding-right: 0.4rem; /* Menos padding na direita para criar zona de escape da barra */
     }
 
-    html.sidebar-collapsed #app-sidebar .sidebar-nav-item {
-        justify-content: center;
-        padding-left: 0.875rem;
-        padding-right: 0.875rem;
+    /* Estilização das Categorias / Divisores */
+    .sidebar-category-header {
+        transition: all 0.3s ease;
+        display: block;
+    }
+
+    /* Categorias no estado colapsado: alinhadas à esquerda e menor (8px) */
+    html.sidebar-collapsed #app-sidebar .sidebar-category-header {
+        text-align: left !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        color: rgb(156 163 175) !important; /* text-gray-400 */
+        padding-left: 0.75rem !important; /* Alinha com a borda esquerda dos botões */
+        padding-right: 0.25rem !important;
+        margin-top: 1.25rem !important;
+        margin-bottom: 0.375rem !important;
+        letter-spacing: 0.05em !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
     }
 
     /* Efeitos de item ativo SUAVE (Sem Liquid Glass) */
     .sidebar-nav-link-active {
         background: rgba(37, 99, 235, 0.05) !important;
-        color: #2563eb !important; /* text-blue-600 */
+        color: #2563eb !important;
         font-weight: 600 !important;
         border-radius: 0.5rem !important;
     }
 
-    /* Garantia de cor para ícone ativo */
     .sidebar-nav-link-active .sidebar-nav-icon {
         color: #2563eb !important;
     }
 
-    /* Espaçamentos, transições e fontes */
-    .sidebar-nav-item, .sidebar-nav-link {
+    /* Espaçamentos, transições e fontes em modo normal */
+    .sidebar-nav-link {
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         border: 1px solid transparent;
         font-size: 1rem; /* 16px */
@@ -68,12 +84,51 @@
         display: flex;
         align-items: center;
         border-radius: 0.5rem;
+        width: 100%;
     }
 
-    /* Tamanho padronizado e maior para os ícones */
+    .sidebar-link-label {
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    /* Ícones quando aberto */
     .sidebar-nav-icon svg {
         width: 1.625rem !important; /* 26px */
         height: 1.625rem !important; /* 26px */
+    }
+
+    /* ESTADO RETRAÍDO: Ícone e Texto empilhados verticalmente e centralizados */
+    html.sidebar-collapsed #app-sidebar .sidebar-nav-link {
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        gap: 0.25rem !important; /* Espaço entre ícone e texto */
+        padding: 0.5rem 0.25rem !important; /* Compacta a altura */
+        margin-bottom: 0.375rem !important;
+        border-radius: 0.5rem !important;
+    }
+
+    /* Texto do link no estado colapsado */
+    html.sidebar-collapsed #app-sidebar .sidebar-link-label {
+        display: block !important;
+        font-size: 9px !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+        text-align: center !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Centralização dos ícones no estado colapsado */
+    html.sidebar-collapsed #app-sidebar .sidebar-nav-icon {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
     }
 
     /* Rotação do ícone colapsar/expandir */
@@ -83,5 +138,29 @@
 
     #sidebar-toggle-icon {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* BARRA DE ROLAGEM CUSTOMIZADA E ULTRA-FINA PARA A SIDEBAR (Evita cobrir os ícones) */
+    .sidebar-nav-scroll::-webkit-scrollbar {
+        width: 4px !important; /* Apenas 4px de largura */
+    }
+
+    .sidebar-nav-scroll::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+
+    .sidebar-nav-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.2) !important; /* Cinza claro bem sutil */
+        border-radius: 4px !important;
+    }
+
+    .sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.4) !important;
+    }
+
+    /* Firefox */
+    .sidebar-nav-scroll {
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(148, 163, 184, 0.2) transparent !important;
     }
 </style>
