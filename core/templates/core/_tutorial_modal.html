@@ -1,0 +1,176 @@
+{% if user.role == 'STANDARD' or user.role == 'SUPERVISOR' %}
+<dialog id="tutorial-modal" class="backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm rounded-2xl shadow-2xl p-0 w-full max-w-lg border-0 m-auto">
+    <div class="bg-white flex flex-col h-[400px]">
+        <!-- Slide 1 -->
+        <div class="tutorial-slide flex-1 flex flex-col items-center justify-center p-8 text-center" data-step="0">
+            <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.438 4.438 0 002.946-2.368c.162-.366.28-.75.352-1.144" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Bem-vindo ao Sistema de TI</h2>
+            <p class="text-slate-500 text-sm leading-relaxed">
+                Este é o seu portal centralizado para solicitar suporte, acompanhar ativos e acessar serviços da equipe de Tecnologia. Vamos fazer um tour rápido?
+            </p>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="tutorial-slide hidden flex-1 flex flex-col items-center justify-center p-8 text-center" data-step="1">
+            <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Navegação Simplificada</h2>
+            <p class="text-slate-500 text-sm leading-relaxed">
+                Use o menu lateral esquerdo para alternar entre os módulos. Nele você pode acessar o **Helpdesk**, verificar **E-mails**, **Chips** e muito mais, tudo dividido por categorias.
+            </p>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="tutorial-slide hidden flex-1 flex flex-col items-center justify-center p-8 text-center" data-step="2">
+            <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Abertura de Chamados</h2>
+            <p class="text-slate-500 text-sm leading-relaxed">
+                No módulo de **Helpdesk**, clique no botão para criar um novo ticket. Seja específico e adicione anexos se necessário. Nossa equipe de suporte receberá instantaneamente.
+            </p>
+        </div>
+
+        <!-- Slide 4 -->
+        <div class="tutorial-slide hidden flex-1 flex flex-col items-center justify-center p-8 text-center" data-step="3">
+            <div class="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Fique de Olho!</h2>
+            <p class="text-slate-500 text-sm leading-relaxed">
+                O sininho no topo da tela manterá você atualizado sobre qualquer resposta, mudança de status ou conclusão dos seus chamados em tempo real.
+            </p>
+        </div>
+
+        <!-- Footer / Controles -->
+        <div class="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50 rounded-b-2xl">
+            <!-- Pular -->
+            <button id="tutorial-skip" class="text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors">
+                Pular
+            </button>
+
+            <!-- Indicadores -->
+            <div class="flex items-center gap-2" id="tutorial-indicators">
+                <div class="w-2 h-2 rounded-full bg-blue-600 transition-all tutorial-dot" data-index="0"></div>
+                <div class="w-2 h-2 rounded-full bg-slate-300 transition-all tutorial-dot" data-index="1"></div>
+                <div class="w-2 h-2 rounded-full bg-slate-300 transition-all tutorial-dot" data-index="2"></div>
+                <div class="w-2 h-2 rounded-full bg-slate-300 transition-all tutorial-dot" data-index="3"></div>
+            </div>
+
+            <!-- Navegação -->
+            <div class="flex items-center gap-2">
+                <button id="tutorial-prev" class="hidden text-sm font-medium text-slate-500 hover:text-slate-700 px-3 py-2 rounded-lg transition-colors">
+                    Voltar
+                </button>
+                <button id="tutorial-next" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-lg shadow-sm transition-colors">
+                    Próximo
+                </button>
+                <button id="tutorial-finish" class="hidden text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2 rounded-lg shadow-sm transition-colors">
+                    Começar
+                </button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.getElementById('tutorial-modal');
+        if (!modal) return;
+
+        const slides = modal.querySelectorAll('.tutorial-slide');
+        const dots = modal.querySelectorAll('.tutorial-dot');
+        const prevBtn = document.getElementById('tutorial-prev');
+        const nextBtn = document.getElementById('tutorial-next');
+        const finishBtn = document.getElementById('tutorial-finish');
+        const skipBtn = document.getElementById('tutorial-skip');
+        
+        let currentStep = 0;
+        const totalSteps = slides.length;
+
+        function updateCarousel() {
+            // Oculta e exibe os slides
+            slides.forEach((slide, index) => {
+                if (index === currentStep) {
+                    slide.classList.remove('hidden');
+                    slide.classList.add('flex');
+                } else {
+                    slide.classList.add('hidden');
+                    slide.classList.remove('flex');
+                }
+            });
+
+            // Atualiza os dots
+            dots.forEach((dot, index) => {
+                if (index === currentStep) {
+                    dot.classList.remove('bg-slate-300');
+                    dot.classList.add('bg-blue-600', 'w-4');
+                } else {
+                    dot.classList.add('bg-slate-300');
+                    dot.classList.remove('bg-blue-600', 'w-4');
+                }
+            });
+
+            // Lógica de botões
+            if (currentStep === 0) {
+                prevBtn.classList.add('hidden');
+            } else {
+                prevBtn.classList.remove('hidden');
+            }
+
+            if (currentStep === totalSteps - 1) {
+                nextBtn.classList.add('hidden');
+                finishBtn.classList.remove('hidden');
+                skipBtn.classList.add('invisible');
+            } else {
+                nextBtn.classList.remove('hidden');
+                finishBtn.classList.add('hidden');
+                skipBtn.classList.remove('invisible');
+            }
+        }
+
+        function closeModal() {
+            modal.close();
+            // Reseta para o próximo uso
+            setTimeout(() => {
+                currentStep = 0;
+                updateCarousel();
+            }, 300);
+        }
+
+        nextBtn.addEventListener('click', () => {
+            if (currentStep < totalSteps - 1) {
+                currentStep++;
+                updateCarousel();
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (currentStep > 0) {
+                currentStep--;
+                updateCarousel();
+            }
+        });
+
+        finishBtn.addEventListener('click', closeModal);
+        skipBtn.addEventListener('click', closeModal);
+
+        // Opcional: auto-open if never seen before using localStorage
+        if (!localStorage.getItem('tutorial_seen')) {
+            // modal.showModal();
+            // localStorage.setItem('tutorial_seen', 'true');
+        }
+    });
+</script>
+{% endif %}
