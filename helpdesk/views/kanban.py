@@ -326,6 +326,7 @@ def ticket_finalize(request, pk):
         ticket.assigned_to = request.user
         
     ticket.unread_by_user = True
+    ticket.unread_count_user += 1
     ticket.save()
     
     if status_anterior != Ticket.StatusChoices.RESOLVED:
@@ -351,15 +352,17 @@ def ticket_drawer(request, pk):
         
     is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
     changed = False
-    if is_ti and ticket.unread_by_tech:
+    if is_ti and (ticket.unread_by_tech or ticket.unread_count_tech > 0):
         ticket.unread_by_tech = False
+        ticket.unread_count_tech = 0
         changed = True
-    elif not is_ti and ticket.unread_by_user:
+    elif not is_ti and (ticket.unread_by_user or ticket.unread_count_user > 0):
         ticket.unread_by_user = False
+        ticket.unread_count_user = 0
         changed = True
         
     if changed:
-        ticket.save(update_fields=['unread_by_tech', 'unread_by_user', 'updated_at'])
+        ticket.save(update_fields=['unread_by_tech', 'unread_by_user', 'unread_count_tech', 'unread_count_user', 'updated_at'])
         response = render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
         response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
         return response
@@ -397,7 +400,8 @@ def ticket_edit(request, pk):
             log_edicao(depois, request.user, metadata, '; '.join(mensagens))
             
         ticket.unread_by_user = True
-        ticket.save(update_fields=['unread_by_user'])
+        ticket.unread_count_user += 1
+        ticket.save(update_fields=['unread_by_user', 'unread_count_user'])
         
         ticket.refresh_from_db()
         response = render(
@@ -454,7 +458,8 @@ def ticket_transfer(request, pk):
         _nome_usuario(tecnico),
     )
     ticket.unread_by_user = True
-    ticket.save(update_fields=['unread_by_user', 'updated_at'])
+    ticket.unread_count_user += 1
+    ticket.save(update_fields=['unread_by_user', 'unread_count_user', 'updated_at'])
     ticket.refresh_from_db()
     response = render(
         request,
@@ -490,9 +495,11 @@ def ticket_add_comment(request, pk):
         is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
         if is_ti:
             ticket.unread_by_user = True
+            ticket.unread_count_user += 1
         else:
             ticket.unread_by_tech = True
-        ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'updated_at'])
+            ticket.unread_count_tech += 1
+        ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'unread_count_user', 'unread_count_tech', 'updated_at'])
         
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})

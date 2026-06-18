@@ -129,6 +129,9 @@ class Ticket(models.Model):
     unread_by_tech = models.BooleanField(default=False, help_text='Possui interações não lidas pela TI.')
     unread_by_user = models.BooleanField(default=False, help_text='Possui interações não lidas pelo usuário.')
     
+    unread_count_tech = models.IntegerField(default=0, help_text='Quantidade de interações não lidas pela TI.')
+    unread_count_user = models.IntegerField(default=0, help_text='Quantidade de interações não lidas pelo usuário.')
+    
     # Soft delete, arquivamento e timestamps
     is_active = models.BooleanField(default=True, help_text='Indica se o registro está ativo (Soft delete).')
     is_archived = models.BooleanField(default=False, help_text='Indica se o chamado foi arquivado após um tempo resolvido.')

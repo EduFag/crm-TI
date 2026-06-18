@@ -3,25 +3,28 @@
      class="relative bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group"
      hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-trigger="click" hx-target="#drawer-container" hx-swap="innerHTML">
     
-    {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
-        {% if ticket.unread_by_tech %}
-        <span class="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5" title="Novas interações">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 border-2 border-white"></span>
-        </span>
-        {% endif %}
-    {% else %}
-        {% if ticket.unread_by_user %}
-        <span class="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5" title="Novas interações">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 border-2 border-white"></span>
-        </span>
-        {% endif %}
-    {% endif %}
+
 
     <!-- Cabeçalho do Card (Tags) -->
     <div class="flex items-center justify-between mb-3">
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Notification Badge -->
+            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+                {% if ticket.unread_count_tech > 0 %}
+                <span class="relative flex h-5 w-5" title="{{ ticket.unread_count_tech }} interação(ões) não lida(s)">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex items-center justify-center rounded-full h-5 w-5 bg-red-500 ring-2 ring-white text-[10px] font-bold text-white z-10">{{ ticket.unread_count_tech }}</span>
+                </span>
+                {% endif %}
+            {% else %}
+                {% if ticket.unread_count_user > 0 %}
+                <span class="relative flex h-5 w-5" title="{{ ticket.unread_count_user }} interação(ões) não lida(s)">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex items-center justify-center rounded-full h-5 w-5 bg-red-500 ring-2 ring-white text-[10px] font-bold text-white z-10">{{ ticket.unread_count_user }}</span>
+                </span>
+                {% endif %}
+            {% endif %}
+
             <!-- Sector/Team Badge -->
             {% if ticket.equipe %}
                 <span class="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wide font-bold bg-slate-100 text-slate-600 border border-slate-200" title="Setor: {{ ticket.equipe.name }}">
