@@ -260,7 +260,7 @@
                             }
                             
                             const span = document.createElement('span');
-                            span.className = 'search-highlight text-yellow-500 transition-colors duration-150';
+                            span.className = 'search-highlight text-yellow-500 font-bold transition-colors duration-150';
                             span.textContent = text.substring(index, index + query.length);
                             wrapper.appendChild(span);
                             matches.push(span);
@@ -294,14 +294,14 @@
 
             function highlightActiveMatch(shouldScroll = true) {
                 matches.forEach(m => {
-                    m.classList.remove('text-amber-600');
-                    m.classList.add('text-yellow-500');
+                    m.classList.remove('text-amber-600', 'font-black');
+                    m.classList.add('text-yellow-500', 'font-bold');
                 });
 
                 const active = matches[currentIndex];
                 if (active) {
-                    active.classList.remove('text-yellow-500');
-                    active.classList.add('text-amber-600');
+                    active.classList.remove('text-yellow-500', 'font-bold');
+                    active.classList.add('text-amber-600', 'font-black');
                     if (shouldScroll) {
                         // inline: 'center' rola horizontalmente caso a palavra esteja em alguma coluna oculta (ex: Kanban)
                         active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
