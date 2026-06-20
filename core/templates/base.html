@@ -259,7 +259,7 @@
                             }
                             
                             const mark = document.createElement('mark');
-                            mark.className = 'search-highlight bg-yellow-200 text-slate-900 rounded-sm px-[2px] transition-all duration-150';
+                            mark.className = 'search-highlight bg-transparent text-yellow-500 font-bold transition-all duration-150';
                             mark.textContent = text.substring(index, index + query.length);
                             fragment.appendChild(mark);
                             matches.push(mark);
@@ -293,14 +293,14 @@
 
             function highlightActiveMatch(shouldScroll = true) {
                 matches.forEach(m => {
-                    m.classList.remove('bg-amber-400', 'ring-1', 'ring-amber-500', 'font-bold');
-                    m.classList.add('bg-yellow-200', 'text-slate-900');
+                    m.classList.remove('text-amber-700', 'font-black', 'underline');
+                    m.classList.add('bg-transparent', 'text-yellow-500', 'font-bold');
                 });
 
                 const active = matches[currentIndex];
                 if (active) {
-                    active.classList.remove('bg-yellow-200');
-                    active.classList.add('bg-amber-400', 'ring-1', 'ring-amber-500', 'font-bold');
+                    active.classList.remove('bg-transparent', 'text-yellow-500', 'font-bold');
+                    active.classList.add('text-amber-700', 'font-black', 'underline');
                     if (shouldScroll) {
                         // inline: 'center' rola horizontalmente caso a palavra esteja em alguma coluna oculta (ex: Kanban)
                         active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
