@@ -258,11 +258,11 @@
                                 fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
                             }
                             
-                            const mark = document.createElement('mark');
-                            mark.className = 'search-highlight bg-transparent text-yellow-500 font-bold transition-all duration-150';
-                            mark.textContent = text.substring(index, index + query.length);
-                            fragment.appendChild(mark);
-                            matches.push(mark);
+                            const span = document.createElement('span');
+                            span.className = 'search-highlight text-yellow-500 font-bold transition-colors duration-150';
+                            span.textContent = text.substring(index, index + query.length);
+                            fragment.appendChild(span);
+                            matches.push(span);
                             
                             lastIndex = index + query.length;
                             index = lowerText.indexOf(query, lastIndex);
@@ -293,14 +293,14 @@
 
             function highlightActiveMatch(shouldScroll = true) {
                 matches.forEach(m => {
-                    m.classList.remove('text-amber-700', 'font-black', 'underline');
-                    m.classList.add('bg-transparent', 'text-yellow-500', 'font-bold');
+                    m.classList.remove('text-amber-600', 'font-black');
+                    m.classList.add('text-yellow-500', 'font-bold');
                 });
 
                 const active = matches[currentIndex];
                 if (active) {
-                    active.classList.remove('bg-transparent', 'text-yellow-500', 'font-bold');
-                    active.classList.add('text-amber-700', 'font-black', 'underline');
+                    active.classList.remove('text-yellow-500', 'font-bold');
+                    active.classList.add('text-amber-600', 'font-black');
                     if (shouldScroll) {
                         // inline: 'center' rola horizontalmente caso a palavra esteja em alguma coluna oculta (ex: Kanban)
                         active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
