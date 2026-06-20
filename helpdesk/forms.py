@@ -351,6 +351,10 @@ class TicketUpdateForm(forms.ModelForm):
             self._remover_campo('status')
             self._remover_campo('assigned_to')
             self._remover_campo('specific_category')
+            if role == CustomUser.RoleChoices.STANDARD:
+                self._remover_campo('tipo_solicitante')
+                self._remover_campo('requester_name')
+                self._remover_campo('requester_user')
 
     def _remover_campo(self, nome):
         if nome in self.fields:
@@ -364,6 +368,11 @@ class TicketUpdateForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        
+        # Se os campos de solicitante não estão no formulário (ex: usuário padrão), não valide ou altere o solicitante
+        if 'tipo_solicitante' not in self.fields:
+            return cleaned
+
         tipo = cleaned.get('tipo_solicitante')
         requester_name = (cleaned.get('requester_name') or '').strip()
         requester_user = cleaned.get('requester_user')
@@ -387,8 +396,9 @@ class TicketUpdateForm(forms.ModelForm):
 
     def save(self, commit=True):
         ticket = super().save(commit=False)
-        ticket.requester_name = self.cleaned_data['requester_name']
-        ticket.requester_user = self.cleaned_data.get('requester_user')
+        if 'tipo_solicitante' in self.fields:
+            ticket.requester_name = self.cleaned_data['requester_name']
+            ticket.requester_user = self.cleaned_data.get('requester_user')
         if commit:
             ticket.save()
         return ticket
