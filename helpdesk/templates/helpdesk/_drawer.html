@@ -175,7 +175,9 @@
             </h4>
             
             <!-- Lista de Comentários (Alvo do HTMX) -->
-            <div id="comments-list" class="flex flex-col gap-4 mb-6">
+            <div id="comments-list" class="flex flex-col gap-4 mb-6"
+                 hx-get="{% url 'helpdesk:ticket_comments' ticket.id %}"
+                 hx-trigger="ticketUpdated from:body">
                 {% include "helpdesk/_comments_list.html" %}
             </div>
         </div>

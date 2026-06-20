@@ -36,4 +36,5 @@ urlpatterns = [
     path('ticket/<int:pk>/attachments/', views.ticket_attachments, name='ticket_attachments'),
     path('ticket/<int:pk>/transfer/', views.ticket_transfer, name='ticket_transfer'),
     path('ticket/<int:pk>/comment/', views.ticket_add_comment, name='ticket_add_comment'),
+    path('ticket/<int:pk>/comments/', views.ticket_comments, name='ticket_comments'),
 ]

@@ -141,6 +141,11 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets_annotated = tickets.annotate(priority_order=priority_ordering)
         
         context['tickets_new'] = tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
+        
+        is_ti = self.request.user.role in ['ADMIN', 'IT_USER'] or self.request.user.is_superuser
+        if is_ti:
+            context['untriaged_count'] = sum(1 for t in context['tickets_new'] if not t.priority)
+            
         context['tickets_in_progress'] = tickets_annotated.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-priority_order', '-created_at')
         context['tickets_pending'] = tickets_annotated.filter(status=Ticket.StatusChoices.PENDING).order_by('-priority_order', '-created_at')
         context['tickets_resolved'] = tickets_annotated.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
@@ -517,6 +522,15 @@ def ticket_add_comment(request, pk):
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
     return response
+
+@requer_modulo(MODULO_HELPDESK)
+def ticket_comments(request, pk):
+    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão.')
+        
+    comments = ticket.comments.filter(is_active=True).order_by('-created_at')
+    return render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
 
 class KanbanBoardPartialView(KanbanView):
     """Retorna apenas o HTML do quadro para ser injetado via HTMX no evento SSE."""

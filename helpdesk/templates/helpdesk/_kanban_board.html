@@ -6,6 +6,11 @@
                 <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
                 <h3 class="font-semibold text-slate-700">Novos</h3>
                 <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ tickets_new.count }}</span>
+                {% if untriaged_count is not None and untriaged_count > 0 %}
+                <span class="bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded-full shadow-sm border border-amber-200" title="{{ untriaged_count }} chamado(s) aguardando triagem inicial">
+                    {{ untriaged_count }} não triados
+                </span>
+                {% endif %}
             </div>
         </div>
         <div class="flex-1 bg-slate-100/50 rounded-xl p-3 overflow-y-auto kanban-column flex flex-col gap-3" data-status="NEW"{% if pode_operar_kanban %} ondragover="allowDrop(event)" ondrop="drop(event)"{% endif %}>
