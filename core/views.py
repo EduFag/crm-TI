@@ -133,6 +133,28 @@ def user_toggle_active(request, pk):
     return redirect('user_list')
 
 
+@requer_modulo(MODULO_GESTAO_USUARIOS)
+@require_POST
+def user_delete(request, pk):
+    """Remove permanentemente um usuário do sistema."""
+    usuario = get_object_or_404(CustomUser, pk=pk)
+    if usuario == request.user:
+        messages.error(request, 'Você não pode excluir sua própria conta.')
+        return redirect('user_list')
+
+    username = usuario.username
+    usuario.delete()
+    
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.DELETED,
+        descricao=f'Usuário "{username}" e todos os registros relacionados foram removidos permanentemente.',
+        actor=request.user,
+    )
+    messages.success(request, f'Usuário "{username}" removido permanentemente com sucesso.')
+    return redirect('user_list')
+
+
 class EquipeListView(ModuloObrigatorioMixin, ListView):
     """Listagem de equipes do sistema (somente ADMIN)."""
     model = Equipe

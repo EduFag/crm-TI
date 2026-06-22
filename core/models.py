@@ -100,6 +100,7 @@ class RegistroAcao(models.Model):
         RECHARGE = 'RECHARGE', 'Recarga'
         BLOCKED = 'BLOCKED', 'Bloqueio'
         UNBLOCKED = 'UNBLOCKED', 'Desbloqueio'
+        DELETED = 'DELETED', 'Exclusão'
 
     modulo = models.CharField(max_length=20, choices=ModuloChoices.choices, db_index=True)
     acao = models.CharField(max_length=30, choices=AcaoChoices.choices, db_index=True)
