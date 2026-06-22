@@ -80,7 +80,7 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
     model = Chip
     fields = [
         'line_number', 'operator', 'status', 'technology', 'iccid',
-        'batch', 'activated_at',
+        'batch', 'activated_at', 'observacao', 'email_vinculado',
     ]
     chips_tab = 'chips'
     modal_title = 'Novo Chip'
@@ -111,7 +111,7 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
     model = Chip
     fields = [
         'line_number', 'operator', 'status', 'technology', 'iccid',
-        'batch', 'activated_at',
+        'batch', 'activated_at', 'observacao', 'email_vinculado',
     ]
     chips_tab = 'chips'
     modal_submit_label = 'Salvar'

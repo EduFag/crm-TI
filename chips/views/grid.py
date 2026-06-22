@@ -167,3 +167,51 @@ class ChipTransferModalView(ModuloObrigatorioMixin, View):
         chip = get_object_or_404(Chip, pk=pk)
         form = TransferForm()
         return render(request, self.template_name, {'chip': chip, 'form': form})
+
+
+class ChipToggleEmailView(ModuloObrigatorioMixin, View):
+    """POST /chips/api/grid/<pk>/toggle-email/ — Alterna email_vinculado para SIM."""
+    modulo_obrigatorio = MODULO_CHIPS
+
+    def post(self, request, pk):
+        chip = get_object_or_404(Chip, pk=pk)
+        chip.email_vinculado = True
+        chip.save(update_fields=['email_vinculado'])
+        # Retorna HttpResponse 200 OK e via javascript poderíamos atualizar, 
+        # mas como estamos no HTMX, vamos retornar o HTML da célula (td) se necessário,
+        # ou recarregar a tabela.
+        # Wait, the frontend logic will use HTMX to swap the TD.
+        # Let's return just the HTML for the SIM span.
+        html = '<span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700">SIM</span>'
+        from django.http import HttpResponse
+        return HttpResponse(html)
+
+
+class ChipObservationModalView(ModuloObrigatorioMixin, View):
+    """GET /chips/api/grid/<pk>/observation/ — Modal com a observação."""
+    modulo_obrigatorio = MODULO_CHIPS
+    
+    def get(self, request, pk):
+        chip = get_object_or_404(Chip, pk=pk)
+        from django.http import HttpResponse
+        html = f"""
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40" onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md pointer-events-auto" onclick="event.stopPropagation()">
+        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 rounded-t-xl flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Observação da Linha</h3>
+                <p class="text-xs text-slate-500 mt-0.5">{chip.line_number}</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-slate-700 whitespace-pre-wrap">{chip.observacao}</p>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''" class="mt-6 w-full py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Fechar</button>
+        </div>
+    </div>
+</div>
+        """
+        return HttpResponse(html)

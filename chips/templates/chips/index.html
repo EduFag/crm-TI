@@ -165,6 +165,19 @@
                     <option value="LOST">Perdido</option>
                 </select>
             </div>
+            <div class="w-full mt-2 pt-3 border-t border-slate-200">
+                <p class="block text-xs font-semibold text-slate-500 uppercase mb-2">Flags</p>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                        <input type="checkbox" id="filter-no-email" onchange="filterChips()" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        Apenas chips sem email vinculado
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                        <input type="checkbox" id="filter-has-obs" onchange="filterChips()" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        Apenas chips com observação
+                    </label>
+                </div>
+            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
@@ -173,16 +186,17 @@
                     <tr>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Linha</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Operadora</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">E-mail</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Envelope</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Funcionário</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(5, 'data-activated')">
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(6, 'data-activated')">
                             <span class="flex items-center gap-1">
                                 Data Ativação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(6, 'data-movement')">
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(7, 'data-movement')">
                             <span class="flex items-center gap-1">
                                 Data Última Movimentação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
@@ -197,9 +211,27 @@
                         data-operator="{{ chip.operator.id }}"
                         data-status="{{ chip.status }}"
                         data-activated="{{ chip.activated_at|date:'Y-m-d'|default:'' }}"
-                        data-movement="{{ chip.last_movement_at|date:'Y-m-d'|default:'' }}">
+                        data-movement="{{ chip.last_movement_at|date:'Y-m-d'|default:'' }}"
+                        data-email="{{ chip.email_vinculado|yesno:'true,false' }}"
+                        data-obs="{{ chip.observacao|yesno:'true,false' }}">
                         <td class="px-6 py-4 font-mono font-bold text-slate-900 chip-linha">{{ chip.line_number }}</td>
                         <td class="px-6 py-4 text-slate-800 chip-operadora">{{ chip.operator.name }}</td>
+                        <td class="px-6 py-4" id="email-td-{{ chip.id }}">
+                            {% if chip.email_vinculado %}
+                            <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700">SIM</span>
+                            {% else %}
+                            <div class="flex items-center gap-1">
+                                <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">NÃO</span>
+                                <button type="button" title="Vincular E-mail"
+                                        hx-post="{% url 'chips:chip_toggle_email' chip.id %}"
+                                        hx-target="#email-td-{{ chip.id }}"
+                                        hx-swap="innerHTML"
+                                        class="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4">
                             <span class="px-2.5 py-1 rounded text-xs font-bold
                                 {% if chip.status == 'AVAILABLE' %}bg-slate-100 text-slate-700
@@ -215,6 +247,15 @@
                         <td class="px-6 py-4 text-slate-600">{{ chip.activated_at|date:"d/m/Y"|default:"—" }}</td>
                         <td class="px-6 py-4 text-slate-600">{{ chip.last_movement_at|date:"d/m/Y"|default:"—" }}</td>
                         <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                            {% if chip.observacao %}
+                            <button type="button" title="Observação"
+                                    hx-get="{% url 'chips:chip_observation_modal' chip.id %}"
+                                    hx-target="#modal-container"
+                                    hx-swap="innerHTML"
+                                    class="text-blue-500 hover:text-blue-700 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                            </button>
+                            {% endif %}
                             <button type="button" title="Editar"
                                     hx-get="{% url 'chips:chip_edit' chip.id %}"
                                     hx-target="#modal-container"
@@ -248,7 +289,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="8" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td></tr>
+                    <tr><td colspan="9" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -512,6 +553,9 @@ $(function() {
         var textInput = ($('#filter-chip-text').val() || '').toLowerCase();
         var opInput = $('#filter-chip-operator').val();
         var statusInput = $('#filter-chip-status').val();
+        var noEmailOnly = $('#filter-no-email').is(':checked');
+        var hasObsOnly = $('#filter-has-obs').is(':checked');
+
         $('#chips-tbody tr').each(function() {
             var $row = $(this);
             if ($row.find('td').length === 1) return;
@@ -528,8 +572,10 @@ $(function() {
 
             var matchOp = !opInput || $row.attr('data-operator') === opInput;
             var matchStatus = !statusInput || $row.attr('data-status') === statusInput;
+            var matchNoEmail = !noEmailOnly || $row.attr('data-email') === 'false';
+            var matchHasObs = !hasObsOnly || $row.attr('data-obs') === 'true';
 
-            if (matchText && matchOp && matchStatus) {
+            if (matchText && matchOp && matchStatus && matchNoEmail && matchHasObs) {
                 $row.show();
             } else {
                 $row.hide();

@@ -118,6 +118,8 @@ def criar_chip_operacional(
     employee_user=None,
     activated_at=None,
     batch=None,
+    observacao='',
+    email_vinculado=False,
     actor,
 ):
     """Cria chip e posiciona na TI ou entrega direto ao callcenter."""
@@ -125,6 +127,8 @@ def criar_chip_operacional(
         line_number=line_number.strip(),
         operator=operator,
         batch=batch,
+        observacao=observacao.strip(),
+        email_vinculado=email_vinculado,
         status=Chip.StatusChoices.IN_USE if employee_name.strip() else Chip.StatusChoices.AVAILABLE,
         activated_at=(
             activated_at or timezone.localdate()

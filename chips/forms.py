@@ -185,6 +185,20 @@ class ChipGridCreateForm(forms.Form):
         empty_label='Selecione o envelope',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
+    observacao = forms.CharField(
+        required=False,
+        label='Observação',
+        widget=forms.Textarea(attrs={
+            'class': INPUT_CLASS,
+            'rows': 3,
+            'placeholder': 'Observações sobre o chip',
+        }),
+    )
+    email_vinculado = forms.BooleanField(
+        required=False,
+        label='Possui e-mail vinculado?',
+        widget=forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'})
+    )
 
     def clean(self):
         cleaned = super().clean()

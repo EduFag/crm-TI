@@ -18,6 +18,8 @@ urlpatterns = [
     path('api/grid/<int:pk>/transfer/', views.ChipTransferView.as_view(), name='grid_transfer'),
     path('api/grid/<int:pk>/return/', views.ChipReturnView.as_view(), name='grid_return'),
     path('api/grid/<int:pk>/transfer/modal/', views.ChipTransferModalView.as_view(), name='grid_transfer_modal'),
+    path('api/grid/<int:pk>/toggle-email/', views.ChipToggleEmailView.as_view(), name='chip_toggle_email'),
+    path('api/grid/<int:pk>/observation/', views.ChipObservationModalView.as_view(), name='chip_observation_modal'),
 
     # Modais HTMX (create/update)
     path('operators/create/', views.OperatorCreateView.as_view(), name='operator_create'),

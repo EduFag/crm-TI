@@ -73,6 +73,9 @@ class Chip(models.Model):
     operator = models.ForeignKey(Operator, on_delete=models.PROTECT, related_name='chips', verbose_name="Operadora")
     batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name='chips', verbose_name="Envelope")
 
+    observacao = models.TextField("Observação", blank=True, help_text="Observações sobre o chip")
+    email_vinculado = models.BooleanField("E-mail Vinculado", default=False, help_text="Indica se a linha tem algum e-mail vinculado")
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
