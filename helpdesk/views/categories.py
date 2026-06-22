@@ -69,6 +69,25 @@ def category_create_action(request, model_type):
 
 @requer_modulo(MODULO_HELPDESK)
 @require_POST
+def category_edit(request, model_type, pk):
+    if not usuario_pode_gerenciar_categorias(request.user):
+        return HttpResponseForbidden('Acesso negado.')
+        
+    model = TicketCategory if model_type == 'general' else TicketSpecificCategory
+    category = get_object_or_404(model, pk=pk)
+    
+    new_name = request.POST.get('HX-Prompt') or request.headers.get('HX-Prompt')
+    if new_name and new_name.strip():
+        category.name = new_name.strip()
+        category.save(update_fields=['name'])
+        
+    return render(request, 'helpdesk/_category_row.html', {
+        'category': category,
+        'type': model_type
+    })
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
 def category_delete(request, model_type, pk):
     if not usuario_pode_gerenciar_categorias(request.user):
         return HttpResponseForbidden('Acesso negado.')
