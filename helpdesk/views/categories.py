@@ -1,6 +1,6 @@
 from django.views.generic import TemplateView
 from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo, resposta_sem_permissao
 from helpdesk.models import TicketCategory, TicketSpecificCategory
@@ -66,3 +66,19 @@ def category_create_action(request, model_type):
         })
         
     return JsonResponse({'success': True})
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def category_delete(request, model_type, pk):
+    if not usuario_pode_gerenciar_categorias(request.user):
+        return HttpResponseForbidden('Acesso negado.')
+        
+    model = TicketCategory if model_type == 'general' else TicketSpecificCategory
+    category = get_object_or_404(model, pk=pk)
+    
+    # Store name for audit
+    name = category.name
+    category.delete()
+    
+    # Render nothing (or a 200 OK) to let HTMX remove the row
+    return HttpResponse(status=200)

@@ -17,6 +17,7 @@ urlpatterns = [
     path('categories/', views.CategoriesManageView.as_view(), name='categories'),
     path('categories/create/<str:model_type>/', views.category_create_action, name='category_create_action'),
     path('categories/toggle/<str:model_type>/<int:pk>/', views.category_toggle_active, name='category_toggle_active'),
+    path('categories/delete/<str:model_type>/<int:pk>/', views.category_delete, name='category_delete'),
     
     # Real-Time e Partials via HTMX
     path('poll/', views.poll_ticket_updates, name='poll'),
