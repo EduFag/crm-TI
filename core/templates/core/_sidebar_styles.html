@@ -140,26 +140,27 @@
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* BARRA DE ROLAGEM CUSTOMIZADA E ULTRA-FINA PARA A SIDEBAR (Evita cobrir os ícones) */
-    .sidebar-nav-scroll::-webkit-scrollbar {
+    /* BARRA DE ROLAGEM CUSTOMIZADA E ULTRA-FINA GLOBAL */
+    ::-webkit-scrollbar {
         width: 4px !important; /* Apenas 4px de largura */
+        height: 4px !important; /* Apenas 4px de altura */
     }
 
-    .sidebar-nav-scroll::-webkit-scrollbar-track {
+    ::-webkit-scrollbar-track {
         background: transparent !important;
     }
 
-    .sidebar-nav-scroll::-webkit-scrollbar-thumb {
+    ::-webkit-scrollbar-thumb {
         background: rgba(148, 163, 184, 0.2) !important; /* Cinza claro bem sutil */
         border-radius: 4px !important;
     }
 
-    .sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
+    ::-webkit-scrollbar-thumb:hover {
         background: rgba(148, 163, 184, 0.4) !important;
     }
 
     /* Firefox */
-    .sidebar-nav-scroll {
+    * {
         scrollbar-width: thin !important;
         scrollbar-color: rgba(148, 163, 184, 0.2) transparent !important;
     }
