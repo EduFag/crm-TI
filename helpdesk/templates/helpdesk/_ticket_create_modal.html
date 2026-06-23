@@ -165,24 +165,33 @@
     </div>
 </div>
 
-{% if form.tipo_solicitante and form.requester_user %}
+{% if form.tipo_solicitante %}
 <script>
 (function() {
     function atualizarCamposSolicitante() {
-        var tipoUsuario = document.querySelector('input[name="tipo_solicitante"][value="usuario"]');
+        var radioUsuario = document.querySelector('input[name="tipo_solicitante"][value="usuario"]');
+        var radioTexto = document.querySelector('input[name="tipo_solicitante"][value="texto"]');
+        var radioEu = document.querySelector('input[name="tipo_solicitante"][value="eu"]');
+
         var campoTexto = document.getElementById('campo-solicitante-texto');
         var campoUsuario = document.getElementById('campo-solicitante-usuario');
+        
         var inputTexto = document.getElementById('{{ form.requester_name.id_for_label }}');
         var selectUsuario = document.getElementById('{{ form.requester_user.id_for_label }}');
-        var modoUsuario = tipoUsuario && tipoUsuario.checked;
 
-        if (modoUsuario) {
+        if (radioUsuario && radioUsuario.checked) {
             if (campoTexto) campoTexto.classList.add('hidden');
             if (campoUsuario) campoUsuario.classList.remove('hidden');
             if (inputTexto) inputTexto.removeAttribute('required');
-        } else {
+        } else if (radioTexto && radioTexto.checked) {
             if (campoTexto) campoTexto.classList.remove('hidden');
             if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.setAttribute('required', 'required');
+            if (selectUsuario) selectUsuario.value = '';
+        } else if (radioEu && radioEu.checked) {
+            if (campoTexto) campoTexto.classList.add('hidden');
+            if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.removeAttribute('required');
             if (selectUsuario) selectUsuario.value = '';
         }
     }

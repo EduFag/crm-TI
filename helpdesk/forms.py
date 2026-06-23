@@ -156,10 +156,10 @@ class TicketCreateForm(forms.ModelForm):
         if role == CustomUser.RoleChoices.SUPERVISOR:
             self.fields['tipo_solicitante'].choices = [
                 (self.TIPO_EU, 'Eu mesmo(a)'),
-                (self.TIPO_USUARIO, 'Usuário da Equipe/Sistema'),
+                (self.TIPO_TEXTO, 'Nome livre'),
             ]
             self.fields['tipo_solicitante'].initial = self.TIPO_EU
-            self._remover_campo('requester_name')
+            self._remover_campo('requester_user')
             self._remover_campo('priority')
             self._remover_campo('specific_category')
             
@@ -185,10 +185,11 @@ class TicketCreateForm(forms.ModelForm):
                 self.fields['priority'].required = False
                 self.fields['priority'].empty_label = 'Sem prioridade (triagem posterior)'
 
-        self.fields['requester_user'].queryset = CustomUser.objects.filter(
-            is_active=True,
-        ).order_by('first_name', 'last_name', 'username')
-        self.fields['requester_user'].label_from_instance = self._rotulo_usuario
+        if 'requester_user' in self.fields:
+            self.fields['requester_user'].queryset = CustomUser.objects.filter(
+                is_active=True,
+            ).order_by('first_name', 'last_name', 'username')
+            self.fields['requester_user'].label_from_instance = self._rotulo_usuario
 
     def _remover_campo(self, nome):
         if nome in self.fields:
@@ -274,6 +275,7 @@ class TicketUpdateForm(forms.ModelForm):
 
     TIPO_TEXTO = 'texto'
     TIPO_USUARIO = 'usuario'
+    TIPO_EU = 'eu'
 
     tipo_solicitante = forms.ChoiceField(
         choices=[
@@ -355,6 +357,23 @@ class TicketUpdateForm(forms.ModelForm):
                 self._remover_campo('tipo_solicitante')
                 self._remover_campo('requester_name')
                 self._remover_campo('requester_user')
+            elif role == CustomUser.RoleChoices.SUPERVISOR:
+                self.fields['tipo_solicitante'].choices = [
+                    (self.TIPO_EU, 'Eu mesmo(a)'),
+                    (self.TIPO_TEXTO, 'Nome livre'),
+                ]
+                self._remover_campo('requester_user')
+                if self.instance and self.instance.pk:
+                    if self.instance.requester_user_id == self.user.id:
+                        self.fields['tipo_solicitante'].initial = self.TIPO_EU
+                    else:
+                        self.fields['tipo_solicitante'].initial = self.TIPO_TEXTO
+                        if self.instance.requester_user_id:
+                            self.fields['requester_name'].initial = (
+                                self.instance.requester_user.get_full_name() or self.instance.requester_user.username
+                            )
+                        else:
+                            self.fields['requester_name'].initial = self.instance.requester_name
 
     def _remover_campo(self, nome):
         if nome in self.fields:
@@ -385,6 +404,9 @@ class TicketUpdateForm(forms.ModelForm):
                     requester_user.get_full_name() or requester_user.username
                 )
                 cleaned['requester_user'] = requester_user
+        elif tipo == self.TIPO_EU:
+            cleaned['requester_name'] = self.user.get_full_name() or self.user.username
+            cleaned['requester_user'] = self.user
         else:
             if not requester_name:
                 self.add_error('requester_name', 'Informe o nome do solicitante.')

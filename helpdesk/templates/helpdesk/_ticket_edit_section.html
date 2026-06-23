@@ -105,16 +105,30 @@
 <script>
 (function() {
     function atualizarSolicitanteEdit() {
-        var tipoUsuario = document.querySelector('#ticket-edit-section input[name="tipo_solicitante"][value="usuario"]');
+        var radioUsuario = document.querySelector('#ticket-edit-section input[name="tipo_solicitante"][value="usuario"]');
+        var radioTexto = document.querySelector('#ticket-edit-section input[name="tipo_solicitante"][value="texto"]');
+        var radioEu = document.querySelector('#ticket-edit-section input[name="tipo_solicitante"][value="eu"]');
+
         var campoTexto = document.getElementById('edit-campo-solicitante-texto');
         var campoUsuario = document.getElementById('edit-campo-solicitante-usuario');
-        if (!tipoUsuario) return;
-        if (tipoUsuario.checked) {
+
+        var inputTexto = document.querySelector('#ticket-edit-section [name="requester_name"]');
+        var selectUsuario = document.querySelector('#ticket-edit-section [name="requester_user"]');
+
+        if (radioUsuario && radioUsuario.checked) {
             if (campoTexto) campoTexto.classList.add('hidden');
             if (campoUsuario) campoUsuario.classList.remove('hidden');
-        } else {
+            if (inputTexto) inputTexto.removeAttribute('required');
+        } else if (radioTexto && radioTexto.checked) {
             if (campoTexto) campoTexto.classList.remove('hidden');
             if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.setAttribute('required', 'required');
+            if (selectUsuario) selectUsuario.value = '';
+        } else if (radioEu && radioEu.checked) {
+            if (campoTexto) campoTexto.classList.add('hidden');
+            if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.removeAttribute('required');
+            if (selectUsuario) selectUsuario.value = '';
         }
     }
     document.querySelectorAll('#ticket-edit-section input[name="tipo_solicitante"]').forEach(function(radio) {
