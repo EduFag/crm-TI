@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema TI{% endblock %}</title>
+    <link rel="shortcut icon" type="image/svg+xml" href="{% static 'helpdesk/images/logo.svg' %}">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -58,7 +59,7 @@
         <!-- Logo & Toggle Header (Spacious scale) -->
         <div class="h-20 flex items-center justify-between px-6 border-b border-slate-100 sidebar-logo-wrap gap-2">
             <div class="flex items-center gap-3.5 min-w-0 sidebar-hide-collapsed">
-                <img src="{% static 'helpdesk/images/moneyzito-andandinho.gif' %}" class="w-10 h-10 object-contain rounded-xl shrink-0 shadow-sm" alt="Logo">
+                <img src="{% static 'helpdesk/images/logo.svg' %}" class="w-10 h-10 object-contain shrink-0" alt="Logo">
                 <span class="font-bold text-xl text-slate-900 tracking-tight">Sistema TI</span>
             </div>
             <!-- Botão recolher/expandir colocado de forma elegante no header -->
