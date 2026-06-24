@@ -76,6 +76,19 @@ def usuarios_solicitantes_equipe(user) -> QuerySet:
     ).distinct().order_by('first_name', 'last_name', 'username')
 
 
+def buscar_membro_equipe_por_nome(user, nome: str):
+    """Busca membro da equipe pelo nome completo ou username (case-insensitive)."""
+    nome = (nome or '').strip()
+    if not nome or not user:
+        return None
+    nome_lower = nome.lower()
+    for membro in usuarios_solicitantes_equipe(user).exclude(pk=user.pk):
+        nome_completo = (membro.get_full_name() or '').strip()
+        if nome_completo.lower() == nome_lower or membro.username.lower() == nome_lower:
+            return membro
+    return None
+
+
 def usuarios_tecnicos_para_transferencia() -> QuerySet:
     """Técnicos disponíveis para transferência: ADMIN e IT_USER ativos."""
     return CustomUser.objects.filter(

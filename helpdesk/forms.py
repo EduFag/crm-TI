@@ -4,8 +4,8 @@ from django.utils.safestring import mark_safe
 from core.models import CustomUser
 from helpdesk.models import Ticket, TicketCategory, validate_image_attachment
 from helpdesk.ticket_access import (
+    buscar_membro_equipe_por_nome,
     usuario_pode_definir_prioridade,
-    usuarios_solicitantes_equipe,
     usuarios_tecnicos_para_transferencia,
 )
 
@@ -38,7 +38,6 @@ class TicketCreateForm(forms.ModelForm):
     TIPO_TEXTO = 'texto'
     TIPO_USUARIO = 'usuario'
     TIPO_EU = 'eu'
-    TIPO_CO_AUTOR = 'co_autor'
 
     tipo_solicitante = forms.ChoiceField(
         choices=[
@@ -63,13 +62,6 @@ class TicketCreateForm(forms.ModelForm):
         required=False,
         label='Usuário solicitante',
         empty_label='Selecione um usuário',
-        widget=forms.Select(attrs={'class': SELECT_CLASS + ' searchable-select'}),
-    )
-    co_autor_user = forms.ModelChoiceField(
-        queryset=CustomUser.objects.none(),
-        required=False,
-        label='Co-autor da equipe',
-        empty_label='Selecione um membro da equipe',
         widget=forms.Select(attrs={'class': SELECT_CLASS + ' searchable-select'}),
     )
     attachment = MultipleFileField(
@@ -157,39 +149,25 @@ class TicketCreateForm(forms.ModelForm):
             self._remover_campo('tipo_solicitante')
             self._remover_campo('requester_name')
             self._remover_campo('requester_user')
-            self._remover_campo('co_autor_user')
             self._remover_campo('priority')
             self._remover_campo('specific_category')
             return
 
-        if role == CustomUser.RoleChoices.MULTIPLIER:
-            self.fields['tipo_solicitante'].choices = [
-                (self.TIPO_EU, 'Eu mesmo(a)'),
-                (self.TIPO_TEXTO, 'Nome livre'),
-                (self.TIPO_CO_AUTOR, 'Co-autor da equipe'),
-            ]
-            self.fields['tipo_solicitante'].initial = self.TIPO_EU
-            self._remover_campo('requester_user')
-            self._remover_campo('priority')
-            self._remover_campo('specific_category')
-            self.fields['co_autor_user'].queryset = usuarios_solicitantes_equipe(self.user).exclude(pk=self.user.pk)
-            self._configurar_equipes_usuario()
-            return
-
-        if role in (CustomUser.RoleChoices.SUPERVISOR, CustomUser.RoleChoices.TEAM_LEADER):
+        if role in (
+            CustomUser.RoleChoices.MULTIPLIER,
+            CustomUser.RoleChoices.SUPERVISOR,
+            CustomUser.RoleChoices.TEAM_LEADER,
+        ):
             self.fields['tipo_solicitante'].choices = [
                 (self.TIPO_EU, 'Eu mesmo(a)'),
                 (self.TIPO_TEXTO, 'Nome livre'),
             ]
             self.fields['tipo_solicitante'].initial = self.TIPO_EU
             self._remover_campo('requester_user')
-            self._remover_campo('co_autor_user')
             self._remover_campo('priority')
             self._remover_campo('specific_category')
             self._configurar_equipes_usuario()
             return
-
-        self._remover_campo('co_autor_user')
         # ADMIN, IT_USER ou superuser
         if 'equipe' in self.fields:
             self.fields['equipe'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
@@ -220,9 +198,6 @@ class TicketCreateForm(forms.ModelForm):
             self.fields['equipe'].empty_label = 'Selecione a equipe'
             self.fields['equipe'].required = True
 
-        if 'co_autor_user' in self.fields:
-            self.fields['co_autor_user'].label_from_instance = self._rotulo_usuario
-
     def _remover_campo(self, nome):
         if nome in self.fields:
             del self.fields[nome]
@@ -247,18 +222,9 @@ class TicketCreateForm(forms.ModelForm):
         tipo = cleaned.get('tipo_solicitante')
         requester_name = (cleaned.get('requester_name') or '').strip()
         requester_user = cleaned.get('requester_user')
-        co_autor_user = cleaned.get('co_autor_user')
+        co_autor_user = None
 
-        if tipo == self.TIPO_CO_AUTOR:
-            if not co_autor_user:
-                self.add_error('co_autor_user', 'Selecione um co-autor da equipe.')
-            else:
-                cleaned['requester_name'] = requester_name or (
-                    self.user.get_full_name() or self.user.username
-                )
-                cleaned['requester_user'] = None
-                cleaned['co_autor_user'] = co_autor_user
-        elif tipo == self.TIPO_USUARIO:
+        if tipo == self.TIPO_USUARIO:
             if not requester_user:
                 self.add_error('requester_user', 'Selecione um usuário do sistema.')
             else:
@@ -277,7 +243,15 @@ class TicketCreateForm(forms.ModelForm):
             else:
                 cleaned['requester_name'] = requester_name
                 cleaned['requester_user'] = None
-                cleaned['co_autor_user'] = None
+                if role == CustomUser.RoleChoices.MULTIPLIER:
+                    co_autor_user = buscar_membro_equipe_por_nome(self.user, requester_name)
+                    if not co_autor_user:
+                        self.add_error(
+                            'requester_name',
+                            'Informe o nome completo ou usuário de um membro da equipe.',
+                        )
+
+        cleaned['co_autor_user'] = co_autor_user
 
         if not usuario_pode_definir_prioridade(self.user):
             cleaned['priority'] = None

@@ -75,17 +75,6 @@
                     {% endif %}
                 </div>
                 {% endif %}
-
-                {% if form.co_autor_user %}
-                <div id="campo-co-autor" class="hidden">
-                    <label for="{{ form.co_autor_user.id_for_label }}" class="block text-xs font-medium text-slate-500 mb-1">Membro da equipe (co-autor)</label>
-                    {{ form.co_autor_user }}
-                    <p class="text-[11px] text-slate-500 mt-1">O co-autor poderá ver e comentar neste chamado.</p>
-                    {% if form.co_autor_user.errors %}
-                    <p class="text-xs text-red-600 mt-1">{{ form.co_autor_user.errors.0 }}</p>
-                    {% endif %}
-                </div>
-                {% endif %}
             </div>
             {% elif form.requester_name %}
             <div>
@@ -183,44 +172,27 @@
         var radioUsuario = document.querySelector('input[name="tipo_solicitante"][value="usuario"]');
         var radioTexto = document.querySelector('input[name="tipo_solicitante"][value="texto"]');
         var radioEu = document.querySelector('input[name="tipo_solicitante"][value="eu"]');
-        var radioCoAutor = document.querySelector('input[name="tipo_solicitante"][value="co_autor"]');
 
         var campoTexto = document.getElementById('campo-solicitante-texto');
         var campoUsuario = document.getElementById('campo-solicitante-usuario');
-        var campoCoAutor = document.getElementById('campo-co-autor');
         
         var inputTexto = document.getElementById('{{ form.requester_name.id_for_label }}');
         var selectUsuario = document.getElementById('{{ form.requester_user.id_for_label }}');
-        var selectCoAutor = null;
-        {% if form.co_autor_user %}
-        selectCoAutor = campoCoAutor ? document.getElementById('{{ form.co_autor_user.id_for_label }}') : null;
-        {% endif %}
 
         if (radioUsuario && radioUsuario.checked) {
             if (campoTexto) campoTexto.classList.add('hidden');
             if (campoUsuario) campoUsuario.classList.remove('hidden');
-            if (campoCoAutor) campoCoAutor.classList.add('hidden');
             if (inputTexto) inputTexto.removeAttribute('required');
-        } else if (radioCoAutor && radioCoAutor.checked) {
-            if (campoTexto) campoTexto.classList.remove('hidden');
-            if (campoUsuario) campoUsuario.classList.add('hidden');
-            if (campoCoAutor) campoCoAutor.classList.remove('hidden');
-            if (inputTexto) inputTexto.removeAttribute('required');
-            if (selectUsuario) selectUsuario.value = '';
         } else if (radioTexto && radioTexto.checked) {
             if (campoTexto) campoTexto.classList.remove('hidden');
             if (campoUsuario) campoUsuario.classList.add('hidden');
-            if (campoCoAutor) campoCoAutor.classList.add('hidden');
             if (inputTexto) inputTexto.setAttribute('required', 'required');
             if (selectUsuario) selectUsuario.value = '';
-            if (selectCoAutor) selectCoAutor.value = '';
         } else if (radioEu && radioEu.checked) {
             if (campoTexto) campoTexto.classList.add('hidden');
             if (campoUsuario) campoUsuario.classList.add('hidden');
-            if (campoCoAutor) campoCoAutor.classList.add('hidden');
             if (inputTexto) inputTexto.removeAttribute('required');
             if (selectUsuario) selectUsuario.value = '';
-            if (selectCoAutor) selectCoAutor.value = '';
         }
     }
 

@@ -192,13 +192,12 @@ class RbacHelpdeskTestCase(TestCase):
 
     def test_multiplicador_co_autor(self):
         form = TicketCreateForm(user=self.multiplier)
-        self.assertIn('co_autor_user', form.fields)
-        self.assertEqual(len(form.fields['tipo_solicitante'].choices), 3)
+        self.assertEqual(len(form.fields['tipo_solicitante'].choices), 2)
+        self.assertNotIn('co_autor_user', form.fields)
 
         data = {
-            'tipo_solicitante': 'co_autor',
-            'co_autor_user': self.colega.pk,
-            'requester_name': 'Cliente X',
+            'tipo_solicitante': 'texto',
+            'requester_name': self.colega.get_full_name() or self.colega.username,
             'title': 'Chamado multiplicador',
             'description': 'Descricao',
             'category': self.categoria.id,
