@@ -219,3 +219,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Chaves SSH de deploy (nunca commitar)
+github-actions-crm-ti
+github-actions-crm-ti.pub
