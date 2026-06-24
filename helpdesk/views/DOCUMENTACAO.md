@@ -4,7 +4,7 @@ Views e endpoints do **helpdesk**.
 
 ## Para que serve
 
-Kanban interativo, dashboard de métricas, histórico filtrado, drawer de detalhe do ticket, comentários, edição/transferência (ADMIN) e poll leve HTMX para refresh sem bloquear workers.
+Permissões centralizadas em `helpdesk/ticket_access.py`. Drawer expõe `pode_comentar` além de `pode_editar` / `pode_excluir`.
 
 ## Arquivos
 
@@ -25,4 +25,4 @@ Kanban interativo, dashboard de métricas, histórico filtrado, drawer de detalh
 | `ticket/<pk>/edit/` | Edição completa (ADMIN/superuser) |
 | `ticket/<pk>/transfer/` | Transferência rápida de técnico |
 | `ticket/<pk>/update-status/` | Drag-and-drop Kanban (ADMIN/superuser) |
-| `ticket/<pk>/comment/` | Novo comentário |
+| `ticket/<pk>/comment/` | Novo comentário (exige `usuario_pode_comentar_chamado`) |

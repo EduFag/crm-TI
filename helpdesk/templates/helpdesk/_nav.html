@@ -1,5 +1,5 @@
 <div class="flex items-center gap-6 border-b border-slate-200 mb-6">
-    {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+    {% if pode_acessar_dashboard_helpdesk %}
     <a href="{% url 'helpdesk:dashboard' %}" class="pb-3 text-sm font-semibold transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-blue-600 border-b-2 border-blue-600{% else %}text-slate-500 hover:text-slate-800{% endif %}">
         Dashboard Geral
     </a>
@@ -7,7 +7,7 @@
     <a href="{% url 'helpdesk:kanban' %}" class="pb-3 text-sm font-semibold transition-colors {% if request.resolver_match.url_name == 'kanban' %}text-blue-600 border-b-2 border-blue-600{% else %}text-slate-500 hover:text-slate-800{% endif %}">
         Quadro Kanban
     </a>
-    {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+    {% if pode_acessar_dashboard_helpdesk %}
     <a href="{% url 'helpdesk:history' %}" class="pb-3 text-sm font-semibold transition-colors {% if request.resolver_match.url_name == 'history' %}text-blue-600 border-b-2 border-blue-600{% else %}text-slate-500 hover:text-slate-800{% endif %}">
         Histórico
     </a>

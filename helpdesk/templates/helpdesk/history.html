@@ -11,7 +11,7 @@
             <p class="text-sm text-slate-500 mt-1">Busque e filtre o histórico completo de chamados.</p>
         </div>
         <div class="flex items-center gap-2">
-            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+            {% if eh_operador_helpdesk %}
             <button type="button"
                     hx-get="{% url 'helpdesk:categories' %}"
                     hx-target="#modal-container"
@@ -112,7 +112,7 @@
                     <td class="px-6 py-4 font-mono text-slate-500">#{{ ticket.id }}</td>
                     <td class="px-6 py-4">
                         <p class="font-medium text-slate-900 truncate max-w-xs">{{ ticket.title }}</p>
-                        <p class="text-xs text-slate-500">{{ ticket.requester_name }}</p>
+                        <p class="text-xs font-semibold text-slate-800">{{ ticket.requester_name }}</p>
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">{{ ticket.get_status_display }}</span>

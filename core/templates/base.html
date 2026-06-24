@@ -120,7 +120,7 @@
             </div>
 
             <div class="flex items-center gap-5 ml-4 text-slate-400">
-                {% if user.role == 'STANDARD' or user.role == 'SUPERVISOR' %}
+                {% if user.role == 'STANDARD' or user.role == 'SUPERVISOR' or user.role == 'TEAM_LEADER' or user.role == 'MULTIPLIER' %}
                 <button type="button" title="Ajuda e Tutoriais" onclick="document.getElementById('tutorial-modal').showModal()"
                     class="hover:text-blue-600 transition-colors relative flex items-center justify-center p-1 rounded-lg hover:bg-blue-50">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

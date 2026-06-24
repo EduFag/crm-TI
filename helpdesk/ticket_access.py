@@ -1,73 +1,69 @@
 """
-Regras de visibilidade de chamados por papel do usuário.
-Usuário padrão (STANDARD) vê apenas os chamados que ele próprio abriu ou onde é solicitante.
+Regras de visibilidade e permissões de chamados por papel do usuário.
+Matriz completa documentada em helpdesk/DOCUMENTACAO.md e .agent/skills/rbac-helpdesk/SKILL.md.
 """
 from django.db.models import Q, QuerySet
 
 from core.models import CustomUser
 
 
-def _eh_admin_ou_superuser(user) -> bool:
+def _role(user) -> str | None:
+    if not user or not user.is_authenticated:
+        return None
+    return getattr(user, 'role', None)
+
+
+def usuario_eh_operador_helpdesk(user) -> bool:
+    """Membro TI, Administrador ou superuser — operações completas no helpdesk."""
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
-    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
+    return _role(user) in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
 
 
 def usuario_pode_acessar_dashboard_e_historico(user) -> bool:
-    """Apenas ADMIN e IT_USER podem acessar dashboard e histórico."""
-    return _eh_admin_ou_superuser(user)
+    """Dashboard e histórico: Membro TI, Administrador ou superuser."""
+    return usuario_eh_operador_helpdesk(user)
+
+
+def usuario_pode_ver_arquivados(user) -> bool:
+    """Arquivados visíveis apenas no histórico para operadores helpdesk."""
+    return usuario_eh_operador_helpdesk(user)
 
 
 def usuario_pode_gerenciar_categorias(user) -> bool:
-    """ADMIN e superusuário podem criar categorias no modal de novo chamado."""
-    return _eh_admin_ou_superuser(user)
+    return usuario_eh_operador_helpdesk(user)
 
 
 def usuario_pode_definir_prioridade(user) -> bool:
-    """Somente ADMIN e superusuário definem prioridade na criação ou edição."""
-    return _eh_admin_ou_superuser(user)
-
-
-def usuario_pode_editar_chamado(user, ticket=None) -> bool:
-    """Administradores e usuários de TI podem editar qualquer chamado. STANDARD e SUPERVISOR apenas os que têm acesso."""
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser or user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER):
-        return True
-    if ticket:
-        return usuario_pode_acessar_chamado(user, ticket)
-    return True
+    return usuario_eh_operador_helpdesk(user)
 
 
 def usuario_pode_transferir_chamado(user) -> bool:
-    """Somente ADMIN e superusuário podem transferir técnico responsável."""
-    return _eh_admin_ou_superuser(user)
-
-
-def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
-    """Administradores e usuários de TI podem excluir qualquer chamado. STANDARD e SUPERVISOR apenas os que têm acesso."""
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser or user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER):
-        return True
-    if ticket:
-        return usuario_pode_acessar_chamado(user, ticket)
-    return True
+    return usuario_eh_operador_helpdesk(user)
 
 
 def usuario_pode_operar_kanban(user) -> bool:
-    """Administradores e usuários de TI podem mover cards e operar o fluxo do Kanban. Restrito para STANDARD."""
+    """Somente operadores helpdesk movem cards no Kanban."""
+    return usuario_eh_operador_helpdesk(user)
+
+
+def usuario_ve_todos_chamados(user) -> bool:
+    """Visão global no Kanban: operadores, supervisor e superuser."""
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
-    return user.role in (CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER)
+    return _role(user) in (
+        CustomUser.RoleChoices.ADMIN,
+        CustomUser.RoleChoices.IT_USER,
+        CustomUser.RoleChoices.SUPERVISOR,
+    )
 
 
 def usuarios_solicitantes_equipe(user) -> QuerySet:
-    """Membros ativos da mesma equipe do gerente (inclui o próprio gerente)."""
+    """Membros ativos das equipes do usuário (inclui o próprio)."""
     if not user or not user.is_authenticated:
         return CustomUser.objects.none()
     if not user.equipes.exists():
@@ -79,90 +75,115 @@ def usuarios_solicitantes_equipe(user) -> QuerySet:
 
 
 def usuarios_tecnicos_para_transferencia() -> QuerySet:
-    """Técnicos disponíveis para transferência: usuários ADMIN e IT_USER ativos."""
+    """Técnicos disponíveis para transferência: ADMIN e IT_USER ativos."""
     return CustomUser.objects.filter(
         is_active=True,
         role__in=[CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER],
     ).order_by('first_name', 'last_name', 'username')
 
 
-def usuario_ve_todos_chamados(user) -> bool:
-    """ADMIN, MANAGER e superusuário enxergam todos os chamados."""
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-    return user.role in (
-        CustomUser.RoleChoices.ADMIN,
-        CustomUser.RoleChoices.IT_USER,
+def _filtro_chamados_proprios(user) -> Q:
+    """Chamados criados pelo usuário, onde é solicitante ou co-autor."""
+    nome = (user.get_full_name() or user.username).strip()
+    return (
+        Q(created_by=user)
+        | Q(requester_user=user)
+        | Q(co_authors=user)
+        | Q(created_by__isnull=True, requester_name__iexact=nome)
+        | Q(created_by__isnull=True, requester_name__iexact=user.username)
+    )
+
+
+def _filtro_chamados_equipe(user) -> Q:
+    """Chamados vinculados às equipes do usuário."""
+    equipes_user = user.equipes.all()
+    if not equipes_user.exists():
+        return Q(pk__in=[])
+    return (
+        Q(equipe__in=equipes_user)
+        | Q(created_by__equipes__in=equipes_user)
+        | Q(requester_user__equipes__in=equipes_user)
     )
 
 
 def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
-    """Restringe o queryset aos chamados do usuário quando o papel for STANDARD."""
+    """Restringe queryset conforme papel do usuário."""
     if usuario_ve_todos_chamados(user):
         return queryset
+    role = _role(user)
+    if role == CustomUser.RoleChoices.TEAM_LEADER:
+        return queryset.filter(
+            _filtro_chamados_equipe(user) | _filtro_chamados_proprios(user)
+        ).distinct()
     return queryset.filter(_filtro_chamados_proprios(user)).distinct()
 
 
 def usuario_pode_acessar_chamado(user, ticket) -> bool:
-    """Verifica se o usuário pode visualizar ou interagir com um chamado específico."""
+    """Verifica se o usuário pode visualizar um chamado específico."""
+    if not user or not user.is_authenticated:
+        return False
     if usuario_ve_todos_chamados(user):
         return True
+    qs = type(ticket).objects.filter(pk=ticket.pk)
+    return filtrar_chamados_para_usuario(qs, user).exists()
+
+
+def usuario_eh_autor_ou_coautor(user, ticket) -> bool:
+    """Autor (quem abriu), solicitante vinculado ou co-autor."""
     if ticket.created_by_id == user.pk:
         return True
     if ticket.requester_user_id == user.pk:
         return True
-        
-    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
-        equipes_user = user.equipes.all()
-        if equipes_user.exists():
-            if ticket.equipe_id and ticket.equipe_id in [e.id for e in equipes_user]:
-                return True
-            if ticket.created_by_id and ticket.created_by.equipes.filter(id__in=equipes_user).exists():
-                return True
-            if ticket.requester_user_id and ticket.requester_user.equipes.filter(id__in=equipes_user).exists():
-                return True
-            
-    if ticket.created_by_id is not None:
+    return ticket.co_authors.filter(pk=user.pk).exists()
+
+
+def usuario_pode_comentar_chamado(user, ticket) -> bool:
+    """Regras de comentário por papel."""
+    if not usuario_pode_acessar_chamado(user, ticket):
         return False
-    nome = (user.get_full_name() or user.username).strip().lower()
-    solicitante = ticket.requester_name.strip().lower()
-    return solicitante in (nome, user.username.strip().lower())
+    if usuario_eh_operador_helpdesk(user):
+        return True
+    role = _role(user)
+    if role == CustomUser.RoleChoices.SUPERVISOR:
+        return True
+    if role in (CustomUser.RoleChoices.TEAM_LEADER, CustomUser.RoleChoices.MULTIPLIER):
+        return usuario_eh_autor_ou_coautor(user, ticket)
+    return True
+
+
+def usuario_pode_editar_chamado(user, ticket=None) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if usuario_eh_operador_helpdesk(user):
+        return True
+    if ticket:
+        return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
+    return False
+
+
+def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if usuario_eh_operador_helpdesk(user):
+        return True
+    if ticket:
+        return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
+    return False
 
 
 def usuario_pode_ver_quem_abriu_chamado(user, ticket) -> bool:
-    """
-    Solicitante vinculado por FK só vê quem abriu o chamado se for ele mesmo.
-    Quem abriu e perfis avançados sempre veem.
-    """
-    if usuario_ve_todos_chamados(user):
+    """Solicitante vinculado só vê quem abriu se for ele mesmo; perfis avançados sempre veem."""
+    if usuario_eh_operador_helpdesk(user):
         return True
-    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
+    role = _role(user)
+    if role in (CustomUser.RoleChoices.SUPERVISOR, CustomUser.RoleChoices.TEAM_LEADER):
         return True
     if ticket.created_by_id == user.pk:
         return True
     if ticket.requester_user_id == user.pk and ticket.created_by_id == user.pk:
         return True
+    if usuario_eh_autor_ou_coautor(user, ticket):
+        return True
     if ticket.requester_user_id is None and ticket.created_by_id is None:
         return True
     return False
-
-
-def _filtro_chamados_proprios(user) -> Q:
-    """
-    Chamados criados pelo usuário logado ou onde ele é solicitante vinculado.
-    Se for SUPERVISOR, inclui chamados de toda a sua equipe.
-    """
-    nome = (user.get_full_name() or user.username).strip()
-    q = (
-        Q(created_by=user)
-        | Q(requester_user=user)
-        | Q(created_by__isnull=True, requester_name__iexact=nome)
-        | Q(created_by__isnull=True, requester_name__iexact=user.username)
-    )
-    if getattr(user, 'role', None) == CustomUser.RoleChoices.SUPERVISOR:
-        equipes_user = user.equipes.all()
-        if equipes_user.exists():
-            q = q | Q(equipe__in=equipes_user) | Q(created_by__equipes__in=equipes_user) | Q(requester_user__equipes__in=equipes_user)
-    return q

@@ -113,6 +113,13 @@ class Ticket(models.Model):
         related_name='created_tickets',
         help_text='Usuário que abriu o chamado no sistema.',
     )
+
+    co_authors = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='coauthored_tickets',
+        help_text='Co-autores com acesso e permissão de comentário no chamado.',
+    )
     
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL, 

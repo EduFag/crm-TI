@@ -45,8 +45,10 @@ class CustomUser(AbstractUser):
     
     class RoleChoices(models.TextChoices):
         ADMIN = 'ADMIN', 'Administrador'
-        IT_USER = 'IT_USER', 'Usuário TI'
+        IT_USER = 'IT_USER', 'Membro da Equipe (TI)'
         SUPERVISOR = 'SUPERVISOR', 'Supervisor'
+        TEAM_LEADER = 'TEAM_LEADER', 'Líder de Equipe'
+        MULTIPLIER = 'MULTIPLIER', 'Multiplicador'
         STANDARD = 'STANDARD', 'Usuário Padrão'
 
     role = models.CharField(

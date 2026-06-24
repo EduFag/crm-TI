@@ -4,7 +4,7 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 
 ## Para que serve
 
-- Modelo de usuário com papéis (RBAC): ADMIN, MANAGER, USER.
+- Modelo de usuário com papéis (RBAC): ADMIN, IT_USER, SUPERVISOR, TEAM_LEADER, MULTIPLIER, STANDARD.
 - Equipes organizacionais (`Equipe`) para agrupar usuários.
 - URLs `/`, `/login/`, `/logout/`, `/sem-permissao/`, `/usuarios/`, `/equipes/`, `/auditoria/`.
 - Layout base HTML compartilhado pelos outros módulos.
@@ -14,37 +14,30 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 
 | Arquivo | Função |
 |---------|--------|
-| `apps.py` | Configuração do app `CoreConfig`. |
 | `models.py` | `Equipe`, `CustomUser` e `RegistroAcao` (auditoria append-only). |
-| `audit.py` | `registrar_acao`, `registrar_alteracoes` e `logs_do_modulo`. |
 | `permissions.py` | Matriz role→módulo, `ModuloObrigatorioMixin`, decorator `@requer_modulo`. |
 | `context_processors.py` | `modulos_menu` — módulos permitidos no menu lateral. |
+| `views.py` | Dashboard, gestão de usuários/equipes, auditoria global. |
 | `forms.py` | Formulários de equipes e de criação/edição de usuários. |
-| `htmx.py` | `HtmxModalMixin` — formulários POST como modal flutuante na listagem. |
-| `views.py` | Dashboard, gestão de usuários/equipes, auditoria global, sem permissão e handlers 403/404/500. |
-| `urls.py` | Rotas de dashboard, login, logout, usuários, equipes e sem-permissao. |
-| `admin.py` | Registro de `Equipe` e `CustomUser` no Django Admin. |
-| `tests.py` | Testes automatizados do app (quando implementados). |
-| `migrations/` | Migrações do banco. Ver `migrations/DOCUMENTACAO.md`. |
-| `templates/` | Templates HTML. Ver `templates/DOCUMENTACAO.md`. |
 
 ## Papéis e módulos
 
 | Papel | Módulos |
 |-------|---------|
-| STANDARD | helpdesk |
+| STANDARD, MULTIPLIER, TEAM_LEADER, SUPERVISOR | helpdesk |
 | IT_USER | helpdesk, chips, emails, equipment, discador |
-| ADMIN | todos (inclui gestao_usuarios e auditoria) |
+| ADMIN | helpdesk |
+| Superuser | todos (inclui gestao_usuarios e auditoria) |
 
-Superusuários ignoram restrições. Cadastro de usuários e equipes é somente por ADMIN (sem auto-registro público).
+**Gestão de usuários/equipes e auditoria:** somente superuser (`is_superuser`).
+
+**Django Admin:** somente superuser (`is_staff=True`). Demais papéis não devem ter `is_staff`.
 
 ## Equipes
 
-- Usuário pode ficar **sem equipe** (`equipe` null).
-- ADMIN atribui equipe no formulário de usuário (`/usuarios/`) ou via Django Admin.
-- CRUD de equipes em `/equipes/` (somente ADMIN).
+- Usuário pode pertencer a várias equipes (`equipes` M2M).
+- Atribuição feita por superuser na gestão de usuários ou Django Admin.
 
-## Subpastas
+## Helpdesk
 
-- `migrations/` — schema do usuário customizado e equipes.
-- `templates/` — `base.html`, login, dashboard, gestão de usuários/equipes e páginas de erro (403/404/500).
+Permissões detalhadas do helpdesk ficam em `helpdesk/ticket_access.py` e `.agent/skills/rbac-helpdesk/SKILL.md`.

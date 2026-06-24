@@ -9,7 +9,7 @@
     <div class="flex items-center justify-between mb-3">
         <div class="flex flex-wrap items-center gap-2">
             <!-- Notification Badge -->
-            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+            {% if eh_operador_helpdesk %}
                 {% if ticket.unread_count_tech > 0 %}
                 <span class="relative flex h-5 w-5" title="{{ ticket.unread_count_tech }} interação(ões) não lida(s)">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -76,8 +76,11 @@
     </h4>
     
     <!-- Info Solicitante -->
+    <p class="text-sm font-semibold text-blue-700 mb-1 truncate" title="Solicitante: {{ ticket.requester_name }}">
+        {{ ticket.requester_name }}
+    </p>
     <p class="text-sm text-slate-500 mb-4 line-clamp-2">
-        {{ ticket.requester_name }} - {{ ticket.description|truncatechars:60 }}
+        {{ ticket.description|truncatechars:60 }}
     </p>
 
     <!-- Rodapé do Card -->
@@ -96,7 +99,7 @@
         </div>
         
         <div class="flex items-center gap-1.5">
-            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+            {% if eh_operador_helpdesk %}
                 {% if not ticket.priority and ticket.status == 'NEW' %}
                     <button type="button" onclick="openTriageWithoutMove('{{ ticket.id }}', event)" class="px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 active:scale-[0.97] text-slate-700 border border-slate-200 shadow-sm transition-all" title="Realizar triagem inicial">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-slate-500"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" /><path d="M9 17v-5" /><path d="M12 17v-1" /><path d="M15 17v-3" /></svg>

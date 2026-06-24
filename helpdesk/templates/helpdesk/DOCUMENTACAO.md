@@ -6,23 +6,32 @@ Templates HTML do módulo **helpdesk**.
 
 Telas completas e fragmentos reutilizáveis para Kanban dinâmico e drawer lateral de ticket.
 
+## Flags de contexto (global)
+
+Via `helpdesk/context_processors.py`:
+
+- `eh_operador_helpdesk` — Membro TI, Administrador ou superuser
+- `pode_operar_kanban` — pode mover cards
+- `pode_acessar_dashboard_helpdesk` — dashboard e histórico
+
+No drawer: `pode_comentar` (por chamado).
+
+## Destaque do solicitante
+
+- `_ticket_card.html`: nome em `font-semibold text-blue-700`, descrição separada
+- `_drawer.html`: badge `bg-blue-50 text-blue-800`
+- `history.html`: `font-semibold text-slate-800`
+
 ## Arquivos
 
 | Arquivo | Função |
 |---------|--------|
 | `kanban.html` | Página principal do quadro Kanban (`/helpdesk/`). |
-| `_kanban_board.html` | Partial do board — atualizado via HTMX quando o poll detecta mudança. |
-| `_poll.html` | Div oculta com `hx-trigger="every 4s"` — poll leve sem socket aberto. |
-| `_ticket_card.html` | Card individual de um chamado na coluna (badge prioridade inclui "Sem prioridade"). |
-| `dashboard.html` | Dashboard de métricas (`/helpdesk/dashboard/`). |
-| `_dashboard_metrics.html` | Partial das métricas — atualizado via poll HTMX. |
-| `history.html` | Histórico de chamados (filtro `__null__` para sem prioridade). |
-| `_ticket_create_modal.html` | Modal de criação — campos condicionais por papel (USER/MANAGER/ADMIN). |
-| `_category_field.html` | Select de categoria com painel de criação inline (ADMIN/superuser). |
-| `_drawer.html` | Painel lateral com detalhes, transferência e link para edição. |
-| `_ticket_edit_section.html` | Formulário de edição de chamado (ADMIN/superuser). |
-| `_comments_list.html` | Lista de comentários no drawer. |
-| `_nav.html` | Navegação interna do módulo helpdesk. |
+| `_ticket_card.html` | Card com solicitante em destaque. |
+| `_drawer.html` | Detalhes; comentário condicional via `pode_comentar`. |
+| `_ticket_create_modal.html` | Modal — campos por papel incl. co-autor (MULTIPLIER). |
+| `_nav.html` | Nav interna; dashboard/histórico via `pode_acessar_dashboard_helpdesk`. |
+| `history.html` | Histórico com solicitante destacado. |
 
 ## Convenção
 

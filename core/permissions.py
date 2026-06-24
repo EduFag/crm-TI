@@ -28,9 +28,11 @@ TODOS_MODULOS = frozenset({
     MODULO_GESTAO_USUARIOS,
 })
 
-# Matriz role → módulos permitidos
+# Matriz role → módulos permitidos (gestao_usuarios apenas via is_superuser)
 MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
     CustomUser.RoleChoices.STANDARD: frozenset({MODULO_HELPDESK}),
+    CustomUser.RoleChoices.MULTIPLIER: frozenset({MODULO_HELPDESK}),
+    CustomUser.RoleChoices.TEAM_LEADER: frozenset({MODULO_HELPDESK}),
     CustomUser.RoleChoices.SUPERVISOR: frozenset({MODULO_HELPDESK}),
     CustomUser.RoleChoices.IT_USER: frozenset({
         MODULO_HELPDESK,
@@ -39,7 +41,7 @@ MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
         MODULO_EQUIPMENT,
         MODULO_DISCADOR,
     }),
-    CustomUser.RoleChoices.ADMIN: TODOS_MODULOS,
+    CustomUser.RoleChoices.ADMIN: frozenset({MODULO_HELPDESK}),
 }
 
 

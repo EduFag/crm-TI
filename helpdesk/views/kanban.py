@@ -21,7 +21,9 @@ from helpdesk.audit import (
 )
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
+    usuario_eh_operador_helpdesk,
     usuario_pode_acessar_chamado,
+    usuario_pode_comentar_chamado,
     usuario_pode_editar_chamado,
     usuario_pode_gerenciar_categorias,
     usuario_pode_operar_kanban,
@@ -106,6 +108,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
         'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
         'pode_editar': pode_editar,
+        'pode_comentar': usuario_pode_comentar_chamado(request.user, ticket),
         'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
@@ -127,7 +130,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets = filtrar_chamados_para_usuario(
             Ticket.objects.filter(is_active=True, is_archived=False),
             self.request.user,
-        ).select_related('assigned_to', 'created_by', 'requester_user', 'category')
+        ).select_related('assigned_to', 'created_by', 'requester_user', 'category').prefetch_related('co_authors')
         
         priority_ordering = Case(
             When(priority='URGENT', then=Value(4)),
@@ -142,7 +145,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         
         context['tickets_new'] = tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
         
-        is_ti = self.request.user.role in ['ADMIN', 'IT_USER'] or self.request.user.is_superuser
+        is_ti = usuario_eh_operador_helpdesk(self.request.user)
         if is_ti:
             context['untriaged_count'] = sum(1 for t in context['tickets_new'] if not t.priority)
             
@@ -360,14 +363,14 @@ def ticket_finalize(request, pk):
 @requer_modulo(MODULO_HELPDESK)
 def ticket_drawer(request, pk):
     ticket = get_object_or_404(
-        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category'),
+        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category').prefetch_related('co_authors'),
         pk=pk,
         is_active=True,
     )
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
         
-    is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
+    is_ti = usuario_eh_operador_helpdesk(request.user)
     changed = False
     if is_ti and (ticket.unread_by_tech or ticket.unread_count_tech > 0):
         ticket.unread_by_tech = False
@@ -491,7 +494,7 @@ def ticket_transfer(request, pk):
 @require_POST
 def ticket_add_comment(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
-    if not usuario_pode_acessar_chamado(request.user, ticket):
+    if not usuario_pode_comentar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para comentar neste chamado.')
     text = request.POST.get('text', '').strip()
     attachment = request.FILES.get('attachment')
@@ -509,7 +512,7 @@ def ticket_add_comment(request, pk):
         else:
             log_comentario(ticket, request.user, 'Anexou uma imagem.')
         
-        is_ti = request.user.role in ['ADMIN', 'IT_USER'] or request.user.is_superuser
+        is_ti = usuario_eh_operador_helpdesk(request.user)
         if is_ti:
             ticket.unread_by_user = True
             ticket.unread_count_user += 1

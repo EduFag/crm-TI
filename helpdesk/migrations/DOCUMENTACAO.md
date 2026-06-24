@@ -17,3 +17,4 @@ Versiona tabelas `Ticket` e `Comment` e campos adicionais (ex.: arquivamento).
 | `0005_ticketcategory.py` | Modelo `TicketCategory` e migração do campo `category` de CharField para FK. |
 | `0006_ticket_priority_nullable.py` | Prioridade nullable (triagem pela TI). |
 | `0007_ticket_description_required.py` | Descrição obrigatória no chamado. |
+| `0015_ticket_co_authors.py` | M2M `co_authors` — co-autores com acesso e comentário. |
