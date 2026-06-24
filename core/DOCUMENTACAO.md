@@ -25,11 +25,11 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 | Papel | Módulos |
 |-------|---------|
 | STANDARD, MULTIPLIER, TEAM_LEADER, SUPERVISOR | helpdesk |
-| IT_USER | helpdesk, chips, emails, equipment, discador |
+| IT_USER | helpdesk, chips, emails, equipment, discador, gestao_usuarios |
 | ADMIN | helpdesk |
-| Superuser | todos (inclui gestao_usuarios e auditoria) |
+| Superuser | todos os módulos (inclui Django Admin via `is_staff`) |
 
-**Gestão de usuários/equipes e auditoria:** somente superuser (`is_superuser`).
+**Gestão de usuários/equipes e auditoria:** `IT_USER` e superuser.
 
 **Django Admin:** somente superuser (`is_staff=True`). Demais papéis não devem ter `is_staff`.
 
