@@ -1,10 +1,12 @@
 # Systemd — Gunicorn CRM TI (porta 9001 — 8000+ já usadas por outros apps)
-# Arquivo: /etc/systemd/system/crm-ti.service
+# Arquivo real: /etc/systemd/system/crm-ti.service
 #
-# sudo systemctl daemon-reload
-# sudo systemctl enable crm-ti
-# sudo systemctl start crm-ti
-# sudo systemctl status crm-ti
+# Instalar/atualizar na VPS (inclui ExecReload para reload suave):
+#   sudo bash /home/edufa/crm-TI/.vps/install-crm-ti-service.sh
+#
+# Depois do .env instalado:
+#   systemctl reload crm-ti   # deploy de código (sem derrubar conexões)
+#   systemctl restart crm-ti  # após alterar .env
 
 [Unit]
 Description=CRM TI — ti.moneypromotora.com.br

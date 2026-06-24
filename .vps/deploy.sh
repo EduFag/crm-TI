@@ -39,14 +39,25 @@ sudo chown -R edufa:www-data "${APP_DIR}/staticfiles"
 sudo chmod -R 755 "${APP_DIR}/staticfiles"
 sudo chmod 755 /home/edufa "${APP_DIR}"
 
+log "Sincronizando unit systemd (${SERVICE})..."
+UNIT_SRC="${APP_DIR}/.vps/gunicorn.service.exemple"
+UNIT_DEST="/etc/systemd/system/${SERVICE}.service"
+if [[ -f "${UNIT_SRC}" ]] && sudo cp "${UNIT_SRC}" "${UNIT_DEST}" 2>/dev/null; then
+    sudo systemctl daemon-reload
+    log "Unit atualizado (ExecReload habilitado)."
+else
+    log "AVISO: unit não sincronizado — rode na VPS: sudo bash .vps/install-crm-ti-service.sh"
+fi
+
 log "Recarregando Gunicorn (${SERVICE})..."
-if sudo systemctl reload "${SERVICE}" 2>/dev/null; then
+EXEC_RELOAD="$(systemctl show "${SERVICE}" -p ExecReload --value 2>/dev/null || true)"
+if [[ -n "${EXEC_RELOAD}" ]] && sudo systemctl reload "${SERVICE}"; then
     log "Reload concluído."
     log "Deploy finalizado com sucesso."
     exit 0
 fi
 
-log "Reload indisponível — reiniciando serviço..."
+log "Reload indisponível — reiniciando serviço (rode install-crm-ti-service.sh uma vez)..."
 sudo systemctl restart "${SERVICE}"
 
 if sudo systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then

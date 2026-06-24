@@ -72,12 +72,11 @@ sudo chmod 755 /home/edufa /home/edufa/crm-TI
 ## 4. Gunicorn (systemd)
 
 ```bash
-sudo cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service
-sudo systemctl daemon-reload
-sudo systemctl enable crm-ti
-sudo systemctl start crm-ti
+sudo bash /home/edufa/crm-TI/.vps/install-crm-ti-service.sh
 sudo systemctl status crm-ti
 ```
+
+O unit inclui `ExecReload` — após deploy de código use `sudo systemctl reload crm-ti` (sem downtime). Após alterar `.env`, use `sudo systemctl restart crm-ti`.
 
 ---
 

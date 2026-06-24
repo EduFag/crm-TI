@@ -14,6 +14,7 @@ Configurações de **produção** (VPS/cloud): PostgreSQL, Gunicorn, Nginx e `.e
 | `env.exemple` | Modelo `.env` com `DB_ENGINE=postgresql` |
 | `postgres-setup.sql` | Criar banco/usuário no Postgres |
 | `gunicorn.service.exemple` | Serviço systemd |
+| `install-crm-ti-service.sh` | Instala/atualiza unit com `ExecReload` (reload suave) |
 | `nginx.conf.exemple` | Proxy reverso |
 
 ## Copiar exemplos → arquivos reais na VPS
@@ -26,9 +27,16 @@ Após `git pull` em `/home/edufa/crm-TI`, use estes comandos (ajuste o caminho d
 | `.vps/nginx.conf.exemple` | `/etc/nginx/sites-available/crm-ti` | `sudo cp /home/edufa/crm-TI/.vps/nginx.conf.exemple /etc/nginx/sites-available/crm-ti` |
 | `.vps/env.exemple` | `/home/edufa/crm-TI/.env` | `cp /home/edufa/crm-TI/.vps/env.exemple /home/edufa/crm-TI/.env` *(edite senhas depois; não sobrescreva .env em produção sem backup)* |
 
-**Após copiar gunicorn:**
+**Após copiar gunicorn** (recomendado — configura `ExecReload`):
 
 ```bash
+sudo bash /home/edufa/crm-TI/.vps/install-crm-ti-service.sh
+```
+
+Ou manualmente:
+
+```bash
+sudo cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service
 sudo systemctl daemon-reload
 sudo systemctl restart crm-ti
 ```

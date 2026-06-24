@@ -54,7 +54,13 @@ sudo visudo -f /etc/sudoers.d/crm-ti-deploy
 Conteúdo (usuário `edufa`) — use `/usr/bin/systemctl` (caminho no Ubuntu):
 
 ```
-edufa ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload crm-ti, /usr/bin/systemctl restart crm-ti, /usr/bin/systemctl is-active crm-ti, /usr/bin/systemctl status crm-ti, /usr/bin/chown, /bin/chmod
+edufa ALL=(ALL) NOPASSWD: /bin/cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service, /usr/bin/systemctl daemon-reload, /usr/bin/systemctl reload crm-ti, /usr/bin/systemctl restart crm-ti, /usr/bin/systemctl is-active crm-ti, /usr/bin/systemctl status crm-ti, /usr/bin/chown, /bin/chmod
+```
+
+Instalar o unit com **ExecReload** (uma vez, como root):
+
+```bash
+sudo bash /home/edufa/crm-TI/.vps/install-crm-ti-service.sh
 ```
 
 Tornar o script executável (uma vez):
