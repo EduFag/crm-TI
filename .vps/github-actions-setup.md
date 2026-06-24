@@ -51,10 +51,10 @@ Permitir **sudo sem senha** só para o que o deploy precisa:
 sudo visudo -f /etc/sudoers.d/crm-ti-deploy
 ```
 
-Conteúdo (usuário `edufa`):
+Conteúdo (usuário `edufa`) — use `/usr/bin/systemctl` (caminho no Ubuntu):
 
 ```
-edufa ALL=(ALL) NOPASSWD: /bin/systemctl reload crm-ti, /bin/systemctl restart crm-ti, /bin/systemctl is-active crm-ti, /bin/systemctl status crm-ti, /usr/bin/chown, /bin/chmod
+edufa ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload crm-ti, /usr/bin/systemctl restart crm-ti, /usr/bin/systemctl is-active crm-ti, /usr/bin/systemctl status crm-ti, /usr/bin/chown, /bin/chmod
 ```
 
 Tornar o script executável (uma vez):

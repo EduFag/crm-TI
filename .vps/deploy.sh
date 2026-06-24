@@ -41,15 +41,17 @@ sudo chmod 755 /home/edufa "${APP_DIR}"
 log "Recarregando Gunicorn (${SERVICE})..."
 if sudo systemctl reload "${SERVICE}" 2>/dev/null; then
     log "Reload concluído."
-else
-    log "Reload indisponível — reiniciando serviço..."
-    sudo systemctl restart "${SERVICE}"
+    log "Deploy finalizado com sucesso."
+    exit 0
 fi
 
-if sudo systemctl is-active --quiet "${SERVICE}"; then
+log "Reload indisponível — reiniciando serviço..."
+sudo systemctl restart "${SERVICE}"
+
+if sudo systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
     log "Deploy finalizado com sucesso."
 else
     log "ERRO: serviço ${SERVICE} não está ativo."
-    sudo systemctl status "${SERVICE}" --no-pager || true
+    sudo systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
     exit 1
 fi
