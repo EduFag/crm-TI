@@ -9,6 +9,8 @@ Configurações de **produção** (VPS/cloud): PostgreSQL, Gunicorn, Nginx e `.e
 | [DOCUMENTACAO.md](DOCUMENTACAO.md) | Guia completo de deploy |
 | [instalar-postgresql.md](instalar-postgresql.md) | Instalar Postgres na VPS (apt → criar banco) |
 | [deploy-ti.moneypromotora.com.br.md](deploy-ti.moneypromotora.com.br.md) | Deploy Gunicorn + Nginx + SSL do subdomínio |
+| [github-actions-setup.md](github-actions-setup.md) | Autodeploy via GitHub Actions (push na `main`) |
+| `deploy.sh` | Script executado na VPS pelo workflow |
 | `env.exemple` | Modelo `.env` com `DB_ENGINE=postgresql` |
 | `postgres-setup.sql` | Criar banco/usuário no Postgres |
 | `gunicorn.service.exemple` | Serviço systemd |
