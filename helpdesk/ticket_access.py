@@ -2,12 +2,14 @@
 Regras de visibilidade e permissões de chamados por papel do usuário.
 Matriz completa documentada em helpdesk/DOCUMENTACAO.md e .agent/skills/rbac-helpdesk/SKILL.md.
 """
+from typing import Optional
+
 from django.db.models import Q, QuerySet
 
 from core.models import CustomUser
 
 
-def _role(user) -> str | None:
+def _role(user) -> Optional[str]:
     if not user or not user.is_authenticated:
         return None
     return getattr(user, 'role', None)
@@ -112,10 +114,12 @@ def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
         return queryset
     role = _role(user)
     if role == CustomUser.RoleChoices.TEAM_LEADER:
-        return queryset.filter(
-            _filtro_chamados_equipe(user) | _filtro_chamados_proprios(user)
-        ).distinct()
-    return queryset.filter(_filtro_chamados_proprios(user)).distinct()
+        filtro = _filtro_chamados_equipe(user) | _filtro_chamados_proprios(user)
+    else:
+        filtro = _filtro_chamados_proprios(user)
+    # distinct() + order_by com M2M quebra no PostgreSQL — filtra por PK
+    ids = queryset.filter(filtro).values_list('pk', flat=True).distinct()
+    return queryset.filter(pk__in=ids)
 
 
 def usuario_pode_acessar_chamado(user, ticket) -> bool:

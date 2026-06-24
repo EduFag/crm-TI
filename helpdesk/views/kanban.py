@@ -148,6 +148,8 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         is_ti = usuario_eh_operador_helpdesk(self.request.user)
         if is_ti:
             context['untriaged_count'] = sum(1 for t in context['tickets_new'] if not t.priority)
+        else:
+            context['untriaged_count'] = 0
             
         context['tickets_in_progress'] = tickets_annotated.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-priority_order', '-created_at')
         context['tickets_pending'] = tickets_annotated.filter(status=Ticket.StatusChoices.PENDING).order_by('-priority_order', '-created_at')
