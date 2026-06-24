@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Deploy automático — chamado pelo GitHub Actions após push na main.
 # Uso manual na VPS: bash /home/edufa/crm-TI/.vps/deploy.sh
+# IMPORTANTE: GitHub Actions conecta como edufa (não root). Teste com:
+#   bash .vps/verify-deploy-permissions.sh
 
 set -euo pipefail
 
@@ -13,10 +15,26 @@ log() {
     echo "[deploy $(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
+# sudo sem senha (GitHub Actions); falha com mensagem clara se sudoers incompleto
+sudo_deploy() {
+    if sudo -n "$@"; then
+        return 0
+    fi
+    log "ERRO: sudo falhou para: $*"
+    log "Configure /etc/sudoers.d/crm-ti-deploy (modelo: .vps/crm-ti-deploy.sudoers.exemple)"
+    log "Teste: bash .vps/verify-deploy-permissions.sh"
+    return 1
+}
+
 cd "${APP_DIR}"
 
+log "Deploy como usuário: $(whoami)"
+
 log "Atualizando código (origin/${BRANCH})..."
-git fetch origin "${BRANCH}"
+if ! git fetch origin "${BRANCH}"; then
+    log "ERRO: git fetch falhou — o usuário $(whoami) precisa de acesso ao GitHub (deploy key ou token)."
+    exit 1
+fi
 git checkout "${BRANCH}"
 # Produção deve espelhar o GitHub — descarta alterações locais acidentais
 git reset --hard "origin/${BRANCH}"
@@ -35,35 +53,36 @@ log "Coletando arquivos estáticos..."
 python manage.py collectstatic --noinput
 
 log "Ajustando permissões de staticfiles..."
-sudo chown -R edufa:www-data "${APP_DIR}/staticfiles"
-sudo chmod -R 755 "${APP_DIR}/staticfiles"
-sudo chmod 755 /home/edufa "${APP_DIR}"
+sudo_deploy chown -R edufa:www-data "${APP_DIR}/staticfiles"
+sudo_deploy chmod -R 755 "${APP_DIR}/staticfiles"
+sudo_deploy chmod 755 /home/edufa "${APP_DIR}"
 
 log "Sincronizando unit systemd (${SERVICE})..."
 UNIT_SRC="${APP_DIR}/.vps/gunicorn.service.exemple"
 UNIT_DEST="/etc/systemd/system/${SERVICE}.service"
-if [[ -f "${UNIT_SRC}" ]] && sudo cp "${UNIT_SRC}" "${UNIT_DEST}" 2>/dev/null; then
-    sudo systemctl daemon-reload
+if [[ -f "${UNIT_SRC}" ]] && sudo -n cp "${UNIT_SRC}" "${UNIT_DEST}" 2>/dev/null; then
+    sudo -n systemctl daemon-reload 2>/dev/null \
+        || log "AVISO: daemon-reload ignorado (adicione ao sudoers se necessário)"
     log "Unit atualizado (ExecReload habilitado)."
 else
-    log "AVISO: unit não sincronizado — rode na VPS: sudo bash .vps/install-crm-ti-service.sh"
+    log "AVISO: unit não sincronizado — rode: sudo bash .vps/install-crm-ti-service.sh"
 fi
 
 log "Recarregando Gunicorn (${SERVICE})..."
 EXEC_RELOAD="$(systemctl show "${SERVICE}" -p ExecReload --value 2>/dev/null || true)"
-if [[ -n "${EXEC_RELOAD}" ]] && sudo systemctl reload "${SERVICE}"; then
+if [[ -n "${EXEC_RELOAD}" ]] && sudo_deploy systemctl reload "${SERVICE}"; then
     log "Reload concluído."
     log "Deploy finalizado com sucesso."
     exit 0
 fi
 
-log "Reload indisponível — reiniciando serviço (rode install-crm-ti-service.sh uma vez)..."
-sudo systemctl restart "${SERVICE}"
+log "Reload indisponível — reiniciando serviço..."
+sudo_deploy systemctl restart "${SERVICE}"
 
-if sudo systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
+if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
     log "Deploy finalizado com sucesso."
 else
     log "ERRO: serviço ${SERVICE} não está ativo."
-    sudo systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
+    sudo -n systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
     exit 1
 fi

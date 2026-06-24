@@ -51,10 +51,18 @@ Permitir **sudo sem senha** só para o que o deploy precisa:
 sudo visudo -f /etc/sudoers.d/crm-ti-deploy
 ```
 
-Conteúdo (usuário `edufa`) — use `/usr/bin/systemctl` (caminho no Ubuntu):
+Conteúdo (usuário `edufa`) — copie de [`.vps/crm-ti-deploy.sudoers.exemple`](crm-ti-deploy.sudoers.exemple):
 
+```bash
+sudo visudo -f /etc/sudoers.d/crm-ti-deploy
+# Cole o conteúdo do arquivo crm-ti-deploy.sudoers.exemple
+sudo chmod 440 /etc/sudoers.d/crm-ti-deploy
 ```
-edufa ALL=(ALL) NOPASSWD: /bin/cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service, /usr/bin/systemctl daemon-reload, /usr/bin/systemctl reload crm-ti, /usr/bin/systemctl restart crm-ti, /usr/bin/systemctl is-active crm-ti, /usr/bin/systemctl status crm-ti, /usr/bin/chown, /bin/chmod
+
+Validar **como edufa** (não como root):
+
+```bash
+su - edufa -c 'bash /home/edufa/crm-TI/.vps/verify-deploy-permissions.sh'
 ```
 
 Instalar o unit com **ExecReload** (uma vez, como root):
@@ -93,14 +101,54 @@ O dono (`EduFag`) precisa cadastrar esses secrets — colaboradores não veem se
 
 ---
 
-## 4. Git na VPS (pull do GitHub)
+## 4. Git na VPS (usuário `edufa`)
 
-O `git pull` na VPS já funciona hoje; mantenha assim:
+O deploy roda como **edufa**. O `git fetch` que funciona como **root** não vale para o Actions — cada usuário usa sua própria chave SSH.
 
-- **HTTPS:** token de acesso em `git credential` ou `.git-credentials`
-- **SSH:** deploy key da VPS em **Settings → Deploy keys** do repo
+### Configurar deploy key (recomendado)
 
-Sem isso, o script falha no `git pull`.
+Na VPS, **como edufa**:
+
+```bash
+cd /home/edufa/crm-TI
+git pull origin main   # se ainda não tiver os scripts .vps/, faça pull como root uma vez e ajuste dono:
+# sudo chown -R edufa:edufa /home/edufa/crm-TI
+
+bash .vps/setup-git-deploy-key.sh
+```
+
+Copie a chave pública exibida e cadastre em:
+
+**GitHub → crm-TI → Settings → Deploy keys → Add deploy key**
+
+| Campo | Valor |
+|-------|--------|
+| Title | `vps-edufa-crm-ti-deploy` |
+| Key | conteúdo de `~/.ssh/crm_ti_github_deploy.pub` |
+| Write access | **desmarcado** (só leitura) |
+
+Teste:
+
+```bash
+ssh -T git@github.com
+# Esperado: "Hi EduFag/crm-TI! You've successfully authenticated..."
+
+cd /home/edufa/crm-TI && git fetch origin main
+bash .vps/verify-deploy-permissions.sh
+```
+
+### Alternativa: HTTPS com token
+
+Se o `origin` for HTTPS (`https://github.com/EduFag/crm-TI.git`):
+
+```bash
+git config --global credential.helper store
+git fetch origin main
+# Username: EduFag
+# Password: <Personal Access Token com escopo repo>
+```
+
+> **Não** use senha da conta GitHub — só PAT.
 
 ---
 
@@ -120,8 +168,10 @@ git push origin main
 
 | Erro | Solução |
 |------|---------|
-| `Permission denied (publickey)` | Conferir `SSH_PRIVATE_KEY` e `authorized_keys` |
-| `sudo: a password is required` | Ajustar `/etc/sudoers.d/crm-ti-deploy` |
+| `git@github.com: Permission denied (publickey)` como edufa | Rodar `bash .vps/setup-git-deploy-key.sh` como edufa e cadastrar Deploy key no GitHub |
+| `Permission denied (publickey)` SSH Actions | Conferir `SSH_PRIVATE_KEY` e `authorized_keys` do usuário `edufa` |
+| `sudo: a password is required` | Atualizar `/etc/sudoers.d/crm-ti-deploy` (modelo em `crm-ti-deploy.sudoers.exemple`) |
+| Action falha mas manual como root funciona | Actions usa `edufa`; rode `verify-deploy-permissions.sh` como edufa, não como root |
 | `git pull` falha | Credenciais Git na VPS ou deploy key |
 | `Not possible to fast-forward` | Na VPS: `git fetch && git reset --hard origin/main` (uma vez) |
 | Serviço não sobe | `sudo systemctl status crm-ti` e logs do Gunicorn |

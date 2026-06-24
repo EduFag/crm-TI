@@ -11,6 +11,9 @@ Configurações de **produção** (VPS/cloud): PostgreSQL, Gunicorn, Nginx e `.e
 | [deploy-ti.moneypromotora.com.br.md](deploy-ti.moneypromotora.com.br.md) | Deploy Gunicorn + Nginx + SSL do subdomínio |
 | [github-actions-setup.md](github-actions-setup.md) | Autodeploy via GitHub Actions (push na `main`) |
 | `deploy.sh` | Script executado na VPS pelo workflow |
+| `setup-git-deploy-key.sh` | Chave SSH do edufa para `git fetch` no GitHub |
+| `verify-deploy-permissions.sh` | Testa git + sudo como edufa (antes do Actions) |
+| `crm-ti-deploy.sudoers.exemple` | Modelo sudoers para deploy automático |
 | `env.exemple` | Modelo `.env` com `DB_ENGINE=postgresql` |
 | `postgres-setup.sql` | Criar banco/usuário no Postgres |
 | `gunicorn.service.exemple` | Serviço systemd |
