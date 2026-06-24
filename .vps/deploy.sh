@@ -18,7 +18,8 @@ cd "${APP_DIR}"
 log "Atualizando código (origin/${BRANCH})..."
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
-git pull --ff-only origin "${BRANCH}"
+# Produção deve espelhar o GitHub — descarta alterações locais acidentais
+git reset --hard "origin/${BRANCH}"
 
 log "Ativando ambiente virtual..."
 # shellcheck source=/dev/null
