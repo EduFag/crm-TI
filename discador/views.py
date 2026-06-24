@@ -2,13 +2,20 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 from django.contrib import messages
 from django.utils import timezone
+
+from core.permissions import MODULO_DISCADOR, ModuloObrigatorioMixin
 from .models import ConfiguracaoAPI, RegraReciclagem, Blacklist, ImportacaoAPI, ProcessamentoBase
 from .forms import ConfiguracaoAPIForm, RegraReciclagemForm, AtualizarBlacklistForm, ProcessarBaseForm
 from .services.api_3cplus import Api3CPlusService
 from .services.blacklist import BlacklistService
 from .services.csv_processor import CsvProcessorService
 
-class DashboardView(View):
+
+class _DiscadorMixin(ModuloObrigatorioMixin):
+    modulo_obrigatorio = MODULO_DISCADOR
+
+
+class DashboardView(_DiscadorMixin, View):
     def get(self, request):
         total_blacklist = Blacklist.objects.filter(is_active=True).count()
         total_bases = ProcessamentoBase.objects.count()
@@ -21,7 +28,7 @@ class DashboardView(View):
         }
         return render(request, 'discador/dashboard.html', context)
 
-class ConfiguracoesAPIView(View):
+class ConfiguracoesAPIView(_DiscadorMixin, View):
     def get(self, request):
         config = ConfiguracaoAPI.objects.first()
         form = ConfiguracaoAPIForm(instance=config)
@@ -36,7 +43,7 @@ class ConfiguracoesAPIView(View):
             return redirect('discador:configuracoes_api')
         return render(request, 'discador/configuracoes_api.html', {'form': form, 'config': config})
 
-class AtualizarBlacklistView(View):
+class AtualizarBlacklistView(_DiscadorMixin, View):
     def get(self, request):
         form = AtualizarBlacklistForm()
         return render(request, 'discador/atualizar_blacklist.html', {'form': form})
@@ -57,7 +64,7 @@ class AtualizarBlacklistView(View):
             return redirect('discador:blacklist_ativa')
         return render(request, 'discador/atualizar_blacklist.html', {'form': form})
 
-class RegrasReciclagemView(View):
+class RegrasReciclagemView(_DiscadorMixin, View):
     def get(self, request):
         regras = RegraReciclagem.objects.all().order_by('-prioridade')
         form = RegraReciclagemForm()
@@ -72,7 +79,7 @@ class RegrasReciclagemView(View):
         regras = RegraReciclagem.objects.all().order_by('-prioridade')
         return render(request, 'discador/regras_reciclagem.html', {'regras': regras, 'form': form})
 
-class ReciclarBasesView(View):
+class ReciclarBasesView(_DiscadorMixin, View):
     def get(self, request):
         form = ProcessarBaseForm()
         return render(request, 'discador/reciclar_bases.html', {'form': form})
@@ -92,12 +99,12 @@ class ReciclarBasesView(View):
             return redirect('discador:historico_processamentos')
         return render(request, 'discador/reciclar_bases.html', {'form': form})
 
-class BlacklistView(View):
+class BlacklistView(_DiscadorMixin, View):
     def get(self, request):
         bloqueios = Blacklist.objects.all().order_by('-bloqueado_em')[:100]
         return render(request, 'discador/blacklist.html', {'bloqueios': bloqueios})
 
-class ConsultaTelefoneView(View):
+class ConsultaTelefoneView(_DiscadorMixin, View):
     def get(self, request):
         telefone = request.GET.get('telefone')
         resultado = None
@@ -111,12 +118,12 @@ class ConsultaTelefoneView(View):
                 
         return render(request, 'discador/consulta_telefone.html', {'resultado': resultado, 'telefone': telefone})
 
-class HistoricoImportacoesView(View):
+class HistoricoImportacoesView(_DiscadorMixin, View):
     def get(self, request):
         importacoes = ImportacaoAPI.objects.order_by('-created_at')[:50]
         return render(request, 'discador/historico_importacoes.html', {'importacoes': importacoes})
 
-class HistoricoProcessamentosView(View):
+class HistoricoProcessamentosView(_DiscadorMixin, View):
     def get(self, request):
         processamentos = ProcessamentoBase.objects.order_by('-created_at')[:50]
         return render(request, 'discador/historico_processamentos.html', {'processamentos': processamentos})

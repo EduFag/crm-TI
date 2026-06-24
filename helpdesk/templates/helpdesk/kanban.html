@@ -10,24 +10,48 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Helpdesk</h2>
             <p class="text-sm text-slate-500 mt-1">Gerencie os chamados e suporte interno.</p>
         </div>
-        <a href="{% url 'helpdesk:ticket_create' %}" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Novo Chamado
-        </a>
+        <div class="flex items-center gap-2">
+            {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:categories' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium border border-slate-300 transition-colors shadow-sm">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Categorias
+            </button>
+            {% endif %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_create' %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Novo Chamado
+            </button>
+        </div>
     </div>
 
     <!-- Navegação interna do módulo -->
     {% include "helpdesk/_nav.html" %}
 
+    {% if not pode_operar_kanban %}
+    <div class="mb-4 px-4 py-3 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600">
+        Modo visualização — apenas administradores podem mover chamados entre colunas.
+    </div>
+    {% endif %}
+
     <!-- Container Kanban -->
     <div class="flex-1 overflow-x-auto overflow-y-hidden pb-4">
-        <!-- Conexão SSE HTMX (Real-Time) -->
-        <div hx-ext="sse" sse-connect="{% url 'helpdesk:sse_stream' %}" class="h-full">
-            <div id="kanban-board-container" hx-trigger="sse:ticket_updated" hx-get="{% url 'helpdesk:kanban_board' %}" hx-swap="innerHTML" class="h-full">
-                {% include "helpdesk/_kanban_board.html" %}
-            </div>
+        {% include "helpdesk/_poll.html" %}
+        <div id="kanban-board-container"
+             hx-trigger="ticketUpdated from:body"
+             hx-get="{% url 'helpdesk:kanban_board' %}"
+             hx-swap="innerHTML"
+             class="h-full">
+            {% include "helpdesk/_kanban_board.html" %}
         </div>
     </div>
 </div>
@@ -35,11 +59,98 @@
 <!-- Drawer Container (será preenchido pelo HTMX) -->
 <div id="drawer-container"></div>
 
+<!-- Modal Finalização (Oculto inicialmente) -->
+<div id="finalize-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <h3 class="text-lg font-bold text-slate-900 tracking-tight">Finalizar Chamado</h3>
+            <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeFinalizeModal()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form id="finalize-form" class="p-6 flex flex-col gap-5">
+            <input type="hidden" id="finalize-ticket-id" name="ticket_id">
+            
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Resultado</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="action" value="resolve" class="peer sr-only" checked>
+                        <div class="text-center px-3 py-2 border border-slate-200 rounded-lg peer-checked:bg-green-50 peer-checked:border-green-500 peer-checked:text-green-700 font-medium transition-all text-slate-600">Resolvido</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="action" value="reject" class="peer sr-only">
+                        <div class="text-center px-3 py-2 border border-slate-200 rounded-lg peer-checked:bg-red-50 peer-checked:border-red-500 peer-checked:text-red-700 font-medium transition-all text-slate-600">Recusado</div>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Observação / Motivo</label>
+                <textarea name="reason" id="finalize-reason" rows="3" required placeholder="Digite a observação da resolução ou o motivo da recusa..." class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-inner bg-slate-50"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" onclick="closeFinalizeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Triagem (Oculto inicialmente) -->
+<div id="triage-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <h3 class="text-lg font-bold text-slate-900 tracking-tight">Triagem Inicial</h3>
+            <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeTriageModal()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form id="triage-form" class="p-6 flex flex-col gap-5">
+            <input type="hidden" id="triage-ticket-id" name="ticket_id">
+            <input type="hidden" id="triage-new-status" name="new_status">
+            
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Prioridade</label>
+                <select name="priority" id="triage-priority" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sem prioridade (triagem posterior)</option>
+                    <option value="LOW">Baixa</option>
+                    <option value="MEDIUM">Média</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Categoria Específica</label>
+                <select name="specific_category" id="triage-specific-category" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Nenhuma / Não se aplica</option>
+                    {% for cat in specific_categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" onclick="closeTriageModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">Salvar e Mover</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- JavaScript para o Drag and Drop do Kanban -->
+{% if pode_operar_kanban %}
 <script>
+    const currentUserId = {{ request.user.id }};
+    let lastDraggedCardParent = null;
+    let currentCardToRevert = null;
+    let parentToRevert = null;
+
     function drag(event) {
-        // Envia o id do ticket
         event.dataTransfer.setData("ticket_id", event.target.id);
+        lastDraggedCardParent = event.target.closest('.kanban-column');
         event.target.classList.add('opacity-50');
     }
 
@@ -67,11 +178,18 @@
         
         let ticketId = ticketIdRaw.split('-')[1];
         let newStatus = targetColumn.getAttribute('data-status');
+        let oldStatus = lastDraggedCardParent.getAttribute('data-status');
         
         let card = document.getElementById(ticketIdRaw);
         if (card) {
-            // Dropa localmente para percepção imediata do usuário
             targetColumn.appendChild(card);
+            
+            if (newStatus === 'RESOLVED') {
+                openFinalizeModal(ticketId, card, lastDraggedCardParent);
+                return;
+            }
+
+
             
             // Avisa o backend
             fetch(`/helpdesk/ticket/${ticketId}/update-status/`, {
@@ -84,11 +202,11 @@
             })
             .then(response => response.json())
             .then(data => {
-                if(!data.success) {
+                if(data.success) {
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
+                } else {
                     console.error("Falha ao atualizar status");
                 }
-                // Como o SSE mandará o 'ticket_updated', 
-                // o painel de todo mundo (inclusive o de quem moveu) fará hx-get para sincronizar.
             })
             .catch(error => console.error('Erro:', error));
         }
@@ -99,5 +217,142 @@
             event.target.classList.remove('bg-slate-200/50');
         }
     });
+
+    function openFinalizeModal(ticketId, card, oldParent) {
+        document.getElementById('finalize-ticket-id').value = ticketId;
+        document.getElementById('finalize-reason').value = '';
+        currentCardToRevert = card;
+        parentToRevert = oldParent;
+        
+        const modal = document.getElementById('finalize-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeFinalizeModal() {
+        const modal = document.getElementById('finalize-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        
+        if (currentCardToRevert && parentToRevert) {
+            parentToRevert.appendChild(currentCardToRevert);
+        }
+        currentCardToRevert = null;
+        parentToRevert = null;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const finalizeForm = document.getElementById('finalize-form');
+        if (finalizeForm) {
+            finalizeForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const ticketId = document.getElementById('finalize-ticket-id').value;
+                const action = finalizeForm.elements['action'].value;
+                const reason = finalizeForm.elements['reason'].value;
+                
+                fetch(`/helpdesk/ticket/${ticketId}/finalize/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ action: action, reason: reason })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        currentCardToRevert = null;
+                        parentToRevert = null;
+                    } else {
+                        console.error("Falha ao finalizar chamado");
+                    }
+                    closeFinalizeModal();
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    closeFinalizeModal();
+                });
+            });
+        }
+
+        const triageForm = document.getElementById('triage-form');
+        if (triageForm) {
+            triageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const ticketId = document.getElementById('triage-ticket-id').value;
+                const newStatus = document.getElementById('triage-new-status').value;
+                const priority = triageForm.elements['priority'].value;
+                const specificCategory = triageForm.elements['specific_category'].value;
+                
+                fetch(`/helpdesk/ticket/${ticketId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ 
+                        status: newStatus,
+                        priority: priority,
+                        specific_category: specificCategory
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        currentCardToRevert = null;
+                        parentToRevert = null;
+                    } else {
+                        console.error("Falha ao realizar triagem");
+                    }
+                    closeTriageModal();
+                    document.body.dispatchEvent(new CustomEvent('ticketUpdated', { detail: { actor_id: currentUserId, acao: 'STATUS_CHANGED' } }));
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    closeTriageModal();
+                });
+            });
+        }
+    });
+
+    function openTriageWithoutMove(ticketId, event) {
+        if(event) event.stopPropagation(); // Evita que clique no card para abrir o drawer
+        document.getElementById('triage-ticket-id').value = ticketId;
+        document.getElementById('triage-new-status').value = 'NEW';
+        
+        currentCardToRevert = null;
+        parentToRevert = null;
+        
+        const modal = document.getElementById('triage-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function openTriageModal(ticketId, newStatus, card, oldParent) {
+        document.getElementById('triage-ticket-id').value = ticketId;
+        document.getElementById('triage-new-status').value = newStatus;
+        
+        currentCardToRevert = card;
+        parentToRevert = oldParent;
+        
+        const modal = document.getElementById('triage-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeTriageModal() {
+        const modal = document.getElementById('triage-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        
+        if (currentCardToRevert && parentToRevert && modal.classList.contains('hidden')) {
+            // Se fechou sem sucesso/cancelou, reverte
+            parentToRevert.appendChild(currentCardToRevert);
+        }
+        currentCardToRevert = null;
+        parentToRevert = null;
+    }
 </script>
+{% endif %}
 {% endblock %}

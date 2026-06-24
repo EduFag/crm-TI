@@ -1,19 +1,25 @@
-from django.urls import reverse_lazy
-from django.views.generic import CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from chips.models import Recharge, Chip
 from django.shortcuts import get_object_or_404
+from django.views.generic import CreateView
 
-class RechargeCreateView(LoginRequiredMixin, CreateView):
-    """Registra uma recarga (RF14, RF15)"""
+from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
+from chips.htmx import ChipsModalMixin
+from chips.models import Recharge, Chip
+from chips.audit import log_recarga
+
+
+class RechargeCreateView(ChipsModalMixin, ModuloObrigatorioMixin, CreateView):
+    """Registra uma recarga (RF14, RF15) via modal no dashboard."""
+    modulo_obrigatorio = MODULO_CHIPS
     model = Recharge
     fields = ['chip', 'amount']
-    template_name = 'chips/form_base.html'
-    success_url = reverse_lazy('chips:dashboard')
+    chips_tab = 'chips'
+    modal_title = 'Nova Recarga'
+    modal_subtitle = 'Registre o valor recarregado para a linha.'
+    modal_submit_label = 'Registrar Recarga'
+    form_layout = 'as_p'
 
     def get_initial(self):
         initial = super().get_initial()
-        # Atalho de recarga pré-preenche o chip (RF15)
         chip_id = self.request.GET.get('chip_id')
         if chip_id:
             initial['chip'] = get_object_or_404(Chip, id=chip_id)
@@ -21,4 +27,6 @@ class RechargeCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.registered_by = self.request.user
-        return super().form_valid(form)
+        self.object = form.save()
+        log_recarga(self.object, self.request.user)
+        return self.htmx_redirect_response()

@@ -1,0 +1,39 @@
+{% load static %}
+{# Poll leve a cada 4s — só dispara refresh quando há alteração no banco #}
+<div id="helpdesk-poll"
+     hx-get="{% url 'helpdesk:poll' %}"
+     hx-trigger="every 4s"
+     hx-swap="none"
+     class="hidden"
+     aria-hidden="true"></div>
+
+<script>
+    (function() {
+        const currentUserId = {{ request.user.id|default:"null" }};
+        
+        // Carrega os áudios a partir da pasta static
+        const audioAtualizacao = new Audio("{% static 'helpdesk/sounds/atualizacao.mp3' %}");
+        const audioComentario = new Audio("{% static 'helpdesk/sounds/comentario.mp3' %}");
+
+        document.body.addEventListener('ticketUpdated', function(event) {
+            const detail = event.detail || {};
+            
+            // Não toca som se o ator da ação for o próprio usuário logado
+            if (detail.actor_id && detail.actor_id === currentUserId) {
+                return;
+            }
+
+            if (detail.acao === 'COMMENT') {
+                audioComentario.currentTime = 0;
+                audioComentario.play().catch(function(e) {
+                    console.log("Audio play prevented (comentario):", e);
+                });
+            } else if (detail.acao === 'STATUS_CHANGED' || detail.acao === 'CREATED') {
+                audioAtualizacao.currentTime = 0;
+                audioAtualizacao.play().catch(function(e) {
+                    console.log("Audio play prevented (atualizacao/criado):", e);
+                });
+            }
+        });
+    })();
+</script>

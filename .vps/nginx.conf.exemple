@@ -1,0 +1,43 @@
+# Nginx — CRM TI
+# Arquivo: /etc/nginx/sites-available/crm-ti  (nome padrão do site)
+# Remova duplicata: sudo rm -f /etc/nginx/sites-enabled/ti.moneypromotora.com.br
+# sudo ln -s /etc/nginx/sites-available/crm-ti /etc/nginx/sites-enabled/
+# sudo nginx -t && sudo systemctl reload nginx
+#
+# DNS: registro A  ti  →  IP da VPS
+# SSL: sudo apt install certbot python3-certbot-nginx
+#       sudo certbot --nginx -d ti.moneypromotora.com.br
+
+server {
+    listen 80;
+    server_name ti.moneypromotora.com.br;
+
+    client_max_body_size 50M;
+
+    location /static/ {
+        alias /home/edufa/crm-TI/staticfiles/;
+        # Após collectstatic: chown edufa:www-data + chmod 755 em staticfiles e /home/edufa
+    }
+
+    location /media/ {
+        alias /home/edufa/crm-TI/media/;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:9001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Falha rápido se o Gunicorn ainda não subiu (evita página carregando minutos)
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+}
+
+# OBRIGATÓRIO em produção: sem bloco HTTPS abaixo, https://ti... cai no default_server
+# de outro site (ex.: capitalcredito) e gera DisallowedHost.
+# sudo certbot --nginx -d ti.moneypromotora.com.br
+# Após certbot, confira no bloco :443: proxy_pass http://127.0.0.1:9001;
+# Mantenha DJANGO_CSRF_TRUSTED_ORIGINS=https://ti.moneypromotora.com.br no .env

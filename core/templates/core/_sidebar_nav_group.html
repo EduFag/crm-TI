@@ -1,0 +1,24 @@
+<details class="mb-1 sidebar-group relative" {% if expanded %}open{% endif %}>
+    <summary
+        class="sidebar-group-trigger flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg cursor-pointer select-none transition-all
+        {% if expanded %}sidebar-group-active{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}"
+        title="{{ title }}">
+        <span class="flex items-center gap-3 font-medium text-sm min-w-0">
+            <div class="sidebar-group-icon shrink-0 {% if expanded %}text-blue-600{% else %}text-slate-500{% endif %}">
+                {{ icon|safe }}
+            </div>
+            <span class="sidebar-hide-collapsed truncate">{{ title }}</span>
+        </span>
+        <svg class="sidebar-group-chevron sidebar-hide-collapsed w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7-7 7-7"></path>
+        </svg>
+    </summary>
+    <div class="sidebar-group-items mt-1 ml-3 pl-3 border-l border-slate-200 space-y-0.5 pb-1">
+        {% include items_template %}
+    </div>
+    <div class="sidebar-flyout" role="menu">
+        <p class="sidebar-flyout-title">{{ title }}</p>
+        {% include items_template %}
+    </div>
+</details>

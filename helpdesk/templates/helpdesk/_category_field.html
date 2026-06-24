@@ -1,0 +1,18 @@
+<div id="category-field-wrapper" class="space-y-2">
+    <label for="{{ form.category.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">
+        Categoria <span class="text-red-500">*</span>
+    </label>
+
+    <div class="flex gap-2 items-start">
+        <div class="flex-1">
+            {{ form.category }}
+        </div>
+    </div>
+
+    {% if form.category.errors %}
+    <p class="text-xs text-red-600">{{ form.category.errors.0 }}</p>
+    {% endif %}
+    {% if erro_categoria %}
+    <p class="text-xs text-red-600">{{ erro_categoria }}</p>
+    {% endif %}
+</div>

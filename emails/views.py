@@ -1,12 +1,26 @@
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, View, ListView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from emails.models import EmailAccount, EmailDomain
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+from core.permissions import MODULO_EMAILS, ModuloObrigatorioMixin
+from core.audit import logs_do_modulo
+from core.htmx import HtmxModalMixin
+from emails.models import EmailAccount, EmailDomain
+from emails.audit import (
+    log_conta_bloqueada,
+    log_conta_criada,
+    log_conta_desbloqueada,
+    log_dominio_criado,
+    log_reset_senha,
+)
+
+
+class _EmailsMixin(ModuloObrigatorioMixin):
+    modulo_obrigatorio = MODULO_EMAILS
+
+
+class DashboardView(_EmailsMixin, TemplateView):
     """Página Unificada: Métricas + Inventário + Filtros"""
     template_name = 'emails/dashboard.html'
 
@@ -20,39 +34,46 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Inventário e Filtros
         context['accounts'] = EmailAccount.objects.select_related('domain').all().order_by('employee_name')
         context['domains'] = EmailDomain.objects.all().order_by('name')
+        context['audit_logs'] = logs_do_modulo(MODULO_EMAILS, limite=50)
+        context['audit_titulo'] = 'Registro de auditoria de e-mails'
         
         return context
 
-class EmailAccountCreateView(LoginRequiredMixin, CreateView):
-    """Cadastro de Novo E-mail (UX Melhorada com Dropdown de Domínio)"""
+class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
+    """Cadastro de novo e-mail via modal no dashboard."""
     model = EmailAccount
     fields = ['username', 'domain', 'employee_name', 'status']
-    template_name = 'emails/account_form.html'
-    success_url = reverse_lazy('emails:dashboard')
+    modal_template_name = 'emails/_account_form_modal.html'
+    list_url_name = 'emails:dashboard'
     
     def form_valid(self, form):
+        self.object = form.save()
+        log_conta_criada(self.object, self.request.user)
         messages.success(self.request, f"E-mail {form.instance.address} cadastrado com sucesso!")
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
 
-class ResetPasswordView(LoginRequiredMixin, View):
+class ResetPasswordView(_EmailsMixin, View):
     """Ação: Reset de Senha"""
     def post(self, request, pk):
         account = get_object_or_404(EmailAccount, pk=pk)
         account.last_password_reset = timezone.now()
         account.save()
+        log_reset_senha(account, request.user)
         messages.success(request, f"Senha da conta {account.address} resetada. Uma notificação temporária foi gerada.")
         return redirect('emails:dashboard')
 
-class ToggleAccountStatusView(LoginRequiredMixin, View):
+class ToggleAccountStatusView(_EmailsMixin, View):
     """Ação: Bloquear/Desbloquear Conta"""
     def post(self, request, pk):
         account = get_object_or_404(EmailAccount, pk=pk)
         if account.status == EmailAccount.StatusChoices.ACTIVE:
             account.status = EmailAccount.StatusChoices.BLOCKED
             action = "bloqueada"
+            log_conta_bloqueada(account, request.user)
         else:
             account.status = EmailAccount.StatusChoices.ACTIVE
             action = "desbloqueada"
+            log_conta_desbloqueada(account, request.user)
         account.save()
         messages.success(request, f"A conta {account.address} foi {action} com sucesso.")
         return redirect('emails:dashboard')
@@ -60,16 +81,14 @@ class ToggleAccountStatusView(LoginRequiredMixin, View):
 # ===============================
 # Gestão de Domínios
 # ===============================
-class EmailDomainListView(LoginRequiredMixin, ListView):
-    model = EmailDomain
-    template_name = 'emails/domain_list.html'
-    context_object_name = 'domains'
-
-class EmailDomainCreateView(LoginRequiredMixin, CreateView):
+class EmailDomainCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     model = EmailDomain
     fields = ['name']
-    template_name = 'emails/form_base.html'
-    success_url = reverse_lazy('emails:domain_list')
+    list_url_name = 'emails:dashboard'
+    modal_title = 'Novo Domínio'
+    modal_subtitle = 'Adicione um domínio corporativo autorizado (ex: empresa.com.br).'
+    modal_submit_label = 'Salvar'
+    form_layout = 'as_p'
     
     def form_valid(self, form):
         # Limpar espaços ou '@' se o usuário digitar sem querer
@@ -77,6 +96,15 @@ class EmailDomainCreateView(LoginRequiredMixin, CreateView):
         if raw_name.startswith('@'):
             raw_name = raw_name[1:]
         form.instance.name = raw_name
-        
+        self.object = form.save()
+        log_dominio_criado(self.object, self.request.user)
         messages.success(self.request, f"Domínio @{form.instance.name} adicionado ao catálogo!")
-        return super().form_valid(form)
+        return self.htmx_redirect_response()
+
+    def htmx_redirect_response(self, url_name=None):
+        from django.urls import reverse
+        from django.http import HttpResponse
+        url = reverse('emails:dashboard') + '?tab=domains'
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = url
+        return response

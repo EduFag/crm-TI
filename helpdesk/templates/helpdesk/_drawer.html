@@ -8,22 +8,67 @@
     <!-- Cabeçalho -->
     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <h3 class="text-lg font-bold text-slate-900 tracking-tight">Detalhes do Chamado</h3>
-        <button onclick="document.getElementById('drawer-container').innerHTML = ''" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
+        <div class="flex items-center gap-2">
+            {% if pode_editar and not mostrar_edicao %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_edit' ticket.id %}"
+                    hx-target="#drawer-container"
+                    hx-swap="innerHTML"
+                    class="text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors">
+                Editar
+            </button>
+            {% endif %}
+            {% if pode_excluir and not mostrar_edicao %}
+            <button type="button"
+                    hx-post="{% url 'helpdesk:ticket_delete' ticket.id %}"
+                    hx-confirm="Tem certeza que deseja excluir este chamado?"
+                    hx-target="#drawer-container"
+                    hx-swap="innerHTML"
+                    class="text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition-colors">
+                Excluir
+            </button>
+            {% endif %}
+            <button type="button" class="text-slate-400 hover:text-slate-600 transition-colors ml-2" onclick="document.getElementById('drawer-container').innerHTML = ''">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
     </div>
 
     <!-- Corpo (Scrollável) -->
     <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+
+        {% if mostrar_edicao and edit_form %}
+        {% include "helpdesk/_ticket_edit_section.html" with form=edit_form %}
+        {% endif %}
         
         <!-- Info Principal -->
         <div>
             <div class="flex items-center gap-2 mb-2">
                 <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">#{{ ticket.id }}</span>
                 <span class="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">{{ ticket.get_status_display }}</span>
+                {% if request.user.role == 'ADMIN' or request.user.role == 'IT_USER' or request.user.is_superuser %}
+                    {% if not ticket.priority and ticket.status == 'NEW' %}
+                        <button type="button" onclick="openTriageWithoutMove('{{ ticket.id }}', event)" class="px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 active:scale-[0.97] text-slate-700 border border-slate-200 shadow-sm transition-all" title="Realizar triagem inicial">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-slate-500"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" /><path d="M9 17v-5" /><path d="M12 17v-1" /><path d="M15 17v-3" /></svg>
+                            <span>Triar</span>
+                        </button>
+                    {% endif %}
+                {% endif %}
+                {% if ticket.is_rejected %}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    Recusado
+                </span>
+                {% endif %}
             </div>
             <h2 class="text-xl font-bold text-slate-900 mb-2 leading-snug">{{ ticket.title }}</h2>
             <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">{{ ticket.description|default:"Sem descrição adicional."|linebreaksbr }}</p>
+            {% if ticket.is_rejected %}
+            <div class="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                <p class="text-xs font-bold text-red-700 uppercase mb-1">Motivo da Recusa:</p>
+                <p class="text-sm text-red-600">{{ ticket.rejection_reason|linebreaksbr }}</p>
+            </div>
+            {% endif %}
         </div>
         
         <!-- Metadados -->
@@ -31,7 +76,22 @@
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Solicitante</span>
                 <span class="font-medium text-slate-800">{{ ticket.requester_name }}</span>
+                {% if ticket.requester_user %}
+                <span class="block text-xs text-slate-400 mt-0.5">@{{ ticket.requester_user.username }}</span>
+                {% endif %}
             </div>
+            {% if pode_ver_quem_abriu %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Aberto por</span>
+                <span class="font-medium text-slate-800">
+                    {% if ticket.created_by %}
+                        {{ ticket.created_by.get_full_name|default:ticket.created_by.username }}
+                    {% else %}
+                        <span class="text-slate-400 italic">Não informado</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Técnico</span>
                 <span class="font-medium text-slate-800">
@@ -42,15 +102,70 @@
                     {% endif %}
                 </span>
             </div>
+            {% if ticket.equipe %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Equipe / Setor</span>
+                <span class="font-medium text-slate-800">{{ ticket.equipe.name }}</span>
+            </div>
+            {% endif %}
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Prioridade</span>
-                <span class="font-medium text-slate-800">{{ ticket.get_priority_display }}</span>
+                <span class="font-medium text-slate-800">{% if ticket.priority %}{{ ticket.get_priority_display }}{% else %}Não definida{% endif %}</span>
             </div>
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Criado em</span>
                 <span class="font-medium text-slate-800">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
             </div>
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Categoria</span>
+                <span class="font-medium text-slate-800">{{ ticket.category.name }}</span>
+            </div>
+            {% if ticket.specific_category %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Categoria Específica</span>
+                <span class="font-medium text-slate-800">{{ ticket.specific_category.name }}</span>
+            </div>
+            {% endif %}
+            {% if ticket.attachments.exists %}
+            <div>
+                <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Anexos</span>
+                <button type="button"
+                        hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}"
+                        hx-target="#modal-container"
+                        class="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 transition-colors w-fit">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>{{ ticket.attachments.count }} imagem(ns)</span>
+                </button>
+            </div>
+            {% endif %}
         </div>
+
+        {% if pode_transferir and not mostrar_edicao %}
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Transferir técnico</p>
+            <form method="post"
+                  action="{% url 'helpdesk:ticket_transfer' ticket.id %}"
+                  hx-post="{% url 'helpdesk:ticket_transfer' ticket.id %}"
+                  hx-target="#drawer-container"
+                  hx-swap="innerHTML"
+                  class="flex gap-2 items-end">
+                {% csrf_token %}
+                <div class="flex-1">
+                    <select name="assigned_to" required class="w-full text-sm p-2 border border-slate-300 rounded-lg bg-white">
+                        <option value="">Selecione o técnico</option>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.pk }}" {% if ticket.assigned_to_id == tecnico.pk %}selected{% endif %}>
+                            {{ tecnico.get_full_name|default:tecnico.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Transferir
+                </button>
+            </form>
+        </div>
+        {% endif %}
 
         <!-- Seção de Comentários -->
         <div class="flex-1 flex flex-col">
@@ -60,7 +175,9 @@
             </h4>
             
             <!-- Lista de Comentários (Alvo do HTMX) -->
-            <div id="comments-list" class="flex flex-col gap-4 mb-6">
+            <div id="comments-list" class="flex flex-col gap-4 mb-6"
+                 hx-get="{% url 'helpdesk:ticket_comments' ticket.id %}"
+                 hx-trigger="ticketUpdated from:body">
                 {% include "helpdesk/_comments_list.html" %}
             </div>
         </div>
@@ -68,13 +185,78 @@
 
     <!-- Input de Comentário (Fixo no Rodapé) -->
     <div class="p-4 border-t border-slate-200 bg-slate-50">
-        <form hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset()" class="flex flex-col gap-3">
-            <textarea name="text" rows="2" placeholder="Adicione uma nota ou atualização..." required class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
-            <div class="flex justify-end">
+        <form id="comment-form-{{ ticket.id }}" hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-encoding="multipart/form-data" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset(); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.add('hidden'); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.remove('flex');" class="flex flex-col gap-3">
+            <textarea name="text" rows="2" placeholder="Adicione uma nota ou atualização..." class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
+            
+            <div id="comment-attachment-preview-{{ ticket.id }}" class="hidden items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm animate-in fade-in">
+                <div class="flex items-center gap-2 overflow-hidden text-slate-700">
+                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span id="comment-attachment-name-{{ ticket.id }}" class="truncate max-w-[200px] font-medium"></span>
+                </div>
+                <button type="button" id="remove-comment-attachment-{{ ticket.id }}" class="text-slate-400 hover:text-red-500 p-1 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="flex justify-between items-center">
+                <label class="cursor-pointer text-slate-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-slate-100 flex items-center gap-1 group">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    <span class="text-xs font-medium">Anexar</span>
+                    <input type="file" id="comment-file-{{ ticket.id }}" name="attachment" class="hidden" accept="image/png, image/jpeg, image/webp">
+                </label>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                     Enviar Comentário
                 </button>
             </div>
         </form>
+        <script>
+        (function() {
+            var form = document.getElementById('comment-form-{{ ticket.id }}');
+            var fileInput = document.getElementById('comment-file-{{ ticket.id }}');
+            var preview = document.getElementById('comment-attachment-preview-{{ ticket.id }}');
+            var removeBtn = document.getElementById('remove-comment-attachment-{{ ticket.id }}');
+            var previewName = document.getElementById('comment-attachment-name-{{ ticket.id }}');
+        
+            if (!form || !fileInput) return;
+        
+            function handleFile(file) {
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                previewName.textContent = file.name;
+                preview.classList.remove('hidden');
+                preview.classList.add('flex');
+            }
+        
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+        
+            removeBtn.addEventListener('click', function() {
+                fileInput.value = '';
+                preview.classList.add('hidden');
+                preview.classList.remove('flex');
+            });
+        
+            form.addEventListener('paste', function(e) {
+                var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (var index in items) {
+                    var item = items[index];
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        var blob = item.getAsFile();
+                        if (blob) {
+                            var ext = blob.type.split('/')[1] || 'png';
+                            var file = new File([blob], "imagem_colada_" + Date.now() + "." + ext, {type: blob.type});
+                            handleFile(file);
+                            e.preventDefault();
+                            break;
+                        }
+                    }
+                }
+            });
+        })();
+        </script>
     </div>
 </div>

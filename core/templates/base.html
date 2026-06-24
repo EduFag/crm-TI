@@ -1,18 +1,21 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema TI{% endblock %}</title>
-    
+    <link rel="shortcut icon" type="image/svg+xml" href="{% static 'helpdesk/images/logo.svg' %}">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Google Fonts (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Configuração do Tailwind -->
     <script>
         tailwind.config = {
@@ -35,97 +38,64 @@
         }
     </script>
 
-    <!-- HTMX e Extensão SSE -->
+    <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+
+    {% include "core/_sidebar_styles.html" %}
     <script>
-        document.body.addEventListener('htmx:configRequest', (event) => {
-            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-        });
+        try {
+            if (localStorage.getItem('sidebar-collapsed') === '1') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        } catch (e) { }
     </script>
 </head>
+
 <body class="bg-slate-50 font-sans text-slate-800 flex h-screen overflow-hidden">
-    
+
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col">
-        <!-- Logo -->
-        <div class="h-16 flex items-center px-6 border-b border-slate-100">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                </div>
-                <span class="font-bold text-lg text-slate-900 tracking-tight">Sistema TI</span>
+    <aside id="app-sidebar"
+        class="relative shrink-0 bg-white border-r border-slate-200 flex flex-col z-30">
+        <!-- Logo & Toggle Header (Spacious scale) -->
+        <div class="h-20 flex items-center justify-between px-6 border-b border-slate-100 sidebar-logo-wrap gap-2">
+            <div class="flex items-center gap-3.5 min-w-0 sidebar-hide-collapsed">
+                <img src="{% static 'helpdesk/images/logo.svg' %}" class="w-10 h-10 object-contain shrink-0" alt="Logo">
+                <span class="font-bold text-xl text-slate-900 tracking-tight">Sistema TI</span>
             </div>
+            <!-- Botão recolher/expandir colocado de forma elegante no header -->
+            <button type="button" id="sidebar-toggle" title="Recolher menu"
+                class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 transition-all focus:outline-none shrink-0 shadow-sm">
+                <svg id="sidebar-toggle-icon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12H12m-8.25 5.25h16.5" />
+                </svg>
+            </button>
         </div>
 
-        <!-- Navegação Lateral -->
-        <nav class="flex-1 overflow-y-auto py-6 px-4">
-            <div class="mb-4">
-                <p class="px-2 text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">Módulos</p>
-                
-                <!-- Item: Helpdesk -->
-                <a href="{% url 'helpdesk:kanban' %}" class="flex items-center gap-3 px-3 py-2 bg-slate-100 text-slate-900 rounded-lg font-medium transition-colors mb-2">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                    </svg>
-                    Helpdesk
-                </a>
-                
-                <!-- Item: Gestão de Chips -->
-                <a href="/chips/" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg font-medium transition-colors mb-2">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                    </svg>
-                    Gestão de Chips
-                </a>
+        {% include "core/_sidebar.html" %}
 
-                <!-- Item: Controle de E-mails -->
-                <a href="/emails/" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg font-medium transition-colors">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
-                    Controle de E-mails
-                </a>
-                
-                <!-- Item: Equipamentos -->
-                <a href="/equipment/" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg font-medium transition-colors mt-2">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
-                    Controle de Ativos
-                </a>
-
-                <!-- Item: Discador -->
-                <a href="{% url 'discador:dashboard' %}" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg font-medium transition-colors mt-2">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-                    </svg>
-                    Discador 3C Plus
-                </a>
-
-            </div>
-        </nav>
-
-        <!-- Área do Usuário -->
-        <div class="p-4 border-t border-slate-200 bg-white">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100">
+        <!-- Área do Usuário (Spacious scale) -->
+        <div class="p-6 border-t border-slate-200 bg-white">
+            <div class="flex items-center gap-3.5 mb-4 sidebar-user-wrap">
+                <div
+                    class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold border border-blue-100 shrink-0 text-lg shadow-sm"
+                    title="{{ user.get_full_name|default:user.username }}">
                     {{ user.username|make_list|first|upper }}
                 </div>
-                <div class="flex-1 min-w-0">
+                <div class="flex-1 min-w-0 sidebar-hide-collapsed">
                     <p class="text-sm font-semibold text-slate-900 truncate">{{ user.get_full_name|default:user.username }}</p>
                     <p class="text-xs text-slate-500 truncate">{{ user.get_role_display|default:"Usuário" }}</p>
                 </div>
             </div>
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
-                <button type="submit" class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 font-medium bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                <button type="submit" title="Sair do Sistema"
+                    class="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-red-600 font-semibold bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                        </path>
                     </svg>
-                    Sair do Sistema
+                    <span class="sidebar-hide-collapsed">Sair do Sistema</span>
                 </button>
             </form>
         </div>
@@ -133,36 +103,258 @@
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-screen overflow-hidden">
-        
-        <!-- Header -->
-        <header class="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-8">
+
+        <!-- Header (Aligned height with logo wrap) -->
+        <header class="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8">
             <div class="flex-1 max-w-xl">
-                <!-- Busca (Placeholder) -->
+                <!-- Busca -->
                 <div class="relative group">
-                    <svg class="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    <svg class="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
-                    <input type="text" placeholder="Pesquisar..." class="w-full pl-10 pr-4 py-2 border-none bg-slate-50 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 rounded-lg text-sm transition-all">
+                    <input id="global-search-input" type="text" placeholder="Pesquisar..."
+                        class="w-full pl-10 pr-20 py-2.5 border-none bg-slate-50 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 rounded-xl text-sm transition-all">
+                    <span id="global-search-counter" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-full select-none pointer-events-none"></span>
                 </div>
             </div>
-            
+
             <div class="flex items-center gap-5 ml-4 text-slate-400">
-               <button class="hover:text-slate-600 transition-colors relative">
-                   <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                   </svg>
-               </button>
+                {% if user.role == 'STANDARD' or user.role == 'SUPERVISOR' %}
+                <button type="button" title="Ajuda e Tutoriais" onclick="document.getElementById('tutorial-modal').showModal()"
+                    class="hover:text-blue-600 transition-colors relative flex items-center justify-center p-1 rounded-lg hover:bg-blue-50">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                    </svg>
+                </button>
+                {% endif %}
             </div>
         </header>
 
         <!-- Dynamic Page Content -->
-        <div class="flex-1 overflow-auto p-8 bg-slate-50/50">
+        <div id="main-content" class="flex-1 overflow-auto p-8 bg-slate-50/50">
             {% block content %}
             {% endblock %}
         </div>
-        
+
     </main>
-    
+
+    <!-- Container global de modais HTMX -->
+    <div id="modal-container"></div>
+
+    <script>
+        // Deve rodar após o <body> existir (script no <head> quebrava em páginas como history)
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+        document.body.addEventListener('closeModal', function () {
+            var modal = document.getElementById('modal-container');
+            if (modal) modal.innerHTML = '';
+        });
+        document.body.addEventListener('closeCreateModal', function () {
+            var modal = document.getElementById('modal-container');
+            if (modal) modal.innerHTML = '';
+        });
+
+        // Menu lateral recolhível
+        (function () {
+            var sidebar = document.getElementById('app-sidebar');
+            var toggle = document.getElementById('sidebar-toggle');
+            var root = document.documentElement;
+            if (!sidebar || !toggle) return;
+
+            var storageKey = 'sidebar-collapsed';
+
+            function menuRecolhido() {
+                return root.classList.contains('sidebar-collapsed');
+            }
+
+            function aplicarEstado(recolhido) {
+                root.classList.toggle('sidebar-collapsed', recolhido);
+                toggle.title = recolhido ? 'Expandir menu' : 'Recolher menu';
+            }
+
+            toggle.addEventListener('click', function () {
+                var recolhido = !menuRecolhido();
+                aplicarEstado(recolhido);
+                try {
+                    localStorage.setItem(storageKey, recolhido ? '1' : '0');
+                } catch (e) { }
+            });
+        })();
+
+        // Pesquisa Global Estilo Ctrl + F
+        (function() {
+            const searchInput = document.getElementById('global-search-input');
+            const counter = document.getElementById('global-search-counter');
+            const mainContent = document.getElementById('main-content');
+            if (!searchInput || !counter || !mainContent) return;
+
+            let matches = [];
+            let currentIndex = -1;
+            let searchTimeout = null;
+
+            function clearHighlights(resetInput = true) {
+                const wrappers = document.querySelectorAll('.search-wrapper');
+                wrappers.forEach(wrapper => {
+                    const parent = wrapper.parentNode;
+                    if (parent) {
+                        const textNode = document.createTextNode(wrapper.textContent);
+                        parent.replaceChild(textNode, wrapper);
+                        parent.normalize();
+                    }
+                });
+                matches = [];
+                if (resetInput) {
+                    currentIndex = -1;
+                    counter.classList.add('hidden');
+                    counter.textContent = '';
+                }
+            }
+
+            function performSearch(resetIndex = true, shouldScroll = true) {
+                const prevIndex = currentIndex;
+                clearHighlights(false);
+                
+                const query = searchInput.value.toLowerCase().trim();
+                if (query.length < 2) return;
+
+                const walker = document.createNodeIterator(
+                    mainContent,
+                    NodeFilter.SHOW_TEXT,
+                    {
+                        acceptNode(node) {
+                            const parent = node.parentNode;
+                            if (!parent) return NodeFilter.FILTER_REJECT;
+                            const tag = parent.tagName.toUpperCase();
+                            if (['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'SELECT'].includes(tag)) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                            if (parent.classList.contains('search-highlight') || parent.classList.contains('search-wrapper')) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                    }
+                );
+
+                const nodes = [];
+                let node;
+                while ((node = walker.nextNode())) {
+                    nodes.push(node);
+                }
+
+                nodes.forEach(textNode => {
+                    const text = textNode.nodeValue;
+                    const lowerText = text.toLowerCase();
+                    let index = lowerText.indexOf(query);
+                    
+                    if (index !== -1) {
+                        const parent = textNode.parentNode;
+                        const wrapper = document.createElement('span');
+                        wrapper.className = 'search-wrapper';
+                        let lastIndex = 0;
+                        
+                        while (index !== -1) {
+                            if (index > lastIndex) {
+                                wrapper.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+                            }
+                            
+                            const span = document.createElement('span');
+                            span.className = 'search-highlight text-yellow-500 font-bold transition-colors duration-150';
+                            span.textContent = text.substring(index, index + query.length);
+                            wrapper.appendChild(span);
+                            matches.push(span);
+                            
+                            lastIndex = index + query.length;
+                            index = lowerText.indexOf(query, lastIndex);
+                        }
+                        
+                        if (lastIndex < text.length) {
+                            wrapper.appendChild(document.createTextNode(text.substring(lastIndex)));
+                        }
+                        
+                        parent.replaceChild(wrapper, textNode);
+                    }
+                });
+
+                if (matches.length > 0) {
+                    if (resetIndex) {
+                        currentIndex = 0;
+                    } else {
+                        currentIndex = Math.max(0, Math.min(prevIndex, matches.length - 1));
+                    }
+                    highlightActiveMatch(shouldScroll);
+                    counter.classList.remove('hidden');
+                    updateCounterText();
+                } else {
+                    counter.classList.remove('hidden');
+                    counter.textContent = '0/0';
+                }
+            }
+
+            function highlightActiveMatch(shouldScroll = true) {
+                matches.forEach(m => {
+                    m.classList.remove('text-amber-600', 'font-black');
+                    m.classList.add('text-yellow-500', 'font-bold');
+                });
+
+                const active = matches[currentIndex];
+                if (active) {
+                    active.classList.remove('text-yellow-500', 'font-bold');
+                    active.classList.add('text-amber-600', 'font-black');
+                    if (shouldScroll) {
+                        // inline: 'center' rola horizontalmente caso a palavra esteja em alguma coluna oculta (ex: Kanban)
+                        active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                    }
+                }
+            }
+
+            function updateCounterText() {
+                counter.textContent = `${currentIndex + 1}/${matches.length}`;
+            }
+
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(performSearch, 250);
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (matches.length === 0) return;
+
+                    if (e.shiftKey) {
+                        currentIndex = (currentIndex - 1 + matches.length) % matches.length;
+                    } else {
+                        currentIndex = (currentIndex + 1) % matches.length;
+                    }
+                    highlightActiveMatch(true);
+                    updateCounterText();
+                } else if (e.key === 'Escape') {
+                    searchInput.value = '';
+                    clearHighlights(true);
+                    searchInput.blur();
+                }
+            });
+
+            // Limpa tudo ao mudar de página principal
+            document.body.addEventListener('htmx:beforeSwap', (e) => {
+                if (e.detail.target && e.detail.target.id === 'main-content') {
+                    searchInput.value = '';
+                    clearHighlights(true);
+                }
+            });
+
+            // Re-aplica os destaques se houver busca ativa após atualizações dinâmicas da página (ex: poll do kanban)
+            document.body.addEventListener('htmx:afterSwap', (e) => {
+                if (e.detail.target && e.detail.target.id !== 'main-content' && searchInput.value.trim().length >= 2) {
+                    performSearch(false, false);
+                }
+            });
+        })();
+    </script>
+
+    {% include "core/_tutorial_modal.html" %}
 </body>
 </html>

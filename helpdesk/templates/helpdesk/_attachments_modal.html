@@ -1,0 +1,41 @@
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 transition-opacity">
+    
+    <!-- Modal -->
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Cabeçalho -->
+        <div class="flex items-center justify-between p-4 border-b border-slate-100">
+            <h3 class="text-lg font-bold text-slate-900">Anexos do Chamado #{{ ticket.id }}</h3>
+            <button type="button" 
+                    onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Galeria (Scrollável) -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
+            <div class="grid grid-cols-1 {% if attachments|length > 1 %}lg:grid-cols-2{% endif %} gap-6">
+                {% for attachment in attachments %}
+                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex-1 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center mb-3 group relative cursor-pointer min-h-[200px]">
+                        <img src="{{ attachment.file.url }}" alt="{{ attachment.file_name }}" class="object-contain w-full h-full {% if attachments|length == 1 %}max-h-[75vh]{% else %}max-h-[400px]{% endif %}">
+                        <!-- Overlay on hover -->
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <a href="{{ attachment.file.url }}" target="_blank" class="px-4 py-2 bg-white rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors">
+                                Abrir original
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-auto">
+                        <p class="text-xs font-medium text-slate-600 truncate flex-1" title="{{ attachment.file_name }}">{{ attachment.file_name }}</p>
+                        <p class="text-[10px] text-slate-400 font-medium ml-2">{{ attachment.created_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+    </div>
+</div>

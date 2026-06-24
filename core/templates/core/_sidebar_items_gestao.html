@@ -1,0 +1,19 @@
+{% if 'chips' in modulos_permitidos %}
+{% url 'chips:dashboard' as chips_url %}
+{% include "core/_sidebar_nav_link.html" with url=chips_url label="Chips" active=menu_chips_ativo icon='<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"></path></svg>' %}
+{% endif %}
+{% if 'emails' in modulos_permitidos %}
+{% url 'emails:dashboard' as emails_url %}
+{% include "core/_sidebar_nav_link.html" with url=emails_url label="E-mails" active=menu_emails_ativo icon='<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' %}
+{% endif %}
+{% if 'equipment' in modulos_permitidos %}
+{% url 'equipment:dashboard' as equipment_url %}
+{% include "core/_sidebar_nav_link.html" with url=equipment_url label="Ativos" active=menu_equipment_ativo icon='<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' %}
+{% endif %}
+{% if 'discador' in modulos_permitidos %}
+{% url 'discador:dashboard' as discador_url %}
+{% include "core/_sidebar_nav_link.html" with url=discador_url label="Discador 3C" active=menu_discador_ativo icon='<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>' %}
+{% endif %}
+
+
+

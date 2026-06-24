@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+    <!-- Escudo Central Verde-Limão -->
+    <path d="M 256,90 L 370,140 L 370,270 L 256,395 L 142,270 L 142,140 Z" 
+          fill="none" 
+          stroke="#6bd600" 
+          stroke-width="20" 
+          stroke-linejoin="round" 
+          stroke-linecap="round" />
+
+    <!-- A Letra M Verde-Limão no centro -->
+    <path d="M 190,270 L 202,160 L 227,160 L 256,230 L 285,160 L 310,160 L 322,270 L 297,270 L 290,205 L 266,270 L 246,270 L 222,205 L 215,270 Z" 
+          fill="#6bd600" 
+          stroke="#6bd600" 
+          stroke-width="6" 
+          stroke-linejoin="round" 
+          stroke-linecap="round" />
+
+    <!-- Linhas de Circuito Integrado Azul-Celeste -->
+    <!-- Esquerda -->
+    <circle cx="230" cy="275" r="7" fill="none" stroke="#00b5ff" stroke-width="5" />
+    <path d="M 230,282 L 230,305 L 210,325 L 210,360" 
+          fill="none" 
+          stroke="#00b5ff" 
+          stroke-width="5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+    <!-- Direita -->
+    <circle cx="282" cy="282" r="7" fill="none" stroke="#00b5ff" stroke-width="5" />
+    <path d="M 282,289 L 282,320 L 262,340 L 262,360" 
+          fill="none" 
+          stroke="#00b5ff" 
+          stroke-width="5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- Headset (Arco do Fone de Ouvido) Azul-Celeste -->
+    <path d="M 95,240 A 170,170 0 0,1 417,240" 
+          fill="none" 
+          stroke="#00b5ff" 
+          stroke-width="24" 
+          stroke-linecap="round" />
+
+    <!-- Almofadas Laterais do Headset -->
+    <rect x="70" y="195" width="46" height="96" rx="23" fill="#00b5ff" />
+    <rect x="396" y="195" width="46" height="96" rx="23" fill="#00b5ff" />
+
+    <!-- Haste e Bolinha do Microfone -->
+    <path d="M 405,275 Q 380,395 295,385" 
+          fill="none" 
+          stroke="#00b5ff" 
+          stroke-width="12" 
+          stroke-linecap="round" />
+    <ellipse cx="285" cy="385" rx="22" ry="16" transform="rotate(-20, 285, 385)" fill="#00b5ff" />
+
+    <!-- Balão de Diálogo de Chat (Canto Inferior Esquerdo) -->
+    <!-- 1. Recorte Branco por Baixo para Segurança Visual -->
+    <rect x="74" y="294" width="132" height="97" rx="27" fill="#ffffff" />
+    <path d="M 89,380 L 89,442 L 150,380 Z" fill="#ffffff" stroke="#ffffff" stroke-width="12" stroke-linejoin="round" />
+
+    <!-- 2. Corpo do Balão Azul-Celeste -->
+    <rect x="82" y="302" width="116" height="81" rx="21" fill="#00b5ff" />
+    <path d="M 97,375 L 97,425 L 140,375 Z" fill="#00b5ff" stroke="#00b5ff" stroke-width="4" stroke-linejoin="round" />
+
+    <!-- 3. Três Pontinhos Brancos do Chat -->
+    <circle cx="112" cy="342.5" r="7" fill="#ffffff" />
+    <circle cx="140" cy="342.5" r="7" fill="#ffffff" />
+    <circle cx="168" cy="342.5" r="7" fill="#ffffff" />
+</svg>

@@ -1,0 +1,313 @@
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+
+<!-- Modal centralizado -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto pointer-events-auto"
+         onclick="event.stopPropagation()">
+
+        <!-- Cabeçalho -->
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">Novo Chamado</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Descreva o problema para abrir um chamado.</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Formulário -->
+        <form method="post"
+              action="{% url 'helpdesk:ticket_create' %}"
+              enctype="multipart/form-data"
+              hx-post="{% url 'helpdesk:ticket_create' %}"
+              hx-encoding="multipart/form-data"
+              hx-target="#modal-container"
+              hx-swap="innerHTML"
+              class="p-6 space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {% if not form.tipo_solicitante and not form.requester_name %}
+            <div class="text-sm text-slate-600 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                Você será registrado automaticamente como solicitante deste chamado.
+            </div>
+            {% endif %}
+
+            <!-- Solicitante -->
+            {% if form.tipo_solicitante %}
+            <div class="space-y-3">
+                <label class="block text-sm font-semibold text-slate-700">Solicitante <span class="text-red-500">*</span></label>
+
+                <div class="flex gap-4 text-sm" id="tipo-solicitante-radios">
+                    {% for radio in form.tipo_solicitante %}
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-slate-700">
+                        {{ radio.tag }}
+                        <span>{{ radio.choice_label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {% if form.requester_name %}
+                <div id="campo-solicitante-texto">
+                    <label for="{{ form.requester_name.id_for_label }}" class="block text-xs font-medium text-slate-500 mb-1">Nome livre</label>
+                    {{ form.requester_name }}
+                    {% if form.requester_name.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.requester_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if form.requester_user %}
+                <div id="campo-solicitante-usuario" class="hidden">
+                    <label for="{{ form.requester_user.id_for_label }}" class="block text-xs font-medium text-slate-500 mb-1">Usuário do sistema</label>
+                    {{ form.requester_user }}
+                    {% if form.requester_user.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.requester_user.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% elif form.requester_name %}
+            <div>
+                <label for="{{ form.requester_name.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Solicitante <span class="text-red-500">*</span></label>
+                {{ form.requester_name }}
+                {% if form.requester_name.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.requester_name.errors.0 }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Categoria -->
+            {% include "helpdesk/_category_field.html" %}
+
+            <!-- Categoria Específica (TI) -->
+            {% if form.specific_category %}
+            <div>
+                <label for="{{ form.specific_category.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Categoria Específica</label>
+                {{ form.specific_category }}
+                {% if form.specific_category.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.specific_category.errors.0 }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Equipe (se usuário tiver mais de 1) -->
+            {% if form.equipe %}
+            <div>
+                <label for="{{ form.equipe.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Equipe/Setor <span class="text-red-500">*</span></label>
+                {{ form.equipe }}
+                {% if form.equipe.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.equipe.errors.0 }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Título -->
+            <div>
+                <label for="{{ form.title.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Título do Problema <span class="text-red-500">*</span></label>
+                {{ form.title }}
+                {% if form.title.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.title.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Descrição -->
+            <div>
+                <label for="{{ form.description.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Descrição Detalhada <span class="text-red-500">*</span></label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.description.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Anexo -->
+            <div>
+                <label for="{{ form.attachment.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.attachment.label }}</label>
+                {{ form.attachment }}
+                <p class="text-[11px] text-slate-500 mt-1 mb-2">{{ form.attachment.help_text }}</p>
+                <div id="attachments-preview" class="flex flex-col gap-2 empty:hidden"></div>
+                {% if form.attachment.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.attachment.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Prioridade -->
+            {% if form.priority %}
+            <div>
+                <label for="{{ form.priority.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">Prioridade Inicial</label>
+                {{ form.priority }}
+                {% if form.priority.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.priority.errors.0 }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="pt-2 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                        class="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm">
+                    Criar Chamado
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if form.tipo_solicitante %}
+<script>
+(function() {
+    function atualizarCamposSolicitante() {
+        var radioUsuario = document.querySelector('input[name="tipo_solicitante"][value="usuario"]');
+        var radioTexto = document.querySelector('input[name="tipo_solicitante"][value="texto"]');
+        var radioEu = document.querySelector('input[name="tipo_solicitante"][value="eu"]');
+
+        var campoTexto = document.getElementById('campo-solicitante-texto');
+        var campoUsuario = document.getElementById('campo-solicitante-usuario');
+        
+        var inputTexto = document.getElementById('{{ form.requester_name.id_for_label }}');
+        var selectUsuario = document.getElementById('{{ form.requester_user.id_for_label }}');
+
+        if (radioUsuario && radioUsuario.checked) {
+            if (campoTexto) campoTexto.classList.add('hidden');
+            if (campoUsuario) campoUsuario.classList.remove('hidden');
+            if (inputTexto) inputTexto.removeAttribute('required');
+        } else if (radioTexto && radioTexto.checked) {
+            if (campoTexto) campoTexto.classList.remove('hidden');
+            if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.setAttribute('required', 'required');
+            if (selectUsuario) selectUsuario.value = '';
+        } else if (radioEu && radioEu.checked) {
+            if (campoTexto) campoTexto.classList.add('hidden');
+            if (campoUsuario) campoUsuario.classList.add('hidden');
+            if (inputTexto) inputTexto.removeAttribute('required');
+            if (selectUsuario) selectUsuario.value = '';
+        }
+    }
+
+    document.querySelectorAll('input[name="tipo_solicitante"]').forEach(function(radio) {
+        radio.addEventListener('change', atualizarCamposSolicitante);
+    });
+    atualizarCamposSolicitante();
+})();
+</script>
+{% endif %}
+
+<script>
+// Suporte avançado para colar imagens e múltipla seleção
+(function() {
+    var globalDataTransfer = new DataTransfer();
+    var maxFiles = 4;
+
+    function renderPreviews() {
+        var fileInput = document.getElementById('{{ form.attachment.id_for_label }}');
+        if (!fileInput) return;
+        
+        var previewContainer = document.getElementById('attachments-preview');
+        previewContainer.innerHTML = '';
+        
+        Array.from(globalDataTransfer.files).forEach(function(file, index) {
+            var itemDiv = document.createElement('div');
+            itemDiv.className = 'flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm animate-in fade-in zoom-in-95';
+            
+            var infoDiv = document.createElement('div');
+            infoDiv.className = 'flex items-center gap-2 overflow-hidden';
+            
+            var icon = document.createElement('span');
+            icon.className = 'text-slate-400';
+            icon.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+            
+            var textName = document.createElement('span');
+            textName.className = 'truncate text-slate-700 font-medium max-w-[200px] sm:max-w-[300px]';
+            textName.textContent = file.name;
+            
+            infoDiv.appendChild(icon);
+            infoDiv.appendChild(textName);
+            
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'text-slate-400 hover:text-red-500 transition-colors p-1';
+            removeBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+            removeBtn.onclick = function() {
+                removeFile(index);
+            };
+            
+            itemDiv.appendChild(infoDiv);
+            itemDiv.appendChild(removeBtn);
+            previewContainer.appendChild(itemDiv);
+        });
+        
+        fileInput.files = globalDataTransfer.files;
+    }
+
+    function removeFile(indexToRemove) {
+        var newDataTransfer = new DataTransfer();
+        var files = Array.from(globalDataTransfer.files);
+        for (var i = 0; i < files.length; i++) {
+            if (i !== indexToRemove) {
+                newDataTransfer.items.add(files[i]);
+            }
+        }
+        globalDataTransfer = newDataTransfer;
+        renderPreviews();
+    }
+
+    function addFiles(newFiles) {
+        var totalCurrent = globalDataTransfer.items.length;
+        Array.from(newFiles).forEach(function(file) {
+            if (totalCurrent < maxFiles) {
+                globalDataTransfer.items.add(file);
+                totalCurrent++;
+            } else {
+                alert('O limite máximo é de 4 imagens.');
+            }
+        });
+        renderPreviews();
+    }
+
+    var fileInput = document.getElementById('{{ form.attachment.id_for_label }}');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            addFiles(e.target.files);
+        });
+    }
+
+    document.addEventListener('paste', function(e) {
+        var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        var hasImages = false;
+        var dt = new DataTransfer();
+        
+        for (var index in items) {
+            var item = items[index];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                var blob = item.getAsFile();
+                if (blob) {
+                    var ext = blob.type.split('/')[1] || 'png';
+                    var file = new File([blob], "imagem_colada_" + Date.now() + "_" + index + "." + ext, {type: blob.type});
+                    dt.items.add(file);
+                    hasImages = true;
+                }
+            }
+        }
+        
+        if (hasImages && fileInput) {
+            addFiles(dt.files);
+            // Impede a ação padrão se não estiver digitando texto
+            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+            }
+        }
+    });
+})();
+</script>

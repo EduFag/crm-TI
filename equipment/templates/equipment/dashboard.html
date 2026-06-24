@@ -9,7 +9,11 @@
             <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Gestão de Equipamentos</h2>
             <p class="text-sm text-slate-500 mt-1">Controle de ciclo de vida de ativos e hardware corporativo.</p>
         </div>
-        <a href="{% url 'equipment:equipment_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Ativo de TI</a>
+        <button type="button"
+                hx-get="{% url 'equipment:equipment_create' %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">+ Novo Ativo de TI</button>
     </div>
 
     <!-- RF01: Métricas 3x3 -->
@@ -62,8 +66,8 @@
                     </select>
                 </div>
             </div>
-            <div class="overflow-y-auto p-0 flex-1 w-full">
-                <table class="w-full text-left text-sm">
+            <div class="overflow-y-auto overflow-x-auto p-0 flex-1 w-full">
+                <table class="w-full text-left text-sm whitespace-nowrap">
                     <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
                         <tr>
                             <th class="px-5 py-4 font-semibold text-slate-600">Patrimônio</th>
@@ -89,7 +93,13 @@
                                 {% endif %}
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{% url 'equipment:equipment_update' eq.id %}" class="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase underline">Editar</a>
+                                <button type="button" title="Editar"
+                                        hx-get="{% url 'equipment:equipment_update' eq.id %}"
+                                        hx-target="#modal-container"
+                                        hx-swap="innerHTML"
+                                        class="text-blue-600 hover:text-blue-800 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                </button>
                             </td>
                         </tr>
                         {% empty %}
@@ -115,8 +125,8 @@
                     </select>
                 </div>
             </div>
-            <div class="overflow-y-auto p-0 flex-1 w-full">
-                <table class="w-full text-left text-sm">
+            <div class="overflow-y-auto overflow-x-auto p-0 flex-1 w-full">
+                <table class="w-full text-left text-sm whitespace-nowrap">
                     <thead class="bg-white sticky top-0 border-b border-slate-100 shadow-sm z-10">
                         <tr>
                             <th class="px-5 py-4 font-semibold text-slate-600">Data</th>
@@ -195,4 +205,6 @@
         });
     }
 </script>
+
+{% include "core/_audit_log_table.html" with registros=audit_logs titulo=audit_titulo %}
 {% endblock %}

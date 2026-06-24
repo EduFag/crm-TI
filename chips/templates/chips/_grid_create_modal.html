@@ -1,0 +1,188 @@
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto pointer-events-auto"
+         onclick="event.stopPropagation()">
+        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 rounded-t-xl sticky top-0 z-10 flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Nova linha</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Cadastre um chip na planilha operacional.</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        {% if not has_operators %}
+        <div class="p-6">
+            <div class="px-4 py-3 rounded-lg text-sm bg-amber-50 text-amber-900 border border-amber-200">
+                Cadastre pelo menos uma operadora ativa antes de adicionar linhas.
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="mt-4 w-full py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                Fechar
+            </button>
+        </div>
+        {% else %}
+        <form id="grid-create-form" class="p-6 space-y-4">
+            {% csrf_token %}
+            <div id="grid-create-erro" class="hidden px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200"></div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Número da linha</label>
+                {{ form.line_number }}
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Operadora</label>
+                {{ form.operator }}
+            </div>
+
+            <div id="grid-create-campos-titular" class="space-y-4">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Tipo de titular</p>
+                    <div class="flex gap-4 text-sm">
+                        {% for radio in form.tipo_titular %}
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            {{ radio.tag }}
+                            <span>{{ radio.choice_label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="grid-create-campo-texto">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Nome do titular</label>
+                    {{ form.employee_name }}
+                </div>
+                <div id="grid-create-campo-usuario" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Usuário do sistema</label>
+                    {{ form.employee_user }}
+                </div>
+            </div>
+
+            <div id="grid-create-campo-envelope" class="hidden">
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Envelope na TI</label>
+                {{ form.batch }}
+                {% if not has_envelopes %}
+                <p class="text-xs text-amber-600 mt-1">Nenhum envelope aberto — cadastre um na aba Envelopes.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data de ativação <span class="text-slate-400 font-normal">(opcional)</span></label>
+                {{ form.activated_at }}
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                        class="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button type="submit" id="grid-create-submit"
+                        class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                        {% if not has_envelopes %}data-envelopes-optional="1"{% endif %}>
+                    Cadastrar linha
+                </button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% if has_operators %}
+<script>
+(function() {
+    var $form = $('#grid-create-form');
+    var $erro = $('#grid-create-erro');
+    var $camposTitular = $('#grid-create-campos-titular');
+    var $campoEnvelope = $('#grid-create-campo-envelope');
+    var $tipoUsuario = $('input[name="tipo_titular"][value="usuario"]');
+    var $campoTexto = $('#grid-create-campo-texto');
+    var $campoUsuario = $('#grid-create-campo-usuario');
+    var $tipoTitular = $('input[name="tipo_titular"]');
+    var $blocoTexto = $('#grid-create-campo-texto');
+    var $blocoUsuario = $('#grid-create-campo-usuario');
+    var csrfToken = '{{ csrf_token }}';
+    var createUrl = '{% url "chips:grid_create" %}';
+
+    function mostrarErro(msg) {
+        $erro.text(msg).removeClass('hidden');
+    }
+
+    function limparErro() {
+        $erro.addClass('hidden').text('');
+    }
+
+    function toggleTitular() {
+        if ($('input[name="tipo_titular"]:checked').val() === 'texto') {
+            $blocoTexto.show();
+            $blocoUsuario.hide();
+        } else {
+            $blocoTexto.hide();
+            $blocoUsuario.show();
+        }
+    }
+
+    $tipoTitular.on('change', toggleTitular);
+    toggleTitular();
+
+    function errosParaTexto(data) {
+        if (data.error) return data.error;
+        if (data.errors) {
+            var partes = [];
+            Object.keys(data.errors).forEach(function(campo) {
+                var msgs = data.errors[campo];
+                partes.push((Array.isArray(msgs) ? msgs.join(' ') : msgs));
+            });
+            return partes.join(' ');
+        }
+        return 'Não foi possível cadastrar a linha.';
+    }
+
+    $form.on('submit', function(e) {
+        e.preventDefault();
+        limparErro();
+
+        var payload = {
+            line_number: ($('#id_line_number').val() || '').trim(),
+            operator: $('#id_operator').val(),
+            tipo_titular: $('input[name="tipo_titular"]:checked').val(),
+            employee_name: ($('#id_employee_name').val() || '').trim(),
+            activated_at: ($('#id_activated_at').val() || '').trim() || null,
+        };
+
+        var userId = $('#id_employee_user').val();
+        if (userId) payload.employee_user = parseInt(userId, 10);
+
+        var batchId = $('#id_batch').val();
+        if (batchId) payload.batch = parseInt(batchId, 10);
+
+        var $btn = $('#grid-create-submit');
+        $btn.prop('disabled', true);
+
+        fetch(createUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify(payload),
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+            if (!res.ok) {
+                mostrarErro(errosParaTexto(res.data));
+                return;
+            }
+            document.getElementById('modal-container').innerHTML = '';
+            window.location.reload();
+        })
+        .catch(function() {
+            mostrarErro('Erro de comunicação com o servidor.');
+        })
+        .finally(function() {
+            $btn.prop('disabled', false);
+        });
+    });
+})();
+</script>
+{% endif %}

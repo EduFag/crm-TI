@@ -1,0 +1,49 @@
+<nav class="flex-1 overflow-y-auto overflow-x-hidden py-6 px-4 sidebar-nav-scroll space-y-6">
+
+    {# Geral / Início #}
+    <div>
+        <p class="sidebar-category-header px-3 text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Geral</p>
+        <a href="{% url 'dashboard' %}" title="Início"
+            class="sidebar-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
+            {% if menu_inicio_ativo %}sidebar-nav-link-active text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <div class="sidebar-nav-icon shrink-0 {% if menu_inicio_ativo %}text-blue-600{% else %}text-slate-400{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                    </path>
+                </svg>
+            </div>
+            <span class="sidebar-link-label truncate">Início</span>
+        </a>
+    </div>
+
+    {# Suporte #}
+    {% if 'helpdesk' in modulos_permitidos %}
+    <div>
+        <p class="sidebar-category-header px-3 text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Suporte</p>
+        <div class="space-y-1">
+            {% include "core/_sidebar_items_suporte.html" %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Gestão de TI #}
+    {% if 'chips' in modulos_permitidos or 'emails' in modulos_permitidos or 'equipment' in modulos_permitidos or 'discador' in modulos_permitidos %}
+    <div>
+        <p class="sidebar-category-header px-3 text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Gestão de TI</p>
+        <div class="space-y-1">
+            {% include "core/_sidebar_items_gestao.html" %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Administração #}
+    {% if 'gestao_usuarios' in modulos_permitidos %}
+    <div>
+        <p class="sidebar-category-header px-3 text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Administração</p>
+        <div class="space-y-1">
+            {% include "core/_sidebar_items_administracao.html" %}
+        </div>
+    </div>
+    {% endif %}
+</nav>

@@ -1,16 +1,26 @@
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from core.audit import logs_do_modulo
+from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, resposta_sem_permissao
 from django.db.models import Count
 from helpdesk.models import Ticket
+from helpdesk.ticket_access import filtrar_chamados_para_usuario, usuario_pode_acessar_dashboard_e_historico
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/dashboard.html'
+    modulo_obrigatorio = MODULO_HELPDESK
+    
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_pode_acessar_dashboard_e_historico(request.user):
+            return resposta_sem_permissao(request)
+        return super().dispatch(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Analisando TODOS os tickets (arquivados e ativos)
-        tickets = Ticket.objects.filter(is_active=True)
+        tickets = filtrar_chamados_para_usuario(
+            Ticket.objects.filter(is_active=True),
+            self.request.user,
+        )
         
         context['total_tickets'] = tickets.count()
         context['total_archived'] = tickets.filter(is_archived=True).count()
@@ -25,6 +35,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Mapeamento limpo para os templates
         context['status_labels'] = dict(Ticket.StatusChoices.choices)
         context['priority_labels'] = dict(Ticket.PriorityChoices.choices)
+        context['audit_logs'] = logs_do_modulo(MODULO_HELPDESK, limite=50)
+        context['audit_titulo'] = 'Últimas ações do Helpdesk'
         
         return context
 
