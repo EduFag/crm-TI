@@ -95,7 +95,11 @@ class ChipTransferView(_JsonChipsMixin, View):
     """POST /chips/api/grid/<pk>/transfer/ — transferência de posse."""
 
     def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)
+        chip = get_object_or_404(
+            Chip, 
+            pk=pk, 
+            status__in=[Chip.StatusChoices.IN_USE, Chip.StatusChoices.AVAILABLE]
+        )
         form = TransferForm(request.POST)
         if not form.is_valid():
             return JsonResponse({'errors': form.errors}, status=400)
