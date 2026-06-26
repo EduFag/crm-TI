@@ -112,6 +112,12 @@
     <p class="mb-4 text-xs text-slate-500">Para exportar, preencha as datas <strong>Criado de</strong> e <strong>Criado até</strong> nos filtros acima.</p>
     {% endif %}
 
+    {% if total_resultados %}
+    <p class="mb-3 text-xs text-slate-500">
+        Exibindo {{ tickets|length }} de {{ total_resultados }} chamado{{ total_resultados|pluralize }} ({{ total_arquivados_visiveis }} arquivado{{ total_arquivados_visiveis|pluralize }})
+    </p>
+    {% endif %}
+
     <!-- Tabela de Histórico -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto flex-1">
         <table class="w-full text-left text-sm whitespace-nowrap">
@@ -163,6 +169,20 @@
             </tbody>
         </table>
     </div>
+
+    {% if is_paginated %}
+    <div class="flex items-center justify-between mt-6 text-sm text-slate-600">
+        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if filtros_query %}&{{ filtros_query }}{% endif %}" class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if filtros_query %}&{{ filtros_query }}{% endif %}" class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">Próxima</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
     
     <!-- Drawer container para a tabela também -->
     <div id="drawer-container"></div>

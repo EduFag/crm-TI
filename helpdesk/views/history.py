@@ -148,6 +148,15 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         context['status_choices'] = Ticket.StatusChoices
         context['priority_choices'] = Ticket.PriorityChoices
         context['categorias'] = TicketCategory.objects.filter(is_active=True).order_by('name')
+
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        context['filtros_query'] = params.urlencode()
+
+        qs_filtrado = self.get_queryset()
+        context['total_resultados'] = qs_filtrado.count()
+        context['total_arquivados_visiveis'] = qs_filtrado.filter(is_archived=True).count()
+
         return context
 
 

@@ -378,3 +378,115 @@ class HistoryExportCsvTestCase(TestCase):
         conteudo = response.content.decode('utf-8-sig')
         self.assertIn('VPN lenta', conteudo)
         self.assertNotIn('Impressora quebrada', conteudo)
+
+
+class HistoricoFiltroArquivadoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+        self.it_user = CustomUser.objects.create_user(
+            username="ti_historico",
+            password="x",
+            role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.ticket_ativo = Ticket.objects.create(
+            title="Chamado ativo",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.NEW,
+            is_archived=False,
+        )
+        self.ticket_arquivado = Ticket.objects.create(
+            title="Chamado arquivado",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.RESOLVED,
+            is_archived=True,
+            resolved_at=timezone.now() - timedelta(hours=48),
+        )
+        Ticket.objects.filter(pk=self.ticket_arquivado.pk).update(
+            created_at=timezone.now() - timedelta(days=30),
+        )
+
+    def _aplicar_filtro(self, archived=None):
+        from django.test import RequestFactory
+        from helpdesk.views.history import aplicar_filtros_historico, queryset_historico_base
+
+        rf = RequestFactory()
+        query = {}
+        if archived is not None:
+            query['archived'] = archived
+        request = rf.get('/helpdesk/history/', query)
+        qs = queryset_historico_base(self.it_user)
+        return aplicar_filtros_historico(qs, request)
+
+    def test_filtro_sim_so_arquivados(self):
+        qs = self._aplicar_filtro('yes')
+        self.assertEqual(qs.count(), 1)
+        self.assertTrue(qs.filter(pk=self.ticket_arquivado.pk).exists())
+        self.assertFalse(qs.filter(pk=self.ticket_ativo.pk).exists())
+
+    def test_filtro_nao_so_nao_arquivados(self):
+        qs = self._aplicar_filtro('no')
+        self.assertEqual(qs.count(), 1)
+        self.assertTrue(qs.filter(pk=self.ticket_ativo.pk).exists())
+        self.assertFalse(qs.filter(pk=self.ticket_arquivado.pk).exists())
+
+    def test_filtro_ambos_inclui_os_dois(self):
+        qs = self._aplicar_filtro('')
+        self.assertEqual(qs.count(), 2)
+        self.assertTrue(qs.filter(pk=self.ticket_ativo.pk).exists())
+        self.assertTrue(qs.filter(pk=self.ticket_arquivado.pk).exists())
+
+    def test_filtro_ambos_sem_parametro(self):
+        from django.test import RequestFactory
+        from helpdesk.views.history import aplicar_filtros_historico, queryset_historico_base
+
+        rf = RequestFactory()
+        request = rf.get('/helpdesk/history/')
+        qs = aplicar_filtros_historico(queryset_historico_base(self.it_user), request)
+        self.assertEqual(qs.count(), 2)
+
+    def test_ambos_paginacao_exibe_arquivados_em_pagina_seguinte(self):
+        from django.urls import reverse
+
+        agora = timezone.now()
+        for i in range(22):
+            ticket = Ticket.objects.create(
+                title=f"Recente {i}",
+                description="Desc",
+                category=self.categoria,
+                requester_name="Teste",
+                status=Ticket.StatusChoices.NEW,
+                is_archived=False,
+            )
+            Ticket.objects.filter(pk=ticket.pk).update(
+                created_at=agora - timedelta(hours=i),
+            )
+        for i in range(8):
+            ticket = Ticket.objects.create(
+                title=f"Arquivado antigo {i}",
+                description="Desc",
+                category=self.categoria,
+                requester_name="Teste",
+                status=Ticket.StatusChoices.RESOLVED,
+                is_archived=True,
+                resolved_at=agora - timedelta(days=10),
+            )
+            Ticket.objects.filter(pk=ticket.pk).update(
+                created_at=agora - timedelta(days=30, hours=i),
+            )
+
+        self.client.force_login(self.it_user)
+        url = reverse('helpdesk:history')
+
+        response_p1 = self.client.get(url)
+        self.assertEqual(response_p1.status_code, 200)
+        self.assertContains(response_p1, 'Página 1 de')
+        self.assertNotContains(response_p1, 'Arquivado antigo 0')
+
+        response_p2 = self.client.get(f'{url}?page=2')
+        self.assertEqual(response_p2.status_code, 200)
+        self.assertContains(response_p2, 'Arquivado antigo')
+        self.assertContains(response_p2, 'Arq')
