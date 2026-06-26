@@ -13,6 +13,7 @@
     }
 
     let estadoPermissao = 'prompt'; // granted | prompt | denied
+    let registradoNoServidor = false;
     let observadorPermissao = null;
 
     function getCsrfToken() {
@@ -35,6 +36,29 @@
 
     function urlSubscribe() {
         return urlBaseHelpdesk() + 'push/subscribe/';
+    }
+
+    function urlStatus() {
+        return urlBaseHelpdesk() + 'push/status/';
+    }
+
+    function permissoesConcedidas() {
+        return estadoPermissao === 'granted' || Notification.permission === 'granted';
+    }
+
+    async function verificarRegistroServidor() {
+        try {
+            const response = await fetch(urlStatus(), { credentials: 'same-origin' });
+            if (!response.ok) {
+                return false;
+            }
+            const data = await response.json();
+            registradoNoServidor = Boolean(data.registered);
+            return registradoNoServidor;
+        } catch (err) {
+            console.error('[helpdesk push] Falha ao verificar status:', err);
+            return false;
+        }
     }
 
     function urlBase64ToUint8Array(base64String) {
@@ -141,17 +165,28 @@
 
         toggle.classList.remove('hidden');
 
-        const ativo = estadoPermissao === 'granted';
-        label.textContent = ativo ? 'Notificações ativas' : 'Notificações';
+        const permissaoOk = permissoesConcedidas();
+        const ativo = permissaoOk && registradoNoServidor;
+        const pendente = permissaoOk && !registradoNoServidor;
+
+        if (ativo) {
+            label.textContent = 'Notificações ativas';
+        } else if (pendente) {
+            label.textContent = 'Sincronizar notificações';
+        } else {
+            label.textContent = 'Notificações';
+        }
+
         label.classList.toggle('text-green-700', ativo);
-        label.classList.toggle('text-slate-600', !ativo);
+        label.classList.toggle('text-amber-700', pendente);
+        label.classList.toggle('text-slate-600', !ativo && !pendente);
 
         track.classList.toggle('bg-green-500', ativo);
-        track.classList.toggle('bg-slate-300', !ativo);
-        track.classList.toggle('bg-amber-400', !ativo && estadoPermissao === 'denied');
+        track.classList.toggle('bg-amber-400', pendente || (!ativo && !pendente && estadoPermissao === 'denied'));
+        track.classList.toggle('bg-slate-300', !ativo && !pendente && estadoPermissao !== 'denied');
 
-        knob.classList.toggle('translate-x-6', ativo);
-        knob.classList.toggle('translate-x-1', !ativo);
+        knob.classList.toggle('translate-x-6', ativo || pendente);
+        knob.classList.toggle('translate-x-1', !ativo && !pendente);
     }
 
     function renderizarBanner() {
@@ -169,8 +204,25 @@
             return;
         }
 
-        if (estadoPermissao === 'granted') {
+        if (estadoPermissao === 'granted' && registradoNoServidor) {
             esconderBanner();
+            atualizarToggleNav();
+            return;
+        }
+
+        if (estadoPermissao === 'granted' && !registradoNoServidor) {
+            banner.classList.remove('hidden');
+            banner.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-950');
+            banner.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-900');
+            texto.textContent = 'Permissão concedida no navegador — falta sincronizar com o servidor';
+            ajuda.textContent = 'Clique em Sincronizar ou ligue o toggle Notificações no canto superior direito.';
+            ajuda.classList.remove('hidden');
+            acoes.innerHTML = '';
+            acoes.appendChild(criarBotao(
+                'Sincronizar',
+                'px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors',
+                concluirAtivacao
+            ));
             atualizarToggleNav();
             return;
         }
@@ -271,7 +323,8 @@
             return;
         }
 
-        if (estadoPermissao === 'granted') {
+        if (permissoesConcedidas()) {
+            concluirAtivacao();
             return;
         }
 
@@ -309,7 +362,18 @@
                     applicationServerKey: urlBase64ToUint8Array(publicKey),
                 });
             } catch (err) {
-                throw new Error('Falha ao inscrever no Push: ' + err.message);
+                const antiga = await registration.pushManager.getSubscription();
+                if (antiga) {
+                    await antiga.unsubscribe();
+                }
+                try {
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicKey),
+                    });
+                } catch (err2) {
+                    throw new Error('Falha ao inscrever no Push: ' + err2.message);
+                }
             }
         }
 
@@ -327,18 +391,37 @@
             const detalhe = await response.text();
             throw new Error('Servidor recusou subscription (' + response.status + '): ' + detalhe);
         }
+
+        const data = await response.json();
+        registradoNoServidor = Boolean(data.success);
         return subscription;
     }
 
     async function concluirAtivacao() {
         try {
             await registrarSubscription();
+            await verificarRegistroServidor();
             esconderBanner();
             atualizarToggleNav();
         } catch (err) {
-            console.error('Erro ao ativar push:', err);
+            registradoNoServidor = false;
+            atualizarToggleNav();
+            console.error('[helpdesk push] Erro ao ativar:', err);
             alert(err.message || 'Não foi possível ativar as notificações.');
         }
+    }
+
+    async function tentarRegistrarSePermitido() {
+        if (!permissoesConcedidas() || !suportaPush()) {
+            return;
+        }
+        await verificarRegistroServidor();
+        if (registradoNoServidor) {
+            atualizarToggleNav();
+            renderizarBanner();
+            return;
+        }
+        await concluirAtivacao();
     }
 
     function dispensarBanner() {
@@ -386,25 +469,18 @@
         }
 
         await sincronizarEstadoPermissao();
+        await verificarRegistroServidor();
         renderizarBanner();
         abrirChamadoDaUrl();
-
-        if (estadoPermissao === 'granted' && suportaPush()) {
-            registrarSubscription().catch(function(err) {
-                console.error('[helpdesk push] Falha ao registrar subscription:', err);
-            });
-        }
+        tentarRegistrarSePermitido();
     });
 
     document.addEventListener('visibilitychange', async function() {
         if (document.visibilityState === 'visible') {
             await sincronizarEstadoPermissao();
+            await verificarRegistroServidor();
             renderizarBanner();
-            if (estadoPermissao === 'granted' && suportaPush()) {
-                registrarSubscription().catch(function(err) {
-                    console.error('[helpdesk push] Falha ao registrar subscription:', err);
-                });
-            }
+            tentarRegistrarSePermitido();
         }
     });
 })();

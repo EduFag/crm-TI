@@ -24,6 +24,7 @@ urlpatterns = [
     # Real-Time e Partials via HTMX
     path('poll/', views.poll_ticket_updates, name='poll'),
     path('push/vapid-public-key/', views.push_vapid_public_key, name='push_vapid_public_key'),
+    path('push/status/', views.push_status, name='push_status'),
     path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
     path('sw.js', views.service_worker_js, name='service_worker'),

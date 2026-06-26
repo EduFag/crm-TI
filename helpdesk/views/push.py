@@ -30,6 +30,18 @@ def service_worker_js(request):
 
 @requer_modulo(MODULO_HELPDESK)
 @require_GET
+def push_status(request):
+    """Indica se o usuário já tem subscription ativa no servidor."""
+    total = PushSubscription.objects.filter(user=request.user, is_active=True).count()
+    return JsonResponse({
+        'configured': bool(settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY),
+        'subscriptions': total,
+        'registered': total > 0,
+    })
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_GET
 def push_vapid_public_key(request):
     """Retorna a chave pública VAPID para inscrição no browser."""
     chave = settings.VAPID_PUBLIC_KEY
