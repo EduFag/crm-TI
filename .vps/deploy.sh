@@ -27,6 +27,23 @@ sudo_deploy() {
     return 1
 }
 
+# Verifica se o Gunicorn está no ar (systemd ou porta local — fallback para CI SSH).
+servico_responde() {
+    local estado
+    estado="$(sudo -n /usr/bin/systemctl is-active "${SERVICE}" 2>/dev/null || true)"
+    estado="${estado//$'\r'/}"
+    if [[ "${estado}" == "active" ]]; then
+        return 0
+    fi
+    if ss -tln 2>/dev/null | grep -q ":${GUNICORN_PORT} "; then
+        return 0
+    fi
+    if curl -sf --max-time 3 "http://127.0.0.1:${GUNICORN_PORT}/login/" >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 cd "${APP_DIR}"
 
 log "Deploy como usuário: $(whoami)"
@@ -92,18 +109,18 @@ else
 fi
 
 # Aguarda até 45s — unit usa graceful-timeout 30s + TimeoutStopSec 35s
-# Nota: sudoers deve permitir exatamente "systemctl is-active crm-ti" (sem --quiet).
 log "Aguardando ${SERVICE} ficar ativo..."
 for tentativa in $(seq 1 15); do
-    estado="$(sudo -n systemctl is-active "${SERVICE}" 2>/dev/null || true)"
-    if [[ "${estado}" == "active" ]]; then
+    if servico_responde; then
         log "Deploy finalizado com sucesso."
         exit 0
     fi
     sleep 3
 done
 
-log "ERRO: serviço ${SERVICE} não ficou ativo após 45s."
+log "ERRO: serviço ${SERVICE} não respondeu após 45s."
+estado="$(sudo -n /usr/bin/systemctl is-active "${SERVICE}" 2>/dev/null || echo 'sem-permissao-sudo')"
+log "Último estado systemd: ${estado}"
 sudo -n systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
 log "--- Últimas linhas do journal (${SERVICE}) ---"
 sudo -n journalctl -u "${SERVICE}" -n 50 --no-pager 2>/dev/null || true
