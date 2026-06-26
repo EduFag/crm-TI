@@ -48,6 +48,51 @@
         }
     }
 
+    function mostrarBannerElemento() {
+        const banner = document.getElementById('helpdesk-push-banner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function atualizarNavPush() {
+        const btn = document.getElementById('helpdesk-push-nav-btn');
+        const label = document.getElementById('helpdesk-push-nav-label');
+        if (!btn || !label) {
+            return;
+        }
+
+        if (!suportaPush()) {
+            btn.classList.add('hidden');
+            return;
+        }
+
+        btn.classList.remove('hidden');
+
+        const permissao = Notification.permission;
+        if (permissao === 'granted') {
+            label.textContent = 'Notificações ativas';
+            btn.classList.remove('text-slate-500', 'hover:text-blue-600', 'text-amber-600', 'hover:text-amber-700');
+            btn.classList.add('text-green-600', 'cursor-default');
+            btn.disabled = true;
+            return;
+        }
+
+        btn.disabled = false;
+        btn.classList.remove('text-green-600', 'cursor-default');
+        if (permissao === 'denied') {
+            label.textContent = 'Reativar notificações';
+            btn.classList.remove('text-slate-500', 'hover:text-blue-600');
+            btn.classList.add('text-amber-600', 'hover:text-amber-700');
+            return;
+        }
+
+        label.textContent = 'Ativar notificações';
+        btn.classList.remove('text-amber-600', 'hover:text-amber-700', 'text-green-600');
+        btn.classList.add('text-slate-500', 'hover:text-blue-600');
+    }
+
     function textoAjudaNegado() {
         return (
             'No Chrome: clique no cadeado à esquerda do endereço → ' +
@@ -77,6 +122,7 @@
 
         if (!suportaPush()) {
             esconderBanner();
+            atualizarNavPush();
             return;
         }
 
@@ -84,6 +130,7 @@
 
         if (permissao === 'granted') {
             esconderBanner();
+            atualizarNavPush();
             return;
         }
 
@@ -101,12 +148,14 @@
                 'px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors',
                 verificarPermissao
             ));
+            atualizarNavPush();
             return;
         }
 
-        // permission === 'default'
+        // permission === 'default' — banner opcional; o botão da nav sempre dispara o prompt nativo
         if (localStorage.getItem(STORAGE_KEY) === 'dismissed') {
             esconderBanner();
+            atualizarNavPush();
             return;
         }
 
@@ -124,6 +173,30 @@
             'px-4 py-2 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors',
             dispensarBanner
         ));
+        atualizarNavPush();
+    }
+
+    function clicarNavPush() {
+        if (!suportaPush()) {
+            alert('Seu navegador não suporta notificações push.');
+            return;
+        }
+
+        const permissao = Notification.permission;
+
+        if (permissao === 'denied') {
+            localStorage.removeItem(STORAGE_KEY);
+            renderizarBanner();
+            mostrarBannerElemento();
+            return;
+        }
+
+        if (permissao === 'granted') {
+            return;
+        }
+
+        // default — gesto do usuário: abre o prompt nativo do navegador (MDN)
+        ativarNotificacoes();
     }
 
     async function buscarChavePublica() {
@@ -191,6 +264,7 @@
         try {
             await registrarSubscription();
             esconderBanner();
+            atualizarNavPush();
         } catch (err) {
             console.error('Erro ao ativar push:', err);
             alert('Não foi possível ativar as notificações. Verifique se o servidor está configurado com chaves VAPID.');
@@ -206,6 +280,7 @@
                 console.error('Erro ao registrar push:', err);
             }
             esconderBanner();
+            atualizarNavPush();
             return;
         }
         renderizarBanner();
@@ -215,6 +290,7 @@
     function dispensarBanner() {
         localStorage.setItem(STORAGE_KEY, 'dismissed');
         esconderBanner();
+        atualizarNavPush();
     }
 
     function abrirChamadoDaUrl() {
@@ -251,6 +327,11 @@
     };
 
     document.addEventListener('DOMContentLoaded', function() {
+        const navBtn = document.getElementById('helpdesk-push-nav-btn');
+        if (navBtn) {
+            navBtn.addEventListener('click', clicarNavPush);
+        }
+
         renderizarBanner();
         abrirChamadoDaUrl();
 
