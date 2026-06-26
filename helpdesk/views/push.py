@@ -11,7 +11,7 @@ from core.permissions import MODULO_HELPDESK, requer_modulo
 from helpdesk.models import PushSubscription
 
 
-@cache_control(max_age=3600)
+@cache_control(max_age=0, no_cache=True, must_revalidate=True)
 @require_http_methods(['GET', 'HEAD'])
 def service_worker_js(request):
     """Serve o SW em /helpdesk/sw.js para escopo correto do Push."""

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 
 from django.conf import settings
 
@@ -108,7 +109,8 @@ def notificar_evento_chamado(ticket: Ticket, actor, tipo: str, mensagem: str) ->
     titulo = f'{titulo_base}: #{ticket.pk}'
     corpo = f'{ticket.title}\n{mensagem}' if mensagem else ticket.title
     url = _url_chamado(ticket.pk)
-    tag = f'helpdesk-ticket-{ticket.pk}'
+    # Tag única por evento — mesma tag faz Chrome/Windows substituir sem novo toast
+    tag = f'helpdesk-{ticket.pk}-{tipo}-{int(time.time() * 1000)}'
 
     for usuario in destinatarios_notificacao(ticket, actor):
         enviar_push_usuario(usuario, titulo, corpo, url, tag)

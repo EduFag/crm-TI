@@ -44,7 +44,9 @@
 
             const titulo = tituloNotificacao(detail);
             const corpo = detail.descricao || 'Há uma atualização no helpdesk.';
-            const tag = detail.ticket_id ? 'helpdesk-ticket-' + detail.ticket_id : 'helpdesk-update';
+            const tag = detail.ticket_id
+                ? 'helpdesk-' + detail.ticket_id + '-' + (detail.acao || 'update') + '-' + Date.now()
+                : 'helpdesk-update-' + Date.now();
             const url = urlNotificacao(detail);
 
             const notification = new Notification(titulo, {

@@ -1,6 +1,6 @@
 /* Service Worker — notificações Web Push do helpdesk */
 
-const CACHE_VERSION = 'helpdesk-push-v1';
+const CACHE_VERSION = 'helpdesk-push-v2';
 const ICON_URL = '/static/helpdesk/images/favicon.ico';
 
 self.addEventListener('push', function(event) {
@@ -20,7 +20,8 @@ self.addEventListener('push', function(event) {
         body: payload.body || '',
         icon: payload.icon || ICON_URL,
         badge: ICON_URL,
-        tag: payload.tag || 'helpdesk-notification',
+        tag: payload.tag || ('helpdesk-' + Date.now()),
+        renotify: true,
         data: { url: payload.url || '/helpdesk/' },
         requireInteraction: false,
     };
