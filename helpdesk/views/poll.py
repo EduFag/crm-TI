@@ -15,6 +15,7 @@ def poll_ticket_updates(request):
     Requisição curta — não mantém socket aberto nem bloqueia worker do Gunicorn.
     """
     agora = timezone.now()
+    Ticket.archive_old_tickets()
     since_raw = request.session.get(_CHAVE_SESSAO_POLL)
 
     tem_mudanca = False

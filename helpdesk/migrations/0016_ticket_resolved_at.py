@@ -15,14 +15,14 @@ def preencher_resolved_at(apps, schema_editor):
         comentario = (
             Comment.objects.filter(ticket_id=ticket.pk)
             .filter(text__startswith='Chamado finalizado')
-            .order_by('created_at')
+            .order_by('-created_at')
             .first()
         )
         if not comentario:
             comentario = (
                 Comment.objects.filter(ticket_id=ticket.pk)
                 .filter(text__startswith='Chamado recusado')
-                .order_by('created_at')
+                .order_by('-created_at')
                 .first()
             )
 
@@ -36,7 +36,7 @@ def preencher_resolved_at(apps, schema_editor):
                     acao='STATUS_CHANGED',
                     descricao__contains='para Resolvido',
                 )
-                .order_by('timestamp')
+                .order_by('-timestamp')
                 .first()
             )
             data_resolucao = log.timestamp if log else (ticket.updated_at or ticket.created_at)

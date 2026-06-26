@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import Q, OuterRef, Subquery, DateTimeField, Case, When
+from django.db.models.functions import Coalesce, Least
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -173,18 +175,46 @@ class Ticket(models.Model):
         if hours_rejected is None:
             hours_rejected = cls.HORAS_ARQUIVAR_RECUSADO
 
-        from django.db.models import Q
         now = timezone.now()
         resolved_cutoff = now - timedelta(hours=hours_resolved)
 
-        # Usa resolved_at (fixo na finalização), não updated_at (muda com comentários/visualizações)
-        cls.objects.filter(
-            status=cls.StatusChoices.RESOLVED,
-            is_archived=False,
+        # Data do último comentário de finalização/recusa (mais confiável que updated_at)
+        finalize_subquery = Comment.objects.filter(
+            ticket_id=OuterRef('pk'),
+            is_active=True,
         ).filter(
-            Q(resolved_at__lt=resolved_cutoff, resolved_at__isnull=False)
-            | Q(resolved_at__isnull=True, updated_at__lt=resolved_cutoff),
-        ).update(is_archived=True)
+            Q(text__startswith='Chamado finalizado') | Q(text__startswith='Chamado recusado')
+        ).order_by('-created_at').values('created_at')[:1]
+
+        elegiveis = (
+            cls.objects.filter(status=cls.StatusChoices.RESOLVED, is_archived=False)
+            .annotate(
+                data_comentario_final=Subquery(finalize_subquery, output_field=DateTimeField()),
+            )
+            .annotate(
+                referencia=Case(
+                    When(
+                        resolved_at__isnull=False,
+                        data_comentario_final__isnull=False,
+                        then=Least('resolved_at', 'data_comentario_final'),
+                    ),
+                    default=Coalesce('resolved_at', 'data_comentario_final', 'updated_at'),
+                    output_field=DateTimeField(),
+                ),
+            )
+            .filter(referencia__lt=resolved_cutoff)
+        )
+
+        pks_arquivar = []
+        for ticket in elegiveis.iterator():
+            pks_arquivar.append(ticket.pk)
+            if not ticket.data_comentario_final:
+                continue
+            if ticket.resolved_at is None or ticket.resolved_at > ticket.data_comentario_final:
+                cls.objects.filter(pk=ticket.pk).update(resolved_at=ticket.data_comentario_final)
+
+        if pks_arquivar:
+            cls.objects.filter(pk__in=pks_arquivar).update(is_archived=True)
 
     def save(self, *args, **kwargs):
         if self.pk:

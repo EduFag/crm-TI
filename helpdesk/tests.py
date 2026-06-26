@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from core.models import CustomUser, Equipe
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
-from helpdesk.models import Ticket, TicketCategory
+from helpdesk.models import Ticket, TicketCategory, Comment
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_pode_acessar_chamado,
@@ -260,6 +260,33 @@ class ArquivamentoAutomaticoTestCase(TestCase):
         Ticket.archive_old_tickets()
         ticket.refresh_from_db()
         self.assertFalse(ticket.is_archived)
+
+    def test_arquiva_mesmo_com_resolved_at_recente_se_comentario_antigo(self):
+        """resolved_at errado (updated_at recente) não deve impedir arquivamento."""
+        ticket = Ticket.objects.create(
+            title="Finalizado há dias",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.RESOLVED,
+            resolved_at=timezone.now(),
+        )
+        Comment.objects.create(
+            ticket=ticket,
+            text='Chamado finalizado.\nObservação: ok',
+        )
+        Comment.objects.filter(ticket=ticket).update(
+            created_at=timezone.now() - timedelta(hours=30),
+        )
+        # Simula resolved_at preenchido errado pelo backfill antigo
+        Ticket.objects.filter(pk=ticket.pk).update(
+            resolved_at=timezone.now(),
+        )
+
+        Ticket.archive_old_tickets()
+        ticket.refresh_from_db()
+        self.assertTrue(ticket.is_archived)
+        self.assertLess(ticket.resolved_at, timezone.now() - timedelta(hours=24))
 
     def test_save_define_resolved_at_ao_finalizar(self):
         ticket = Ticket.objects.create(
