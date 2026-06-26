@@ -158,6 +158,11 @@ def usuario_pode_comentar_chamado(user, ticket) -> bool:
     """Regras de comentário por papel."""
     if not usuario_pode_acessar_chamado(user, ticket):
         return False
+    if (
+        ticket.status == ticket.StatusChoices.RESOLVED
+        and not usuario_eh_operador_helpdesk(user)
+    ):
+        return False
     if usuario_eh_operador_helpdesk(user):
         return True
     role = _role(user)
@@ -166,6 +171,19 @@ def usuario_pode_comentar_chamado(user, ticket) -> bool:
     if role in (CustomUser.RoleChoices.TEAM_LEADER, CustomUser.RoleChoices.MULTIPLIER):
         return usuario_eh_autor_ou_coautor(user, ticket)
     return True
+
+
+def usuario_pode_contestar_chamado(user, ticket) -> bool:
+    """Solicitante vinculado pode contestar chamado finalizado (não arquivado)."""
+    if not usuario_pode_acessar_chamado(user, ticket):
+        return False
+    if usuario_eh_operador_helpdesk(user):
+        return False
+    if not ticket.is_active or ticket.is_archived:
+        return False
+    if ticket.status != ticket.StatusChoices.RESOLVED:
+        return False
+    return usuario_eh_autor_ou_coautor(user, ticket)
 
 
 def usuario_pode_editar_chamado(user, ticket=None) -> bool:

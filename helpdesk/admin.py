@@ -5,6 +5,7 @@ from helpdesk.models import (
     Ticket,
     TicketAttachment,
     TicketCategory,
+    TicketContestation,
     TicketSpecificCategory,
 )
 
@@ -47,7 +48,7 @@ class TicketAdmin(admin.ModelAdmin):
     list_filter = ('status', 'priority', 'category', 'is_archived', 'is_active', 'is_rejected')
     search_fields = ('title', 'requester_name', 'description')
     readonly_fields = ('created_at', 'updated_at')
-    autocomplete_fields = ('category', 'specific_category', 'equipe', 'requester_user', 'created_by', 'assigned_to')
+    autocomplete_fields = ('category', 'specific_category', 'equipe', 'requester_user', 'created_by', 'assigned_to', 'resolved_by')
     inlines = (CommentInline, TicketAttachmentInline)
     date_hierarchy = 'created_at'
 
@@ -67,3 +68,12 @@ class TicketAttachmentAdmin(admin.ModelAdmin):
     search_fields = ('file_name', 'ticket__title')
     readonly_fields = ('created_at',)
     autocomplete_fields = ('ticket',)
+
+
+@admin.register(TicketContestation)
+class TicketContestationAdmin(admin.ModelAdmin):
+    list_display = ('ticket', 'contested_by', 'finalized_by', 'was_rejected', 'created_at')
+    list_filter = ('was_rejected',)
+    search_fields = ('reason', 'ticket__title')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('ticket', 'contested_by', 'finalized_by')

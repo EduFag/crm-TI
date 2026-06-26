@@ -1,3 +1,4 @@
+{% load helpdesk_permissions %}
 <div id="ticket-{{ ticket.id }}"
      {% if pode_operar_kanban %}draggable="true" ondragstart="drag(event)" ondragend="dragEnd(event)"{% endif %}
      class="relative bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group"
@@ -62,9 +63,26 @@
             {% endif %}
         </div>
         
-        <button class="text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
-        </button>
+        {% pode_contestar_chamado ticket as pode_contestar %}
+        {% if pode_contestar %}
+        <div class="relative shrink-0" onclick="event.stopPropagation()">
+            <button type="button"
+                    onclick="toggleContestMenu('{{ ticket.id }}', event)"
+                    class="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
+                    title="Opções do chamado"
+                    aria-label="Opções do chamado">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+            </button>
+            <div id="contest-menu-{{ ticket.id }}"
+                 class="hidden absolute right-0 top-full mt-1 z-20 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+                <button type="button"
+                        onclick="openContestModal('{{ ticket.id }}', event)"
+                        class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                    Contestar resolução
+                </button>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Título -->

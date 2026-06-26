@@ -167,6 +167,12 @@
         </div>
         {% endif %}
 
+        {% if total_contestacoes %}
+        <div class="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            Este chamado já foi finalizado {{ total_contestacoes }} vez{{ total_contestacoes|pluralize:"es" }} e contestado.
+        </div>
+        {% endif %}
+
         <!-- Seção de Comentários -->
         <div class="flex-1 flex flex-col">
             <h4 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -260,7 +266,13 @@
         })();
         </script>
         {% else %}
+        {% if ticket.status == 'RESOLVED' and pode_contestar %}
+        <p class="text-sm text-slate-500 text-center py-2">Chamado finalizado — comentários disponíveis apenas para a TI. Para contestar, use o menu ⋮ no card.</p>
+        {% elif ticket.status == 'RESOLVED' %}
+        <p class="text-sm text-slate-500 text-center py-2">Chamado finalizado — comentários disponíveis apenas para a TI.</p>
+        {% else %}
         <p class="text-sm text-slate-500 text-center py-2">Você pode visualizar este chamado, mas não comentar nele.</p>
+        {% endif %}
         {% endif %}
     </div>
 </div>

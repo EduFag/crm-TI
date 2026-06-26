@@ -33,6 +33,7 @@ urlpatterns = [
     # Ações assíncronas via Fetch/HTMX
     path('ticket/<int:pk>/update-status/', views.ticket_update_status, name='ticket_update_status'),
     path('ticket/<int:pk>/finalize/', views.ticket_finalize, name='ticket_finalize'),
+    path('ticket/<int:pk>/contest/', views.ticket_contest, name='ticket_contest'),
     path('ticket/<int:pk>/drawer/', views.ticket_drawer, name='ticket_drawer'),
     path('ticket/<int:pk>/edit/', views.ticket_edit, name='ticket_edit'),
     path('ticket/<int:pk>/delete/', views.ticket_delete, name='ticket_delete'),

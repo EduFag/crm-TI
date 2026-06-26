@@ -98,3 +98,17 @@ def log_chamado_recusado(ticket, actor, motivo):
         actor=actor,
         obj=ticket,
     )
+
+
+def log_contestacao(ticket, actor, motivo, finalized_by_nome):
+    return registrar_acao(
+        modulo=MODULO_HELPDESK,
+        acao=RegistroAcao.AcaoChoices.STATUS_CHANGED,
+        descricao=(
+            f'Chamado "{ticket.title}" contestado por {actor.get_full_name() or actor.username}. '
+            f'Havia sido finalizado por {finalized_by_nome}. Motivo: {motivo[:120]}'
+        ),
+        actor=actor,
+        obj=ticket,
+        metadata={'motivo': motivo, 'finalized_by': finalized_by_nome},
+    )

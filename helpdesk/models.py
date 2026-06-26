@@ -149,6 +149,14 @@ class Ticket(models.Model):
         blank=True,
         help_text='Momento em que o chamado foi finalizado/resolvido (base do arquivamento automático).',
     )
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='resolved_tickets',
+        help_text='Usuário que finalizou ou recusou o chamado.',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
@@ -226,6 +234,7 @@ class Ticket(models.Model):
                         self.resolved_at = timezone.now()
                     elif old_status == self.StatusChoices.RESOLVED:
                         self.resolved_at = None
+                        self.resolved_by = None
             except Ticket.DoesNotExist:
                 pass
         elif self.status == self.StatusChoices.RESOLVED:
@@ -295,3 +304,47 @@ class Comment(models.Model):
 
     def __str__(self) -> str:
         return f"Comentário de {self.author} em {self.ticket.title}"
+
+
+class TicketContestation(models.Model):
+    """Registro de contestação de chamado finalizado pelo solicitante."""
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name='contestations',
+        help_text='Chamado contestado.',
+    )
+    contested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='ticket_contestations',
+        help_text='Usuário que contestou a finalização.',
+    )
+    reason = models.TextField(help_text='Motivo informado na contestação.')
+    finalized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contested_finalizations',
+        help_text='Usuário que havia finalizado ou recusado o chamado.',
+    )
+    finalized_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Momento em que o chamado havia sido finalizado.',
+    )
+    was_rejected = models.BooleanField(
+        default=False,
+        help_text='Indica se a finalização contestada era uma recusa.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'contestação de chamado'
+        verbose_name_plural = 'contestações de chamado'
+
+    def __str__(self) -> str:
+        return f'Contestação #{self.pk} — chamado #{self.ticket_id}'

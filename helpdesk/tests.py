@@ -4,11 +4,12 @@ from datetime import timedelta
 
 from core.models import CustomUser, Equipe
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
-from helpdesk.models import Ticket, TicketCategory, Comment
+from helpdesk.models import Ticket, TicketCategory, Comment, TicketContestation
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_pode_acessar_chamado,
     usuario_pode_comentar_chamado,
+    usuario_pode_contestar_chamado,
     usuario_pode_operar_kanban,
     usuario_ve_todos_chamados,
 )
@@ -490,3 +491,152 @@ class HistoricoFiltroArquivadoTestCase(TestCase):
         self.assertEqual(response_p2.status_code, 200)
         self.assertContains(response_p2, 'Arquivado antigo')
         self.assertContains(response_p2, 'Arq')
+
+
+class ComentarioFinalizadoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name="Software", is_active=True)
+        self.it_user = CustomUser.objects.create_user(
+            username="ti_final", password="x", role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.admin = CustomUser.objects.create_user(
+            username="admin_final", password="x", role=CustomUser.RoleChoices.ADMIN,
+        )
+        self.supervisor = CustomUser.objects.create_user(
+            username="sup_final", password="x", role=CustomUser.RoleChoices.SUPERVISOR,
+        )
+        self.standard = CustomUser.objects.create_user(
+            username="pad_final", password="x", role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.ticket = Ticket.objects.create(
+            title="Chamado resolvido",
+            description="Desc",
+            category=self.categoria,
+            created_by=self.standard,
+            requester_name="Padrao",
+            requester_user=self.standard,
+            status=Ticket.StatusChoices.RESOLVED,
+            resolved_at=timezone.now(),
+        )
+
+    def test_standard_nao_comenta_finalizado(self):
+        self.assertFalse(usuario_pode_comentar_chamado(self.standard, self.ticket))
+
+    def test_supervisor_nao_comenta_finalizado(self):
+        self.assertFalse(usuario_pode_comentar_chamado(self.supervisor, self.ticket))
+
+    def test_it_user_comenta_finalizado(self):
+        self.assertTrue(usuario_pode_comentar_chamado(self.it_user, self.ticket))
+
+    def test_admin_comenta_finalizado(self):
+        self.assertTrue(usuario_pode_comentar_chamado(self.admin, self.ticket))
+
+    def test_standard_comenta_nao_finalizado(self):
+        self.ticket.status = Ticket.StatusChoices.NEW
+        self.ticket.save()
+        self.assertTrue(usuario_pode_comentar_chamado(self.standard, self.ticket))
+
+
+class ContestacaoChamadoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+        self.it_user = CustomUser.objects.create_user(
+            username="ti_contest", password="x", role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.standard = CustomUser.objects.create_user(
+            username="sol_contest", password="x", role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.outro = CustomUser.objects.create_user(
+            username="outro_contest", password="x", role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.resolved_at = timezone.now() - timedelta(hours=2)
+        self.ticket = Ticket.objects.create(
+            title="Chamado para contestar",
+            description="Desc",
+            category=self.categoria,
+            created_by=self.standard,
+            requester_name="Solicitante",
+            requester_user=self.standard,
+            status=Ticket.StatusChoices.RESOLVED,
+            resolved_at=self.resolved_at,
+            resolved_by=self.it_user,
+            assigned_to=self.it_user,
+        )
+
+    def test_solicitante_pode_contestar(self):
+        self.assertTrue(usuario_pode_contestar_chamado(self.standard, self.ticket))
+
+    def test_operador_nao_contesta(self):
+        self.assertFalse(usuario_pode_contestar_chamado(self.it_user, self.ticket))
+
+    def test_usuario_alheio_nao_contesta(self):
+        self.assertFalse(usuario_pode_contestar_chamado(self.outro, self.ticket))
+
+    def test_arquivado_nao_contesta(self):
+        self.ticket.is_archived = True
+        self.ticket.save()
+        self.assertFalse(usuario_pode_contestar_chamado(self.standard, self.ticket))
+
+    def test_nao_finalizado_nao_contesta(self):
+        self.ticket.status = Ticket.StatusChoices.IN_PROGRESS
+        self.ticket.save()
+        self.assertFalse(usuario_pode_contestar_chamado(self.standard, self.ticket))
+
+    def test_co_autor_pode_contestar(self):
+        self.ticket.created_by = self.outro
+        self.ticket.requester_user = self.outro
+        self.ticket.co_authors.add(self.standard)
+        self.ticket.save()
+        self.assertTrue(usuario_pode_contestar_chamado(self.standard, self.ticket))
+
+    def test_recusado_pode_ser_contestado(self):
+        self.ticket.is_rejected = True
+        self.ticket.rejection_reason = 'Fora de escopo'
+        self.ticket.save()
+        self.assertTrue(usuario_pode_contestar_chamado(self.standard, self.ticket))
+
+    def test_post_contest_reabre_como_novo(self):
+        from django.urls import reverse
+        import json
+
+        self.client.force_login(self.standard)
+        url = reverse('helpdesk:ticket_contest', args=[self.ticket.pk])
+        response = self.client.post(
+            url,
+            data=json.dumps({'reason': 'Problema persiste'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, Ticket.StatusChoices.NEW)
+        self.assertFalse(self.ticket.is_rejected)
+        self.assertIsNone(self.ticket.resolved_at)
+        self.assertIsNone(self.ticket.resolved_by)
+        self.assertTrue(self.ticket.unread_by_tech)
+
+        contestacao = TicketContestation.objects.get(ticket=self.ticket)
+        self.assertEqual(contestacao.contested_by, self.standard)
+        self.assertEqual(contestacao.finalized_by, self.it_user)
+        self.assertEqual(contestacao.reason, 'Problema persiste')
+        self.assertFalse(contestacao.was_rejected)
+
+        comentario = Comment.objects.filter(ticket=self.ticket, text__startswith='Contestação do chamado').first()
+        self.assertIsNotNone(comentario)
+        self.assertIn('Problema persiste', comentario.text)
+        self.assertIn(self.it_user.get_full_name() or self.it_user.username, comentario.text)
+
+    def test_post_contest_sem_permissao(self):
+        from django.urls import reverse
+        import json
+
+        self.client.force_login(self.outro)
+        url = reverse('helpdesk:ticket_contest', args=[self.ticket.pk])
+        response = self.client.post(
+            url,
+            data=json.dumps({'reason': 'Tentativa inválida'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 403)

@@ -7,12 +7,14 @@ from core.models import CustomUser
 from core.permissions import MODULO_HELPDESK, ModuloObrigatorioMixin, requer_modulo
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.db.models import Q
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
-from helpdesk.models import Ticket, TicketCategory, Comment
+from helpdesk.models import Ticket, TicketCategory, Comment, TicketContestation
 from helpdesk.audit import (
     log_atribuicao,
     log_chamado_criado,
     log_comentario,
+    log_contestacao,
     log_edicao,
     log_status_alterado,
     log_transferencia,
@@ -24,6 +26,7 @@ from helpdesk.ticket_access import (
     usuario_eh_operador_helpdesk,
     usuario_pode_acessar_chamado,
     usuario_pode_comentar_chamado,
+    usuario_pode_contestar_chamado,
     usuario_pode_editar_chamado,
     usuario_pode_gerenciar_categorias,
     usuario_pode_operar_kanban,
@@ -48,6 +51,20 @@ def _nome_usuario(user):
     if not user:
         return 'Não atribuído'
     return user.get_full_name() or user.username
+
+
+def _autor_ultima_finalizacao(ticket):
+    """Retorna autor do último comentário de finalização/recusa (fallback)."""
+    comentario = (
+        Comment.objects.filter(ticket=ticket, is_active=True)
+        .filter(
+            Q(text__startswith='Chamado finalizado') | Q(text__startswith='Chamado recusado')
+        )
+        .order_by('-created_at')
+        .select_related('author')
+        .first()
+    )
+    return comentario.author if comentario else None
 
 
 def gerar_comentarios_alteracao(antes, depois):
@@ -109,6 +126,8 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
         'pode_editar': pode_editar,
         'pode_comentar': usuario_pode_comentar_chamado(request.user, ticket),
+        'pode_contestar': usuario_pode_contestar_chamado(request.user, ticket),
+        'total_contestacoes': ticket.contestations.count(),
         'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
@@ -345,7 +364,8 @@ def ticket_finalize(request, pk):
         
     if not ticket.assigned_to:
         ticket.assigned_to = request.user
-        
+
+    ticket.resolved_by = request.user
     ticket.unread_by_user = True
     ticket.unread_count_user += 1
     ticket.save()
@@ -359,6 +379,69 @@ def ticket_finalize(request, pk):
         )
         
     return JsonResponse({'success': True})
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_contest(request, pk):
+    ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
+    if not usuario_pode_contestar_chamado(request.user, ticket):
+        return JsonResponse({'success': False, 'error': 'Sem permissão para contestar este chamado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        reason = (data.get('reason') or '').strip()
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Payload inválido'}, status=400)
+
+    if not reason:
+        return JsonResponse({'success': False, 'error': 'Motivo da contestação é obrigatório'}, status=400)
+
+    finalized_by = ticket.resolved_by or _autor_ultima_finalizacao(ticket)
+    finalized_at = ticket.resolved_at
+    was_rejected = ticket.is_rejected
+    finalized_by_nome = _nome_usuario(finalized_by)
+
+    TicketContestation.objects.create(
+        ticket=ticket,
+        contested_by=request.user,
+        reason=reason,
+        finalized_by=finalized_by,
+        finalized_at=finalized_at,
+        was_rejected=was_rejected,
+    )
+
+    rotulo_finalizacao = 'recusado' if was_rejected else 'finalizado'
+    data_fmt = finalized_at.strftime('%d/%m/%Y %H:%M') if finalized_at else 'data não registrada'
+    Comment.objects.create(
+        ticket=ticket,
+        author=request.user,
+        text=(
+            f'Contestação do chamado.\n'
+            f'Motivo: {reason}\n'
+            f'(Havia sido {rotulo_finalizacao} por {finalized_by_nome} em {data_fmt})'
+        ),
+    )
+
+    status_anterior = ticket.status
+    ticket.status = Ticket.StatusChoices.NEW
+    ticket.is_rejected = False
+    ticket.rejection_reason = ''
+    ticket.unread_by_tech = True
+    ticket.unread_count_tech += 1
+    ticket.save()
+
+    log_status_alterado(
+        ticket,
+        request.user,
+        _rotulo_status(status_anterior),
+        _rotulo_status(Ticket.StatusChoices.NEW),
+    )
+    log_contestacao(ticket, request.user, reason, finalized_by_nome)
+
+    response = JsonResponse({'success': True})
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
 
 
 @requer_modulo(MODULO_HELPDESK)

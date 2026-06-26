@@ -8,15 +8,19 @@ Registrar tickets (título, prioridade, categoria, solicitante, co-autores), mov
 
 ## Matriz de papéis (RBAC)
 
-| Papel | Código | Módulos | Ver chamados | Arquivados | Kanban move | Comentar |
-|-------|--------|---------|--------------|------------|-------------|----------|
-| Superuser | `is_superuser` | Todos | Todos | Sim | Sim | Todos |
-| Membro Equipe (TI) | `IT_USER` | chips, emails, equipment, discador, helpdesk | Todos | Sim | Sim | Todos |
-| Administrador | `ADMIN` | helpdesk | Todos | Sim | Sim | Todos |
-| Supervisor | `SUPERVISOR` | helpdesk | Todos ativos | Não | Não | Qualquer visível |
-| Líder de Equipe | `TEAM_LEADER` | helpdesk | Equipes do usuário | Não | Não | Só autor/solicitante/co-autor |
-| Multiplicador | `MULTIPLIER` | helpdesk | Próprios + co-autor | Não | Não | Só autor/solicitante/co-autor |
-| Usuário Padrão | `STANDARD` | helpdesk | Próprios | Não | Não | Próprios |
+| Papel | Código | Módulos | Ver chamados | Arquivados | Kanban move | Comentar | Contestar |
+|-------|--------|---------|--------------|------------|-------------|----------|-----------|
+| Superuser | `is_superuser` | Todos | Todos | Sim | Sim | Todos | Não |
+| Membro Equipe (TI) | `IT_USER` | chips, emails, equipment, discador, helpdesk | Todos | Sim | Sim | Todos | Não |
+| Administrador | `ADMIN` | helpdesk | Todos | Sim | Sim | Todos | Não |
+| Supervisor | `SUPERVISOR` | helpdesk | Todos ativos | Não | Não | Qualquer visível* | Não |
+| Líder de Equipe | `TEAM_LEADER` | helpdesk | Equipes do usuário | Não | Não | Só autor/solicitante/co-autor* | Não |
+| Multiplicador | `MULTIPLIER` | helpdesk | Próprios + co-autor | Não | Não | Só autor/solicitante/co-autor* | Não |
+| Usuário Padrão | `STANDARD` | helpdesk | Próprios | Não | Não | Próprios* | Sim** |
+
+\* Em chamados **finalizados** (`status=RESOLVED`), apenas operadores helpdesk (Admin, Membro TI, superuser) podem comentar.
+
+\*\* Contestação: solicitante vinculado (autor, `requester_user` ou co-autor) em chamado finalizado **não arquivado** — reabre como Novo e registra histórico em `TicketContestation`.
 
 **Criação de chamados:**
 - `STANDARD`: sempre para si.
@@ -35,7 +39,7 @@ Implementação central: `ticket_access.py`. Skill do agente: `.agent/skills/rba
 | Arquivo | Função |
 |---------|--------|
 | `apps.py` | Configuração do app. |
-| `models.py` | `TicketCategory`, `Ticket` (status Kanban, prioridade nullable, arquivamento, `created_by`, `requester_user`, `co_authors`) e `Comment`. |
+| `models.py` | `TicketCategory`, `Ticket` (status Kanban, prioridade nullable, arquivamento, `created_by`, `requester_user`, `co_authors`, `resolved_by`) e `Comment`, `TicketContestation`. |
 | `forms.py` | `TicketCreateForm` (campos por papel) e `TicketUpdateForm` (edição). |
 | `ticket_access.py` | Filtro de chamados, permissões por papel, co-autores. |
 | `context_processors.py` | Flags `eh_operador_helpdesk`, `pode_operar_kanban`, `pode_acessar_dashboard_helpdesk`. |
