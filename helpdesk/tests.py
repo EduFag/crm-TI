@@ -300,3 +300,81 @@ class ArquivamentoAutomaticoTestCase(TestCase):
         ticket.save()
         ticket.refresh_from_db()
         self.assertIsNotNone(ticket.resolved_at)
+
+
+class HistoryExportCsvTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name="Hardware", is_active=True)
+        self.it_user = CustomUser.objects.create_user(
+            username="ti_export",
+            password="x",
+            role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.supervisor = CustomUser.objects.create_user(
+            username="super_export",
+            password="x",
+            role=CustomUser.RoleChoices.SUPERVISOR,
+        )
+        self.ticket_novo = Ticket.objects.create(
+            title="Impressora quebrada",
+            description="Não imprime",
+            category=self.categoria,
+            requester_name="João Silva",
+            status=Ticket.StatusChoices.NEW,
+        )
+        self.ticket_resolvido = Ticket.objects.create(
+            title="VPN lenta",
+            description="Conexão instável",
+            category=self.categoria,
+            requester_name="Maria",
+            status=Ticket.StatusChoices.RESOLVED,
+        )
+        Ticket.objects.filter(pk=self.ticket_novo.pk).update(
+            created_at=timezone.now() - timedelta(days=5),
+        )
+        Ticket.objects.filter(pk=self.ticket_resolvido.pk).update(
+            created_at=timezone.now() - timedelta(days=3),
+        )
+        self.ticket_novo.refresh_from_db()
+        self.ticket_resolvido.refresh_from_db()
+
+        self.date_from = (timezone.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+        self.date_to = timezone.now().strftime('%Y-%m-%d')
+
+    def _url_export(self, **params):
+        from django.urls import reverse
+        base = reverse('helpdesk:history_export')
+        query = {'date_from': self.date_from, 'date_to': self.date_to, **params}
+        return f"{base}?{'&'.join(f'{k}={v}' for k, v in query.items())}"
+
+    def test_it_user_exporta_csv_com_dados(self):
+        self.client.force_login(self.it_user)
+        response = self.client.get(self._url_export())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/csv', response['Content-Type'])
+        self.assertIn('attachment', response['Content-Disposition'])
+        conteudo = response.content.decode('utf-8-sig')
+        self.assertIn('ID;Título;Descrição;Solicitante', conteudo)
+        self.assertIn('Impressora quebrada', conteudo)
+        self.assertIn('João Silva', conteudo)
+        self.assertIn('Hardware', conteudo)
+
+    def test_supervisor_sem_permissao_export(self):
+        self.client.force_login(self.supervisor)
+        response = self.client.get(self._url_export())
+        self.assertEqual(response.status_code, 403)
+
+    def test_export_sem_periodo_redireciona_com_erro(self):
+        self.client.force_login(self.it_user)
+        from django.urls import reverse
+        response = self.client.get(reverse('helpdesk:history_export'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('erro=export_periodo', response.url)
+
+    def test_export_respeita_filtro_status(self):
+        self.client.force_login(self.it_user)
+        response = self.client.get(self._url_export(status=Ticket.StatusChoices.RESOLVED))
+        self.assertEqual(response.status_code, 200)
+        conteudo = response.content.decode('utf-8-sig')
+        self.assertIn('VPN lenta', conteudo)
+        self.assertNotIn('Impressora quebrada', conteudo)

@@ -12,6 +12,7 @@ urlpatterns = [
     
     # Histórico e Filtros
     path('history/', views.HistoryListView.as_view(), name='history'),
+    path('history/export/', views.history_export_csv, name='history_export'),
     
     # Gerenciamento de Categorias
     path('categories/', views.CategoriesManageView.as_view(), name='categories'),

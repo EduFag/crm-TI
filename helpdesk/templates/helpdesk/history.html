@@ -90,8 +90,27 @@
             <a href="{% url 'helpdesk:history' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
                 Limpar
             </a>
+            {% if eh_operador_helpdesk %}
+            <a id="btn-export-csv"
+               href="{% url 'helpdesk:history_export' %}?{{ request.GET.urlencode }}"
+               class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-5 py-2 rounded-lg text-sm font-medium border border-slate-300 transition-colors shadow-sm {% if not request.GET.date_from or not request.GET.date_to %}opacity-50 pointer-events-none{% endif %}"
+               title="Preencha as datas De e Até para exportar">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                </svg>
+                Exportar CSV
+            </a>
+            {% endif %}
         </div>
     </form>
+
+    {% if request.GET.erro == 'export_periodo' %}
+    <div class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+        Preencha as datas <strong>Criado de</strong> e <strong>Criado até</strong> para exportar o CSV.
+    </div>
+    {% elif eh_operador_helpdesk %}
+    <p class="mb-4 text-xs text-slate-500">Para exportar, preencha as datas <strong>Criado de</strong> e <strong>Criado até</strong> nos filtros acima.</p>
+    {% endif %}
 
     <!-- Tabela de Histórico -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto flex-1">
