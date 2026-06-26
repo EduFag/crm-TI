@@ -27,6 +27,10 @@ Não substitui o `.env` da raiz: aqui ficam modelos e scripts que você copia/ad
 7. Rodar migrações e `collectstatic` (comandos Django no servidor).
 8. Configurar `gunicorn.service` e `nginx.conf`, reiniciar serviços.
 
+## Gunicorn `--preload` e deploy
+
+O unit `gunicorn.service.exemple` usa `--preload` (startup mais rápido). Com preload, **`systemctl reload` não recarrega código Python** no processo master — apenas troca workers com o app antigo em memória. Após deploy de código, use sempre **`systemctl restart crm-ti`**. O script `deploy.sh` já faz restart automaticamente.
+
 ## Variáveis PostgreSQL (`.env`)
 
 | Variável | Exemplo | Descrição |

@@ -134,21 +134,15 @@ sudo systemctl restart crm-ti
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**Deploy de código** (Python/templates, sem alterar `.env`): prefira reload suave em vez de restart completo:
+**Deploy de código** (Python/templates): use **restart** — o unit usa `--preload` e `reload` (HUP) **não** recarrega módulos Python no master:
 
 ```bash
-sudo systemctl reload crm-ti
+sudo systemctl restart crm-ti
 ```
 
-> `reload` só funciona se o unit tiver `ExecReload` (já incluso em `gunicorn.service.exemple`). Após atualizar o `.service`, rode `sudo systemctl daemon-reload` uma vez.
+> O script `.vps/deploy.sh` (GitHub Actions) já faz restart automaticamente. `reload` só troca workers sem recarregar o app preloadado — pode causar HTTP 500 após deploy.
 
-Se `reload` não estiver configurado ainda, use o sinal HUP direto no master do Gunicorn:
-
-```bash
-sudo kill -HUP $(systemctl show -p MainPID --value crm-ti)
-```
-
-**Alterou `.env`?** Use `sudo systemctl restart crm-ti` — variáveis de ambiente só são relidas no start.
+**Alterou `.env`?** Também use `sudo systemctl restart crm-ti` — variáveis de ambiente só são relidas no start.
 
 ### DisallowedHost em `ti.moneypromotora.com.br`
 

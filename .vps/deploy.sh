@@ -68,15 +68,8 @@ else
     log "AVISO: unit não sincronizado — rode: sudo bash .vps/install-crm-ti-service.sh"
 fi
 
-log "Recarregando Gunicorn (${SERVICE})..."
-EXEC_RELOAD="$(systemctl show "${SERVICE}" -p ExecReload --value 2>/dev/null || true)"
-if [[ -n "${EXEC_RELOAD}" ]] && sudo_deploy systemctl reload "${SERVICE}"; then
-    log "Reload concluído."
-    log "Deploy finalizado com sucesso."
-    exit 0
-fi
-
-log "Reload indisponível — reiniciando serviço..."
+log "Reiniciando Gunicorn (${SERVICE})..."
+# Com --preload no unit, reload (HUP) não recarrega código Python no master — restart obrigatório após deploy
 sudo_deploy systemctl restart "${SERVICE}"
 
 if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
