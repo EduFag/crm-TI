@@ -31,7 +31,11 @@ for cmd in \
     "chmod 755 /home/edufa ${APP_DIR}" \
     "cp ${APP_DIR}/.vps/gunicorn.service.exemple /etc/systemd/system/${SERVICE}.service" \
     "systemctl daemon-reload" \
-    "systemctl reload ${SERVICE}"; do
+    "systemctl reload ${SERVICE}" \
+    "systemctl restart ${SERVICE}" \
+    "systemctl stop ${SERVICE}" \
+    "systemctl start ${SERVICE}" \
+    "systemctl status ${SERVICE}"; do
     if sudo -n ${cmd} >/dev/null 2>&1; then
         ok "sudo ${cmd}"
     else

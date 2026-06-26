@@ -76,13 +76,20 @@ else
 fi
 
 log "Reiniciando Gunicorn (${SERVICE})..."
-# Para limpar processo preso na porta (deploy anterior interrompido)
-sudo_deploy systemctl stop "${SERVICE}" 2>/dev/null || true
-sleep 2
-if command -v fuser >/dev/null 2>&1; then
-    sudo -n fuser -k "${GUNICORN_PORT}/tcp" 2>/dev/null || true
+# Preferência: stop + start (libera porta). Fallback: restart (sudoers antigo).
+if sudo -n systemctl stop "${SERVICE}" 2>/dev/null; then
+    sleep 2
+    if command -v fuser >/dev/null 2>&1; then
+        sudo -n fuser -k "${GUNICORN_PORT}/tcp" 2>/dev/null || true
+    fi
+    if ! sudo -n systemctl start "${SERVICE}" 2>/dev/null; then
+        log "AVISO: start falhou — tentando restart."
+        sudo_deploy systemctl restart "${SERVICE}"
+    fi
+else
+    log "AVISO: stop não permitido no sudoers — usando restart."
+    sudo_deploy systemctl restart "${SERVICE}"
 fi
-sudo_deploy systemctl start "${SERVICE}"
 
 # Aguarda até 45s — unit usa graceful-timeout 30s + TimeoutStopSec 35s
 log "Aguardando ${SERVICE} ficar ativo..."
