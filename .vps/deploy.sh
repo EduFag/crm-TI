@@ -84,14 +84,18 @@ if command -v fuser >/dev/null 2>&1; then
 fi
 sudo_deploy systemctl start "${SERVICE}"
 
-sleep 3
+# Aguarda até 45s — unit usa graceful-timeout 30s + TimeoutStopSec 35s
+log "Aguardando ${SERVICE} ficar ativo..."
+for tentativa in $(seq 1 15); do
+    if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
+        log "Deploy finalizado com sucesso."
+        exit 0
+    fi
+    sleep 3
+done
 
-if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
-    log "Deploy finalizado com sucesso."
-else
-    log "ERRO: serviço ${SERVICE} não está ativo."
-    sudo -n systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
-    log "--- Últimas linhas do journal (${SERVICE}) ---"
-    sudo -n journalctl -u "${SERVICE}" -n 50 --no-pager 2>/dev/null || true
-    exit 1
-fi
+log "ERRO: serviço ${SERVICE} não ficou ativo após 45s."
+sudo -n systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
+log "--- Últimas linhas do journal (${SERVICE}) ---"
+sudo -n journalctl -u "${SERVICE}" -n 50 --no-pager 2>/dev/null || true
+exit 1
