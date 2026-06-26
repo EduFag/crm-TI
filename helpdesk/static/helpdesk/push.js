@@ -93,12 +93,20 @@
         btn.classList.add('text-slate-500', 'hover:text-blue-600');
     }
 
+    function mostrarFeedbackBanner(mensagem) {
+        const ajuda = document.getElementById('helpdesk-push-ajuda');
+        if (ajuda) {
+            ajuda.textContent = mensagem;
+            ajuda.classList.remove('hidden');
+        }
+    }
+
     function textoAjudaNegado() {
         return (
-            'No Chrome: clique no cadeado à esquerda do endereço → ' +
-            '<strong>Notificações</strong> → ligue a opção (ou clique em ' +
-            '<strong>Redefinir permissão</strong>) → depois clique em <strong>Verificar</strong> aqui. ' +
-            'O navegador não permite que sites abram essa tela automaticamente por segurança.'
+            'Se o Chrome mostra "Sem permissão (padrão)", clique em ' +
+            '<strong>Ativar notificações</strong> abaixo para abrir o prompt do navegador. ' +
+            'Se estiver bloqueado de vez, use o cadeado → Notificações → ' +
+            '<strong>Redefinir permissão</strong> e clique em Ativar novamente.'
         );
     }
 
@@ -140,13 +148,13 @@
 
         if (permissao === 'denied') {
             banner.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-950');
-            texto.textContent = 'Notificações bloqueadas neste site';
+            texto.textContent = 'Notificações desativadas neste site';
             ajuda.innerHTML = textoAjudaNegado();
             ajuda.classList.remove('hidden');
             acoes.appendChild(criarBotao(
-                'Verificar',
+                'Ativar notificações',
                 'px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors',
-                verificarPermissao
+                solicitarPermissao
             ));
             atualizarNavPush();
             return;
@@ -166,7 +174,7 @@
         acoes.appendChild(criarBotao(
             'Ativar notificações',
             'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors',
-            ativarNotificacoes
+            solicitarPermissao
         ));
         acoes.appendChild(criarBotao(
             'Agora não',
@@ -182,21 +190,14 @@
             return;
         }
 
-        const permissao = Notification.permission;
-
-        if (permissao === 'denied') {
-            localStorage.removeItem(STORAGE_KEY);
-            renderizarBanner();
-            mostrarBannerElemento();
+        if (Notification.permission === 'granted') {
             return;
         }
 
-        if (permissao === 'granted') {
-            return;
-        }
-
-        // default — gesto do usuário: abre o prompt nativo do navegador (MDN)
-        ativarNotificacoes();
+        localStorage.removeItem(STORAGE_KEY);
+        renderizarBanner();
+        mostrarBannerElemento();
+        solicitarPermissao();
     }
 
     async function buscarChavePublica() {
@@ -237,30 +238,7 @@
         return subscription;
     }
 
-    async function ativarNotificacoes() {
-        if (!suportaPush()) {
-            alert('Seu navegador não suporta notificações push.');
-            return;
-        }
-
-        if (Notification.permission === 'denied') {
-            renderizarBanner();
-            return;
-        }
-
-        const permissao = await Notification.requestPermission();
-        localStorage.setItem(STORAGE_KEY, permissao === 'default' ? 'dismissed' : permissao);
-
-        if (permissao === 'denied') {
-            renderizarBanner();
-            return;
-        }
-
-        if (permissao !== 'granted') {
-            renderizarBanner();
-            return;
-        }
-
+    async function concluirAtivacao() {
         try {
             await registrarSubscription();
             esconderBanner();
@@ -271,20 +249,36 @@
         }
     }
 
-    async function verificarPermissao() {
-        if (Notification.permission === 'granted') {
-            localStorage.removeItem(STORAGE_KEY);
-            try {
-                await registrarSubscription();
-            } catch (err) {
-                console.error('Erro ao registrar push:', err);
-            }
-            esconderBanner();
-            atualizarNavPush();
+    async function solicitarPermissao() {
+        if (!suportaPush()) {
+            alert('Seu navegador não suporta notificações push.');
             return;
         }
+
+        const antes = Notification.permission;
+
+        if (antes === 'granted') {
+            localStorage.removeItem(STORAGE_KEY);
+            await concluirAtivacao();
+            return;
+        }
+
+        // Gesto do usuário: abre o prompt nativo quando permission === 'default'
+        const resultado = await Notification.requestPermission();
+        localStorage.setItem(STORAGE_KEY, resultado === 'default' ? 'dismissed' : resultado);
+
+        if (resultado === 'granted') {
+            await concluirAtivacao();
+            return;
+        }
+
         renderizarBanner();
-        alert('Notificações ainda estão desligadas. Siga os passos no banner (cadeado → Notificações → permitir) e clique em Verificar novamente.');
+
+        if (resultado === 'denied' || Notification.permission === 'denied') {
+            mostrarFeedbackBanner(
+                'O navegador bloqueou o prompt. Abra o cadeado → Notificações → Redefinir permissão → clique em Ativar notificações.'
+            );
+        }
     }
 
     function dispensarBanner() {
@@ -320,8 +314,7 @@
     }
 
     window.helpdeskPush = {
-        ativar: ativarNotificacoes,
-        verificar: verificarPermissao,
+        ativar: solicitarPermissao,
         dispensar: dispensarBanner,
         suportaPush: suportaPush,
     };
@@ -345,6 +338,11 @@
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
             renderizarBanner();
+            if (Notification.permission === 'granted' && suportaPush()) {
+                registrarSubscription().catch(function() {
+                    /* silencioso */
+                });
+            }
         }
     });
 })();
