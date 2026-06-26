@@ -348,3 +348,27 @@ class TicketContestation(models.Model):
 
     def __str__(self) -> str:
         return f'Contestação #{self.pk} — chamado #{self.ticket_id}'
+
+
+class PushSubscription(models.Model):
+    """Inscrição Web Push do usuário para notificações de chamados."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='push_subscriptions',
+        help_text='Usuário inscrito para receber push.',
+    )
+    endpoint = models.TextField(unique=True, help_text='URL do endpoint do browser.')
+    p256dh = models.CharField(max_length=255, help_text='Chave pública do cliente (p256dh).')
+    auth = models.CharField(max_length=255, help_text='Segredo de autenticação do cliente.')
+    user_agent = models.CharField(max_length=255, blank=True, help_text='User-Agent no momento da inscrição.')
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, help_text='False quando o endpoint expirou ou foi cancelado.')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'inscrição push'
+        verbose_name_plural = 'inscrições push'
+
+    def __str__(self) -> str:
+        return f'Push #{self.pk} — {self.user}'

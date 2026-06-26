@@ -16,10 +16,19 @@ from helpdesk.audit import (
     log_comentario,
     log_contestacao,
     log_edicao,
+    log_prioridade_alterada,
     log_status_alterado,
     log_transferencia,
     log_chamado_excluido,
     log_chamado_recusado,
+    log_triagem_alterada,
+)
+from helpdesk.notifications import (
+    EVENTO_COMMENT,
+    EVENTO_PRIORITY_CHANGED,
+    EVENTO_STATUS_CHANGED,
+    EVENTO_TRIAGE_CHANGED,
+    agendar_notificacao_chamado,
 )
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
@@ -85,6 +94,10 @@ def gerar_comentarios_alteracao(antes, depois):
             f'Prioridade alterada de {_rotulo_prioridade(antes.priority)} '
             f'para {_rotulo_prioridade(depois.priority)}.'
         )
+    if antes.specific_category_id != depois.specific_category_id:
+        antes_nome = antes.specific_category.name if antes.specific_category_id else 'Nenhuma'
+        depois_nome = depois.specific_category.name if depois.specific_category_id else 'Nenhuma'
+        mensagens.append(f'Triagem alterada de {antes_nome} para {depois_nome}.')
     if antes.requester_name != depois.requester_name or antes.requester_user_id != depois.requester_user_id:
         mensagens.append(f'Solicitante alterado para {depois.requester_name}.')
     if antes.assigned_to_id != depois.assigned_to_id:
@@ -104,6 +117,11 @@ def _metadata_alteracao_ticket(antes, depois):
         metadata['status'] = {'antes': antes.status, 'depois': depois.status}
     if antes.priority != depois.priority:
         metadata['priority'] = {'antes': antes.priority, 'depois': depois.priority}
+    if antes.specific_category_id != depois.specific_category_id:
+        metadata['specific_category'] = {
+            'antes': antes.specific_category_id,
+            'depois': depois.specific_category_id,
+        }
     if antes.category_id != depois.category_id:
         metadata['category'] = {'antes': str(antes.category), 'depois': str(depois.category)}
     if antes.requester_name != depois.requester_name:
@@ -286,16 +304,19 @@ def ticket_update_status(request, pk):
 
     if new_status in dict(Ticket.StatusChoices.choices):
         status_anterior = ticket.status
+        prioridade_anterior = ticket.priority
+        triagem_anterior = ticket.specific_category
+
         ticket.status = new_status
-        
+
         priority = data.get('priority')
         if priority is not None:
             ticket.priority = priority or None
-            
+
         specific_category_id = data.get('specific_category')
         if specific_category_id is not None:
             ticket.specific_category_id = specific_category_id if specific_category_id else None
-            
+
         if not ticket.assigned_to and new_status != Ticket.StatusChoices.NEW:
             ticket.assigned_to = request.user
             Comment.objects.create(
@@ -315,6 +336,30 @@ def ticket_update_status(request, pk):
                 request.user,
                 _rotulo_status(status_anterior),
                 _rotulo_status(new_status),
+            )
+            agendar_notificacao_chamado(
+                ticket,
+                request.user,
+                EVENTO_STATUS_CHANGED,
+                f'Movido para {_rotulo_status(new_status)}.',
+            )
+        if prioridade_anterior != ticket.priority:
+            log_prioridade_alterada(ticket, request.user, prioridade_anterior, ticket.priority)
+            agendar_notificacao_chamado(
+                ticket,
+                request.user,
+                EVENTO_PRIORITY_CHANGED,
+                f'Prioridade: {_rotulo_prioridade(prioridade_anterior)} → {_rotulo_prioridade(ticket.priority)}.',
+            )
+        triagem_depois = ticket.specific_category
+        if triagem_anterior != triagem_depois:
+            log_triagem_alterada(ticket, request.user, triagem_anterior, triagem_depois)
+            depois_nome = triagem_depois.name if triagem_depois else 'Nenhuma'
+            agendar_notificacao_chamado(
+                ticket,
+                request.user,
+                EVENTO_TRIAGE_CHANGED,
+                f'Triagem: {depois_nome}.',
             )
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'error': 'Status inválido'}, status=400)
@@ -377,7 +422,13 @@ def ticket_finalize(request, pk):
             _rotulo_status(status_anterior),
             _rotulo_status(Ticket.StatusChoices.RESOLVED),
         )
-        
+        agendar_notificacao_chamado(
+            ticket,
+            request.user,
+            EVENTO_STATUS_CHANGED,
+            f'Movido para {_rotulo_status(Ticket.StatusChoices.RESOLVED)}.',
+        )
+
     return JsonResponse({'success': True})
 
 
@@ -438,6 +489,12 @@ def ticket_contest(request, pk):
         _rotulo_status(Ticket.StatusChoices.NEW),
     )
     log_contestacao(ticket, request.user, reason, finalized_by_nome)
+    agendar_notificacao_chamado(
+        ticket,
+        request.user,
+        EVENTO_STATUS_CHANGED,
+        f'Contestado — voltou para {_rotulo_status(Ticket.StatusChoices.NEW)}.',
+    )
 
     response = JsonResponse({'success': True})
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
@@ -492,7 +549,7 @@ def ticket_edit(request, pk):
             _contexto_drawer(request, ticket, edit_form=TicketUpdateForm(instance=ticket, user=request.user)),
         )
 
-    antes = Ticket.objects.select_related('assigned_to', 'category').get(pk=ticket.pk)
+    antes = Ticket.objects.select_related('assigned_to', 'category', 'specific_category').get(pk=ticket.pk)
     form = TicketUpdateForm(request.POST, instance=ticket, user=request.user)
     if form.is_valid():
         depois = form.save()
@@ -502,7 +559,32 @@ def ticket_edit(request, pk):
         metadata = _metadata_alteracao_ticket(antes, depois)
         if metadata:
             log_edicao(depois, request.user, metadata, '; '.join(mensagens))
-            
+
+        if 'status' in metadata:
+            msg_status = next((m for m in mensagens if m.startswith('Status')), None)
+            agendar_notificacao_chamado(
+                depois,
+                request.user,
+                EVENTO_STATUS_CHANGED,
+                msg_status or f'Movido para {_rotulo_status(depois.status)}.',
+            )
+        if 'priority' in metadata:
+            msg_prioridade = next((m for m in mensagens if m.startswith('Prioridade')), 'Prioridade alterada.')
+            agendar_notificacao_chamado(
+                depois,
+                request.user,
+                EVENTO_PRIORITY_CHANGED,
+                msg_prioridade,
+            )
+        if 'specific_category' in metadata:
+            msg_triagem = next((m for m in mensagens if m.startswith('Triagem')), 'Triagem alterada.')
+            agendar_notificacao_chamado(
+                depois,
+                request.user,
+                EVENTO_TRIAGE_CHANGED,
+                msg_triagem,
+            )
+
         ticket.unread_by_user = True
         ticket.unread_count_user += 1
         ticket.save(update_fields=['unread_by_user', 'unread_count_user'])
@@ -603,7 +685,10 @@ def ticket_add_comment(request, pk):
             ticket.unread_by_tech = True
             ticket.unread_count_tech += 1
         ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'unread_count_user', 'unread_count_tech', 'updated_at'])
-        
+
+        preview = text[:120] if text else 'Nova imagem anexada.'
+        agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
+
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})

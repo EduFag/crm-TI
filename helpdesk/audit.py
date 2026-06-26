@@ -112,3 +112,46 @@ def log_contestacao(ticket, actor, motivo, finalized_by_nome):
         obj=ticket,
         metadata={'motivo': motivo, 'finalized_by': finalized_by_nome},
     )
+
+
+def log_prioridade_alterada(ticket, actor, prioridade_anterior, prioridade_nova):
+    from helpdesk.models import Ticket
+
+    def _rotulo(valor):
+        if not valor:
+            return 'Sem prioridade'
+        return dict(Ticket.PriorityChoices.choices).get(valor, valor)
+
+    return registrar_acao(
+        modulo=MODULO_HELPDESK,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=(
+            f'Prioridade do chamado "{ticket.title}" alterada de '
+            f'{_rotulo(prioridade_anterior)} para {_rotulo(prioridade_nova)}.'
+        ),
+        actor=actor,
+        obj=ticket,
+        metadata={'priority': {'antes': prioridade_anterior, 'depois': prioridade_nova}},
+    )
+
+
+def log_triagem_alterada(ticket, actor, categoria_anterior, categoria_nova):
+    def _rotulo(cat):
+        return cat.name if cat else 'Nenhuma'
+
+    return registrar_acao(
+        modulo=MODULO_HELPDESK,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=(
+            f'Triagem do chamado "{ticket.title}" alterada de '
+            f'{_rotulo(categoria_anterior)} para {_rotulo(categoria_nova)}.'
+        ),
+        actor=actor,
+        obj=ticket,
+        metadata={
+            'specific_category': {
+                'antes': categoria_anterior.pk if categoria_anterior else None,
+                'depois': categoria_nova.pk if categoria_nova else None,
+            }
+        },
+    )

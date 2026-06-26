@@ -7,5 +7,8 @@ psycopg[binary]>=3.1,<4
 # Deploy em VPS (gunicorn + proxy reverso)
 gunicorn>=22.0,<24
 
+# Web Push (notificações do browser no helpdesk)
+pywebpush>=2.0,<3
+
 # MySQL/MariaDB — só se DB_ENGINE=mysql
 # mysqlclient>=2.2,<3

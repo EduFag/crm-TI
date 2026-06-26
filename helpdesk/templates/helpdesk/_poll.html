@@ -10,15 +10,58 @@
 <script>
     (function() {
         const currentUserId = {{ request.user.id|default:"null" }};
-        
-        // Carrega os áudios a partir da pasta static
+
         const audioAtualizacao = new Audio("{% static 'helpdesk/sounds/atualizacao.mp3' %}");
         const audioComentario = new Audio("{% static 'helpdesk/sounds/comentario.mp3' %}");
 
+        const TITULOS_NOTIFICACAO = {
+            COMMENT: 'Novo comentário',
+            STATUS_CHANGED: 'Chamado movido',
+            PRIORITY_CHANGED: 'Prioridade alterada',
+            TRIAGE_CHANGED: 'Triagem alterada',
+            CREATED: 'Novo chamado',
+        };
+
+        function tituloNotificacao(detail) {
+            const base = TITULOS_NOTIFICACAO[detail.acao] || 'Atualização no helpdesk';
+            return detail.ticket_id ? base + ' #' + detail.ticket_id : base;
+        }
+
+        function urlNotificacao(detail) {
+            if (detail.ticket_id) {
+                return '/helpdesk/?ticket=' + detail.ticket_id;
+            }
+            return '/helpdesk/';
+        }
+
+        function exibirNotificacaoBrowser(detail) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                return;
+            }
+            if (!document.hidden) {
+                return;
+            }
+
+            const titulo = tituloNotificacao(detail);
+            const corpo = detail.descricao || 'Há uma atualização no helpdesk.';
+            const tag = detail.ticket_id ? 'helpdesk-ticket-' + detail.ticket_id : 'helpdesk-update';
+            const url = urlNotificacao(detail);
+
+            const notification = new Notification(titulo, {
+                body: corpo,
+                icon: "{% static 'helpdesk/images/favicon.ico' %}",
+                tag: tag,
+            });
+            notification.onclick = function() {
+                window.focus();
+                window.location.href = url;
+                notification.close();
+            };
+        }
+
         document.body.addEventListener('ticketUpdated', function(event) {
             const detail = event.detail || {};
-            
-            // Não toca som se o ator da ação for o próprio usuário logado
+
             if (detail.actor_id && detail.actor_id === currentUserId) {
                 return;
             }
@@ -26,14 +69,21 @@
             if (detail.acao === 'COMMENT') {
                 audioComentario.currentTime = 0;
                 audioComentario.play().catch(function(e) {
-                    console.log("Audio play prevented (comentario):", e);
+                    console.log('Audio play prevented (comentario):', e);
                 });
-            } else if (detail.acao === 'STATUS_CHANGED' || detail.acao === 'CREATED') {
+            } else if (
+                detail.acao === 'STATUS_CHANGED' ||
+                detail.acao === 'CREATED' ||
+                detail.acao === 'PRIORITY_CHANGED' ||
+                detail.acao === 'TRIAGE_CHANGED'
+            ) {
                 audioAtualizacao.currentTime = 0;
                 audioAtualizacao.play().catch(function(e) {
-                    console.log("Audio play prevented (atualizacao/criado):", e);
+                    console.log('Audio play prevented (atualizacao):', e);
                 });
             }
+
+            exibirNotificacaoBrowser(detail);
         });
     })();
 </script>

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from helpdesk.models import (
     Comment,
+    PushSubscription,
     Ticket,
     TicketAttachment,
     TicketCategory,
@@ -77,3 +78,12 @@ class TicketContestationAdmin(admin.ModelAdmin):
     search_fields = ('reason', 'ticket__title')
     readonly_fields = ('created_at',)
     autocomplete_fields = ('ticket', 'contested_by', 'finalized_by')
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('user__username', 'endpoint')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('user',)

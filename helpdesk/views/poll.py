@@ -1,3 +1,5 @@
+import json
+
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -6,6 +8,32 @@ from core.permissions import MODULO_HELPDESK, requer_modulo
 from helpdesk.models import Ticket
 
 _CHAVE_SESSAO_POLL = 'helpdesk_poll_desde'
+
+
+def _resolver_acao_poll(log):
+    """Mapeia registro de auditoria para tipo de evento do frontend."""
+    if not log:
+        return 'UPDATED'
+
+    acao = log.acao
+    metadata = log.metadata or {}
+
+    if acao == 'COMMENT':
+        return 'COMMENT'
+    if acao == 'STATUS_CHANGED':
+        return 'STATUS_CHANGED'
+    if acao == 'CREATED':
+        return 'CREATED'
+
+    if acao == 'UPDATED':
+        if 'priority' in metadata:
+            return 'PRIORITY_CHANGED'
+        if 'specific_category' in metadata:
+            return 'TRIAGE_CHANGED'
+        if 'status' in metadata:
+            return 'STATUS_CHANGED'
+
+    return acao
 
 
 @requer_modulo(MODULO_HELPDESK)
@@ -19,6 +47,7 @@ def poll_ticket_updates(request):
     since_raw = request.session.get(_CHAVE_SESSAO_POLL)
 
     tem_mudanca = False
+    since = None
     if since_raw:
         since = parse_datetime(since_raw)
         if since is not None:
@@ -29,25 +58,28 @@ def poll_ticket_updates(request):
     request.session[_CHAVE_SESSAO_POLL] = agora.isoformat()
     request.session.modified = True
 
-    if tem_mudanca:
-        import json
+    if tem_mudanca and since is not None:
         from django.contrib.contenttypes.models import ContentType
         from core.models import RegistroAcao
-        
+
         ticket_ct = ContentType.objects.get_for_model(Ticket)
         latest_log = RegistroAcao.objects.filter(
             modulo=RegistroAcao.ModuloChoices.HELPDESK,
             timestamp__gt=since,
-            content_type=ticket_ct
+            content_type=ticket_ct,
         ).order_by('-timestamp').first()
-        
+
         actor_id = latest_log.actor_id if latest_log else None
-        acao = latest_log.acao if latest_log else 'UPDATED'
-        
+        acao = _resolver_acao_poll(latest_log)
+        ticket_id = latest_log.object_id if latest_log else None
+        descricao = latest_log.descricao[:200] if latest_log else ''
+
         trigger_data = {
             'ticketUpdated': {
                 'actor_id': actor_id,
-                'acao': acao
+                'acao': acao,
+                'ticket_id': ticket_id,
+                'descricao': descricao,
             }
         }
         return HttpResponse(status=200, headers={'HX-Trigger': json.dumps(trigger_data)})

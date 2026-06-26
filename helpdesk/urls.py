@@ -23,6 +23,9 @@ urlpatterns = [
     
     # Real-Time e Partials via HTMX
     path('poll/', views.poll_ticket_updates, name='poll'),
+    path('push/vapid-public-key/', views.push_vapid_public_key, name='push_vapid_public_key'),
+    path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
+    path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
     path('kanban/board/', views.KanbanBoardPartialView.as_view(), name='kanban_board'),
     path('dashboard/metrics/', views.DashboardMetricsPartialView.as_view(), name='dashboard_metrics'),
     
