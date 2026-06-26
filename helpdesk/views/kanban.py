@@ -208,7 +208,6 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
             request,
             self.template_name,
             self._contexto_modal(request, form),
-            status=422,
         )
 
 
@@ -230,7 +229,7 @@ def ticket_category_create(request):
             'pode_gerenciar_categorias': True,
             'erro_categoria': 'Informe o nome da categoria.',
             'painel_nova_categoria_aberto': True,
-        }, status=422)
+        })
 
     categoria = TicketCategory.objects.filter(name__iexact=nome).first()
     if categoria:
@@ -438,7 +437,6 @@ def ticket_edit(request, pk):
         request,
         'helpdesk/_drawer.html',
         _contexto_drawer(request, ticket, edit_form=form),
-        status=422,
     )
 
 
