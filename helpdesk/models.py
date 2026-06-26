@@ -145,14 +145,28 @@ class Ticket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
+    # Prazos padrão de arquivamento automático (em horas)
+    HORAS_ARQUIVAR_RESOLVIDO = 24
+    HORAS_ARQUIVAR_RECUSADO = 24
+
     @classmethod
-    def archive_old_tickets(cls, hours_resolved=24, hours_rejected=24, days_resolved=None):
+    def archive_old_tickets(
+        cls,
+        hours_resolved=None,
+        hours_rejected=None,
+        days_resolved=None,
+        **_kwargs,
+    ):
         """
-        Arquiva tickets RESOLVED após 'hours_resolved' horas e REJECTED após 'hours_rejected' horas.
-        (days_resolved é suportado para manter retrocompatibilidade com scripts externos).
+        Arquiva tickets RESOLVED após N horas e REJECTED após M horas.
+        Aceita hours_resolved ou days_resolved (legado) para evitar erro em deploy parcial.
         """
-        if days_resolved is not None:
+        if hours_resolved is None and days_resolved is not None:
             hours_resolved = days_resolved * 24
+        if hours_resolved is None:
+            hours_resolved = cls.HORAS_ARQUIVAR_RESOLVIDO
+        if hours_rejected is None:
+            hours_rejected = cls.HORAS_ARQUIVAR_RECUSADO
 
         from django.db.models import Q
         now = timezone.now()

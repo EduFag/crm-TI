@@ -1,4 +1,5 @@
 import json
+import logging
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
@@ -32,6 +33,8 @@ from helpdesk.ticket_access import (
     usuarios_tecnicos_para_transferencia,
     usuario_pode_excluir_chamado,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _rotulo_prioridade(valor):
@@ -123,8 +126,11 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Aplica a regra de arquivar antigos antes de carregar o kanban
-        Ticket.archive_old_tickets(hours_resolved=24, hours_rejected=24)
+        # Usa defaults do model — evita TypeError se deploy ficar com assinatura antiga
+        try:
+            Ticket.archive_old_tickets()
+        except Exception:
+            logger.exception('Falha ao arquivar chamados antigos no Kanban')
         
         # Apenas tickets ativos e NÃO arquivados no Kanban
         tickets = filtrar_chamados_para_usuario(
