@@ -146,10 +146,14 @@ class Ticket(models.Model):
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
     @classmethod
-    def archive_old_tickets(cls, hours_resolved=24, hours_rejected=24):
+    def archive_old_tickets(cls, hours_resolved=24, hours_rejected=24, days_resolved=None):
         """
         Arquiva tickets RESOLVED após 'hours_resolved' horas e REJECTED após 'hours_rejected' horas.
+        (days_resolved é suportado para manter retrocompatibilidade com scripts externos).
         """
+        if days_resolved is not None:
+            hours_resolved = days_resolved * 24
+
         from django.db.models import Q
         now = timezone.now()
         resolved_cutoff = now - timedelta(hours=hours_resolved)
