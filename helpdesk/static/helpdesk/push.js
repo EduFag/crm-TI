@@ -16,6 +16,10 @@
     let observadorPermissao = null;
 
     function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute('content')) {
+            return meta.getAttribute('content');
+        }
         const match = document.cookie.match(/csrftoken=([^;]+)/);
         return match ? decodeURIComponent(match[1]) : '';
     }
@@ -386,8 +390,8 @@
         abrirChamadoDaUrl();
 
         if (estadoPermissao === 'granted' && suportaPush()) {
-            registrarSubscription().catch(function() {
-                /* silencioso — chaves VAPID podem não estar configuradas em dev */
+            registrarSubscription().catch(function(err) {
+                console.error('[helpdesk push] Falha ao registrar subscription:', err);
             });
         }
     });
@@ -397,8 +401,8 @@
             await sincronizarEstadoPermissao();
             renderizarBanner();
             if (estadoPermissao === 'granted' && suportaPush()) {
-                registrarSubscription().catch(function() {
-                    /* silencioso */
+                registrarSubscription().catch(function(err) {
+                    console.error('[helpdesk push] Falha ao registrar subscription:', err);
                 });
             }
         }

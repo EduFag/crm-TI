@@ -17,4 +17,5 @@
 </div>
 
 <meta name="helpdesk-push-base" content="{% url 'helpdesk:kanban' %}">
-<script src="{% static 'helpdesk/push.js' %}" defer></script>
+<meta name="csrf-token" content="{{ csrf_token }}">
+<script src="{% static 'helpdesk/push.js' %}?v=3" defer></script>
