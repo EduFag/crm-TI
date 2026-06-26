@@ -5,23 +5,26 @@ from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.cache import cache_control
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core.permissions import MODULO_HELPDESK, requer_modulo
 from helpdesk.models import PushSubscription
 
 
 @cache_control(max_age=3600)
-@require_GET
+@require_http_methods(['GET', 'HEAD'])
 def service_worker_js(request):
     """Serve o SW em /helpdesk/sw.js para escopo correto do Push."""
     caminho = finders.find('helpdesk/sw.js')
     if not caminho:
         return HttpResponse('// Service Worker não encontrado', status=404, content_type='application/javascript')
 
-    conteudo = Path(caminho).read_text(encoding='utf-8')
-    resposta = HttpResponse(conteudo, content_type='application/javascript; charset=utf-8')
+    resposta = HttpResponse(content_type='application/javascript; charset=utf-8')
     resposta['Service-Worker-Allowed'] = '/helpdesk/'
+
+    if request.method == 'GET':
+        resposta.content = Path(caminho).read_text(encoding='utf-8')
+
     return resposta
 
 
