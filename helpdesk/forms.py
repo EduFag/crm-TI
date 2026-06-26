@@ -245,11 +245,6 @@ class TicketCreateForm(forms.ModelForm):
                 cleaned['requester_user'] = None
                 if role == CustomUser.RoleChoices.MULTIPLIER:
                     co_autor_user = buscar_membro_equipe_por_nome(self.user, requester_name)
-                    if not co_autor_user:
-                        self.add_error(
-                            'requester_name',
-                            'Informe o nome completo ou usuário de um membro da equipe.',
-                        )
 
         cleaned['co_autor_user'] = co_autor_user
 
