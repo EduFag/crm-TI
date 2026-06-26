@@ -52,6 +52,12 @@ python manage.py migrate --noinput
 log "Coletando arquivos estáticos..."
 python manage.py collectstatic --noinput
 
+log "Verificando aplicação Django..."
+if ! python manage.py check; then
+    log "ERRO: manage.py check falhou — corrija antes de reiniciar o Gunicorn."
+    exit 1
+fi
+
 log "Ajustando permissões de staticfiles..."
 sudo_deploy chown -R edufa:www-data "${APP_DIR}/staticfiles"
 sudo_deploy chmod -R 755 "${APP_DIR}/staticfiles"
@@ -72,10 +78,14 @@ log "Reiniciando Gunicorn (${SERVICE})..."
 # Com --preload no unit, reload (HUP) não recarrega código Python no master — restart obrigatório após deploy
 sudo_deploy systemctl restart "${SERVICE}"
 
+sleep 2
+
 if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
     log "Deploy finalizado com sucesso."
 else
     log "ERRO: serviço ${SERVICE} não está ativo."
     sudo -n systemctl status "${SERVICE}" --no-pager 2>/dev/null || true
+    log "--- Últimas linhas do journal (${SERVICE}) ---"
+    sudo -n journalctl -u "${SERVICE}" -n 50 --no-pager 2>/dev/null || true
     exit 1
 fi
