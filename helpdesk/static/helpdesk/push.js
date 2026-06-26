@@ -1,5 +1,6 @@
 /**
  * Registro Web Push e pedido de permissão — helpdesk.
+ * requestPermission() deve ser chamado no mesmo stack do clique (sem DOM/await antes).
  */
 (function() {
     'use strict';
@@ -7,6 +8,9 @@
     const STORAGE_KEY = 'helpdesk_push_banner';
     const SW_URL = '/static/helpdesk/sw.js';
     const SW_SCOPE = '/helpdesk/';
+
+    let estadoPermissao = 'prompt'; // granted | prompt | denied
+    let observadorPermissao = null;
 
     function getCsrfToken() {
         const match = document.cookie.match(/csrftoken=([^;]+)/);
@@ -41,56 +45,53 @@
         return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     }
 
+    function mapearEstadoLegado() {
+        if (Notification.permission === 'granted') {
+            return 'granted';
+        }
+        if (Notification.permission === 'denied') {
+            return 'denied';
+        }
+        return 'prompt';
+    }
+
+    async function sincronizarEstadoPermissao() {
+        if (!suportaPush()) {
+            estadoPermissao = 'denied';
+            return estadoPermissao;
+        }
+
+        if ('permissions' in navigator) {
+            try {
+                const status = await navigator.permissions.query({ name: 'notifications' });
+                estadoPermissao = status.state;
+
+                if (!observadorPermissao) {
+                    observadorPermissao = status;
+                    status.onchange = function() {
+                        estadoPermissao = status.state;
+                        renderizarBanner();
+                        atualizarToggleNav();
+                        if (status.state === 'granted') {
+                            concluirAtivacao();
+                        }
+                    };
+                }
+                return estadoPermissao;
+            } catch (err) {
+                /* Safari antigo ou API indisponível */
+            }
+        }
+
+        estadoPermissao = mapearEstadoLegado();
+        return estadoPermissao;
+    }
+
     function esconderBanner() {
         const banner = document.getElementById('helpdesk-push-banner');
         if (banner) {
             banner.classList.add('hidden');
         }
-    }
-
-    function mostrarBannerElemento() {
-        const banner = document.getElementById('helpdesk-push-banner');
-        if (banner) {
-            banner.classList.remove('hidden');
-            banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
-
-    function atualizarNavPush() {
-        const btn = document.getElementById('helpdesk-push-nav-btn');
-        const label = document.getElementById('helpdesk-push-nav-label');
-        if (!btn || !label) {
-            return;
-        }
-
-        if (!suportaPush()) {
-            btn.classList.add('hidden');
-            return;
-        }
-
-        btn.classList.remove('hidden');
-
-        const permissao = Notification.permission;
-        if (permissao === 'granted') {
-            label.textContent = 'Notificações ativas';
-            btn.classList.remove('text-slate-500', 'hover:text-blue-600', 'text-amber-600', 'hover:text-amber-700');
-            btn.classList.add('text-green-600', 'cursor-default');
-            btn.disabled = true;
-            return;
-        }
-
-        btn.disabled = false;
-        btn.classList.remove('text-green-600', 'cursor-default');
-        if (permissao === 'denied') {
-            label.textContent = 'Reativar notificações';
-            btn.classList.remove('text-slate-500', 'hover:text-blue-600');
-            btn.classList.add('text-amber-600', 'hover:text-amber-700');
-            return;
-        }
-
-        label.textContent = 'Ativar notificações';
-        btn.classList.remove('text-amber-600', 'hover:text-amber-700', 'text-green-600');
-        btn.classList.add('text-slate-500', 'hover:text-blue-600');
     }
 
     function mostrarFeedbackBanner(mensagem) {
@@ -103,10 +104,8 @@
 
     function textoAjudaNegado() {
         return (
-            'Se o Chrome mostra "Sem permissão (padrão)", clique em ' +
-            '<strong>Ativar notificações</strong> abaixo para abrir o prompt do navegador. ' +
-            'Se estiver bloqueado de vez, use o cadeado → Notificações → ' +
-            '<strong>Redefinir permissão</strong> e clique em Ativar novamente.'
+            'O Chrome não permite abrir as configurações por código. ' +
+            'Clique no cadeado → Notificações → Redefinir permissão → volte e ligue o toggle acima.'
         );
     }
 
@@ -117,6 +116,35 @@
         btn.className = classes;
         btn.addEventListener('click', onclick);
         return btn;
+    }
+
+    function atualizarToggleNav() {
+        const toggle = document.getElementById('helpdesk-push-toggle');
+        const track = document.getElementById('helpdesk-push-toggle-track');
+        const knob = document.getElementById('helpdesk-push-toggle-knob');
+        const label = document.getElementById('helpdesk-push-nav-label');
+        if (!toggle || !track || !knob || !label) {
+            return;
+        }
+
+        if (!suportaPush()) {
+            toggle.classList.add('hidden');
+            return;
+        }
+
+        toggle.classList.remove('hidden');
+
+        const ativo = estadoPermissao === 'granted';
+        label.textContent = ativo ? 'Notificações ativas' : 'Notificações';
+        label.classList.toggle('text-green-700', ativo);
+        label.classList.toggle('text-slate-600', !ativo);
+
+        track.classList.toggle('bg-green-500', ativo);
+        track.classList.toggle('bg-slate-300', !ativo);
+        track.classList.toggle('bg-amber-400', !ativo && estadoPermissao === 'denied');
+
+        knob.classList.toggle('translate-x-6', ativo);
+        knob.classList.toggle('translate-x-1', !ativo);
     }
 
     function renderizarBanner() {
@@ -130,15 +158,13 @@
 
         if (!suportaPush()) {
             esconderBanner();
-            atualizarNavPush();
+            atualizarToggleNav();
             return;
         }
 
-        const permissao = Notification.permission;
-
-        if (permissao === 'granted') {
+        if (estadoPermissao === 'granted') {
             esconderBanner();
-            atualizarNavPush();
+            atualizarToggleNav();
             return;
         }
 
@@ -146,58 +172,104 @@
         banner.classList.remove('hidden', 'bg-blue-50', 'border-blue-200', 'text-blue-900');
         banner.classList.remove('bg-amber-50', 'border-amber-300', 'text-amber-950');
 
-        if (permissao === 'denied') {
+        if (estadoPermissao === 'denied') {
             banner.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-950');
-            texto.textContent = 'Notificações desativadas neste site';
+            texto.textContent = 'Notificações bloqueadas pelo navegador';
             ajuda.innerHTML = textoAjudaNegado();
             ajuda.classList.remove('hidden');
             acoes.appendChild(criarBotao(
-                'Ativar notificações',
+                'Como reativar',
                 'px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors',
-                solicitarPermissao
+                function() {
+                    mostrarFeedbackBanner(
+                        'Cadeado na barra de endereço → Notificações → Redefinir permissão. ' +
+                        'Depois ligue o toggle "Notificações" no canto superior direito.'
+                    );
+                }
             ));
-            atualizarNavPush();
+            atualizarToggleNav();
             return;
         }
 
-        // permission === 'default' — banner opcional; o botão da nav sempre dispara o prompt nativo
+        // prompt — pode abrir popup nativo no clique
         if (localStorage.getItem(STORAGE_KEY) === 'dismissed') {
             esconderBanner();
-            atualizarNavPush();
+            atualizarToggleNav();
             return;
         }
 
         banner.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-900');
-        texto.textContent = 'Receba alertas de chamados mesmo com o navegador fechado — comentários, movimentações e alterações de prioridade.';
+        texto.textContent = 'Receba alertas de chamados mesmo com o navegador fechado.';
         ajuda.classList.add('hidden');
         ajuda.textContent = '';
         acoes.appendChild(criarBotao(
             'Ativar notificações',
             'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors',
-            solicitarPermissao
+            pedirPermissaoNoClique
         ));
         acoes.appendChild(criarBotao(
             'Agora não',
             'px-4 py-2 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors',
             dispensarBanner
         ));
-        atualizarNavPush();
+        atualizarToggleNav();
     }
 
-    function clicarNavPush() {
+    function tratarResultadoPermissao(resultado) {
+        localStorage.setItem(STORAGE_KEY, resultado === 'default' ? 'dismissed' : resultado);
+
+        if (resultado === 'granted') {
+            estadoPermissao = 'granted';
+            concluirAtivacao();
+            return;
+        }
+
+        if (resultado === 'denied') {
+            estadoPermissao = 'denied';
+        } else {
+            estadoPermissao = 'prompt';
+        }
+
+        renderizarBanner();
+
+        if (resultado === 'denied') {
+            mostrarFeedbackBanner(
+                'O Chrome bloqueou o prompt (permissão negada). ' +
+                'Use o cadeado → Notificações → Redefinir permissão e ligue o toggle novamente.'
+            );
+        }
+    }
+
+    function pedirPermissaoNoClique() {
         if (!suportaPush()) {
             alert('Seu navegador não suporta notificações push.');
             return;
         }
 
         if (Notification.permission === 'granted') {
+            estadoPermissao = 'granted';
+            concluirAtivacao();
+            return;
+        }
+
+        // Sem await/DOM antes — preserva gesto do usuário para o popup nativo
+        Notification.requestPermission().then(tratarResultadoPermissao);
+    }
+
+    function clicarToggleNav(event) {
+        event.preventDefault();
+
+        if (!suportaPush()) {
+            alert('Seu navegador não suporta notificações push.');
+            return;
+        }
+
+        if (estadoPermissao === 'granted') {
             return;
         }
 
         localStorage.removeItem(STORAGE_KEY);
-        renderizarBanner();
-        mostrarBannerElemento();
-        solicitarPermissao();
+        pedirPermissaoNoClique();
     }
 
     async function buscarChavePublica() {
@@ -242,49 +314,17 @@
         try {
             await registrarSubscription();
             esconderBanner();
-            atualizarNavPush();
+            atualizarToggleNav();
         } catch (err) {
             console.error('Erro ao ativar push:', err);
             alert('Não foi possível ativar as notificações. Verifique se o servidor está configurado com chaves VAPID.');
         }
     }
 
-    async function solicitarPermissao() {
-        if (!suportaPush()) {
-            alert('Seu navegador não suporta notificações push.');
-            return;
-        }
-
-        const antes = Notification.permission;
-
-        if (antes === 'granted') {
-            localStorage.removeItem(STORAGE_KEY);
-            await concluirAtivacao();
-            return;
-        }
-
-        // Gesto do usuário: abre o prompt nativo quando permission === 'default'
-        const resultado = await Notification.requestPermission();
-        localStorage.setItem(STORAGE_KEY, resultado === 'default' ? 'dismissed' : resultado);
-
-        if (resultado === 'granted') {
-            await concluirAtivacao();
-            return;
-        }
-
-        renderizarBanner();
-
-        if (resultado === 'denied' || Notification.permission === 'denied') {
-            mostrarFeedbackBanner(
-                'O navegador bloqueou o prompt. Abra o cadeado → Notificações → Redefinir permissão → clique em Ativar notificações.'
-            );
-        }
-    }
-
     function dispensarBanner() {
         localStorage.setItem(STORAGE_KEY, 'dismissed');
         esconderBanner();
-        atualizarNavPush();
+        atualizarToggleNav();
     }
 
     function abrirChamadoDaUrl() {
@@ -314,31 +354,33 @@
     }
 
     window.helpdeskPush = {
-        ativar: solicitarPermissao,
+        ativar: pedirPermissaoNoClique,
         dispensar: dispensarBanner,
         suportaPush: suportaPush,
     };
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const navBtn = document.getElementById('helpdesk-push-nav-btn');
-        if (navBtn) {
-            navBtn.addEventListener('click', clicarNavPush);
+    document.addEventListener('DOMContentLoaded', async function() {
+        const toggle = document.getElementById('helpdesk-push-toggle');
+        if (toggle) {
+            toggle.addEventListener('click', clicarToggleNav);
         }
 
+        await sincronizarEstadoPermissao();
         renderizarBanner();
         abrirChamadoDaUrl();
 
-        if (Notification.permission === 'granted' && suportaPush()) {
+        if (estadoPermissao === 'granted' && suportaPush()) {
             registrarSubscription().catch(function() {
                 /* silencioso — chaves VAPID podem não estar configuradas em dev */
             });
         }
     });
 
-    document.addEventListener('visibilitychange', function() {
+    document.addEventListener('visibilitychange', async function() {
         if (document.visibilityState === 'visible') {
+            await sincronizarEstadoPermissao();
             renderizarBanner();
-            if (Notification.permission === 'granted' && suportaPush()) {
+            if (estadoPermissao === 'granted' && suportaPush()) {
                 registrarSubscription().catch(function() {
                     /* silencioso */
                 });

@@ -13,13 +13,16 @@
     </a>
     {% endif %}
     <button type="button"
-            id="helpdesk-push-nav-btn"
-            class="hidden ml-auto pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 text-slate-500 hover:text-blue-600"
-            title="Ativar alertas de chamados no navegador">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-        </svg>
-        <span id="helpdesk-push-nav-label">Ativar notificações</span>
+            id="helpdesk-push-toggle"
+            class="hidden ml-auto pb-3 flex items-center gap-2.5 cursor-pointer select-none"
+            title="Ligar alertas de chamados no navegador">
+        <span id="helpdesk-push-nav-label" class="text-sm font-medium text-slate-600">Notificações</span>
+        <span id="helpdesk-push-toggle-track"
+              class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full bg-slate-300 transition-colors"
+              aria-hidden="true">
+            <span id="helpdesk-push-toggle-knob"
+                  class="inline-block h-4 w-4 translate-x-1 rounded-full bg-white shadow transition-transform"></span>
+        </span>
     </button>
 </div>
 {% include "helpdesk/_push_banner.html" %}
