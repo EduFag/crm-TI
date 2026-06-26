@@ -4,5 +4,6 @@
 # Permissões do arquivo: chmod 440 /etc/sudoers.d/crm-ti-deploy
 #
 # Necessário para o GitHub Actions (usuário edufa) rodar .vps/deploy.sh
+# IMPORTANTE: use "systemctl is-active crm-ti" sem flags extras — o sudo exige comando exato.
 
 edufa ALL=(ALL) NOPASSWD: /bin/cp /home/edufa/crm-TI/.vps/gunicorn.service.exemple /etc/systemd/system/crm-ti.service, /usr/bin/systemctl daemon-reload, /usr/bin/systemctl reload crm-ti, /usr/bin/systemctl restart crm-ti, /usr/bin/systemctl stop crm-ti, /usr/bin/systemctl start crm-ti, /usr/bin/systemctl is-active crm-ti, /usr/bin/systemctl status crm-ti, /usr/bin/journalctl -u crm-ti*, /usr/bin/chown, /bin/chmod

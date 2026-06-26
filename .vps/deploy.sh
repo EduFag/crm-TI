@@ -92,9 +92,11 @@ else
 fi
 
 # Aguarda até 45s — unit usa graceful-timeout 30s + TimeoutStopSec 35s
+# Nota: sudoers deve permitir exatamente "systemctl is-active crm-ti" (sem --quiet).
 log "Aguardando ${SERVICE} ficar ativo..."
 for tentativa in $(seq 1 15); do
-    if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
+    estado="$(sudo -n systemctl is-active "${SERVICE}" 2>/dev/null || true)"
+    if [[ "${estado}" == "active" ]]; then
         log "Deploy finalizado com sucesso."
         exit 0
     fi
