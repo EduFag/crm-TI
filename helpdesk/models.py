@@ -142,6 +142,11 @@ class Ticket(models.Model):
     # Soft delete, arquivamento e timestamps
     is_active = models.BooleanField(default=True, help_text='Indica se o registro está ativo (Soft delete).')
     is_archived = models.BooleanField(default=False, help_text='Indica se o chamado foi arquivado após um tempo resolvido.')
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Momento em que o chamado foi finalizado/resolvido (base do arquivamento automático).',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
@@ -171,12 +176,14 @@ class Ticket(models.Model):
         from django.db.models import Q
         now = timezone.now()
         resolved_cutoff = now - timedelta(hours=hours_resolved)
-        rejected_cutoff = now - timedelta(hours=hours_rejected)
-        
+
+        # Usa resolved_at (fixo na finalização), não updated_at (muda com comentários/visualizações)
         cls.objects.filter(
-            Q(status=cls.StatusChoices.RESOLVED, updated_at__lt=resolved_cutoff) |
-            Q(is_rejected=True, updated_at__lt=rejected_cutoff),
-            is_archived=False
+            status=cls.StatusChoices.RESOLVED,
+            is_archived=False,
+        ).filter(
+            Q(resolved_at__lt=resolved_cutoff, resolved_at__isnull=False)
+            | Q(resolved_at__isnull=True, updated_at__lt=resolved_cutoff),
         ).update(is_archived=True)
 
     def save(self, *args, **kwargs):
@@ -185,8 +192,14 @@ class Ticket(models.Model):
                 old_status = Ticket.objects.only('status').get(pk=self.pk).status
                 if old_status != self.status:
                     self.is_archived = False
+                    if self.status == self.StatusChoices.RESOLVED:
+                        self.resolved_at = timezone.now()
+                    elif old_status == self.StatusChoices.RESOLVED:
+                        self.resolved_at = None
             except Ticket.DoesNotExist:
                 pass
+        elif self.status == self.StatusChoices.RESOLVED:
+            self.resolved_at = timezone.now()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

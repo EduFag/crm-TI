@@ -14,6 +14,7 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
     def dispatch(self, request, *args, **kwargs):
         if not usuario_pode_acessar_dashboard_e_historico(request.user):
             return resposta_sem_permissao(request)
+        Ticket.archive_old_tickets()
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):

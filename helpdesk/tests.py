@@ -1,4 +1,6 @@
 from django.test import TestCase
+from django.utils import timezone
+from datetime import timedelta
 
 from core.models import CustomUser, Equipe
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
@@ -223,3 +225,51 @@ class RbacHelpdeskTestCase(TestCase):
         self.ticket_equipe.co_authors.add(self.multiplier)
         qs = filtrar_chamados_para_usuario(Ticket.objects.all(), self.multiplier)
         self.assertEqual(qs.count(), 2)
+
+
+class ArquivamentoAutomaticoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+
+    def test_arquiva_resolvido_apos_24h_por_resolved_at(self):
+        """Comentários não devem adiar arquivamento — usa resolved_at, não updated_at."""
+        ticket = Ticket.objects.create(
+            title="Chamado antigo",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.RESOLVED,
+            resolved_at=timezone.now() - timedelta(hours=25),
+        )
+        ticket.updated_at = timezone.now()
+        ticket.save(update_fields=['updated_at'])
+
+        Ticket.archive_old_tickets()
+        ticket.refresh_from_db()
+        self.assertTrue(ticket.is_archived)
+
+    def test_nao_arquiva_resolvido_recente(self):
+        ticket = Ticket.objects.create(
+            title="Chamado novo",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.RESOLVED,
+            resolved_at=timezone.now() - timedelta(hours=2),
+        )
+        Ticket.archive_old_tickets()
+        ticket.refresh_from_db()
+        self.assertFalse(ticket.is_archived)
+
+    def test_save_define_resolved_at_ao_finalizar(self):
+        ticket = Ticket.objects.create(
+            title="Em atendimento",
+            description="Desc",
+            category=self.categoria,
+            requester_name="Teste",
+            status=Ticket.StatusChoices.IN_PROGRESS,
+        )
+        ticket.status = Ticket.StatusChoices.RESOLVED
+        ticket.save()
+        ticket.refresh_from_db()
+        self.assertIsNotNone(ticket.resolved_at)

@@ -46,4 +46,4 @@ Implementação central: `ticket_access.py`. Skill do agente: `.agent/skills/rba
 
 ## Status do Kanban (`Ticket.StatusChoices`)
 
-Novos → Em Atendimento → Pendente → Resolvido (arquivamento automático após 24h resolvido ou 24h recusado).
+Novos → Em Atendimento → Pendente → Resolvido (arquivamento automático 24h após finalização, via `resolved_at`).
