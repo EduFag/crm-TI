@@ -259,6 +259,17 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Web Push (helpdesk) — gere chaves com: python -m py_vapid --applicationServerKey
-VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+def _carregar_vapid_private_key(valor: str) -> str:
+    """Aceita conteúdo PEM ou caminho para arquivo .pem na VPS."""
+    valor = (valor or '').strip()
+    if not valor:
+        return ''
+    caminho = Path(valor)
+    if caminho.is_file():
+        return caminho.read_text(encoding='utf-8').strip()
+    return valor
+
+
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+VAPID_PRIVATE_KEY = _carregar_vapid_private_key(os.environ.get('VAPID_PRIVATE_KEY', ''))
 VAPID_ADMIN_EMAIL = os.environ.get('VAPID_ADMIN_EMAIL', 'mailto:ti@localhost')

@@ -26,6 +26,7 @@ urlpatterns = [
     path('push/vapid-public-key/', views.push_vapid_public_key, name='push_vapid_public_key'),
     path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
+    path('sw.js', views.service_worker_js, name='service_worker'),
     path('kanban/board/', views.KanbanBoardPartialView.as_view(), name='kanban_board'),
     path('dashboard/metrics/', views.DashboardMetricsPartialView.as_view(), name='dashboard_metrics'),
     

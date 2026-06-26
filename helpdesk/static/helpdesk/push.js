@@ -6,8 +6,11 @@
     'use strict';
 
     const STORAGE_KEY = 'helpdesk_push_banner';
-    const SW_URL = '/static/helpdesk/sw.js';
     const SW_SCOPE = '/helpdesk/';
+
+    function urlServiceWorker() {
+        return urlBaseHelpdesk() + 'sw.js';
+    }
 
     let estadoPermissao = 'prompt'; // granted | prompt | denied
     let observadorPermissao = null;
@@ -283,15 +286,27 @@
 
     async function registrarSubscription() {
         const publicKey = await buscarChavePublica();
-        const registration = await navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
+        const swUrl = urlServiceWorker();
+        let registration;
+
+        try {
+            registration = await navigator.serviceWorker.register(swUrl, { scope: SW_SCOPE });
+        } catch (err) {
+            throw new Error('Falha ao registrar Service Worker (' + swUrl + '): ' + err.message);
+        }
+
         await navigator.serviceWorker.ready;
 
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(publicKey),
-            });
+            try {
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey),
+                });
+            } catch (err) {
+                throw new Error('Falha ao inscrever no Push: ' + err.message);
+            }
         }
 
         const response = await fetch(urlSubscribe(), {
@@ -305,7 +320,8 @@
         });
 
         if (!response.ok) {
-            throw new Error('Falha ao salvar subscription');
+            const detalhe = await response.text();
+            throw new Error('Servidor recusou subscription (' + response.status + '): ' + detalhe);
         }
         return subscription;
     }
@@ -317,7 +333,7 @@
             atualizarToggleNav();
         } catch (err) {
             console.error('Erro ao ativar push:', err);
-            alert('Não foi possível ativar as notificações. Verifique se o servidor está configurado com chaves VAPID.');
+            alert(err.message || 'Não foi possível ativar as notificações.');
         }
     }
 

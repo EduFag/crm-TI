@@ -1,11 +1,28 @@
 import json
+from pathlib import Path
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.contrib.staticfiles import finders
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET, require_POST
 
 from core.permissions import MODULO_HELPDESK, requer_modulo
 from helpdesk.models import PushSubscription
+
+
+@cache_control(max_age=3600)
+@require_GET
+def service_worker_js(request):
+    """Serve o SW em /helpdesk/sw.js para escopo correto do Push."""
+    caminho = finders.find('helpdesk/sw.js')
+    if not caminho:
+        return HttpResponse('// Service Worker não encontrado', status=404, content_type='application/javascript')
+
+    conteudo = Path(caminho).read_text(encoding='utf-8')
+    resposta = HttpResponse(conteudo, content_type='application/javascript; charset=utf-8')
+    resposta['Service-Worker-Allowed'] = '/helpdesk/'
+    return resposta
 
 
 @requer_modulo(MODULO_HELPDESK)
@@ -13,7 +30,7 @@ from helpdesk.models import PushSubscription
 def push_vapid_public_key(request):
     """Retorna a chave pública VAPID para inscrição no browser."""
     chave = settings.VAPID_PUBLIC_KEY
-    if not chave:
+    if not chave or not settings.VAPID_PRIVATE_KEY:
         return JsonResponse({'error': 'Web Push não configurado no servidor.'}, status=503)
     return JsonResponse({'publicKey': chave})
 
