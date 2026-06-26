@@ -10,6 +10,7 @@ APP_DIR="/home/edufa/crm-TI"
 VENV="${APP_DIR}/myvenv"
 BRANCH="main"
 SERVICE="crm-ti"
+GUNICORN_PORT=9001
 
 log() {
     echo "[deploy $(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -75,10 +76,15 @@ else
 fi
 
 log "Reiniciando Gunicorn (${SERVICE})..."
-# Com --preload no unit, reload (HUP) não recarrega código Python no master — restart obrigatório após deploy
-sudo_deploy systemctl restart "${SERVICE}"
-
+# Para limpar processo preso na porta (deploy anterior interrompido)
+sudo_deploy systemctl stop "${SERVICE}" 2>/dev/null || true
 sleep 2
+if command -v fuser >/dev/null 2>&1; then
+    sudo -n fuser -k "${GUNICORN_PORT}/tcp" 2>/dev/null || true
+fi
+sudo_deploy systemctl start "${SERVICE}"
+
+sleep 3
 
 if sudo -n systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
     log "Deploy finalizado com sucesso."
