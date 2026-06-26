@@ -75,7 +75,7 @@
         <div class="grid grid-cols-2 gap-4 text-sm bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div>
                 <span class="block text-slate-400 font-medium text-xs uppercase mb-1">Solicitante</span>
-                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 border border-blue-100">{{ ticket.requester_name }}</span>
+                <span class="font-medium text-slate-800">{{ ticket.requester_name }}</span>
                 {% if ticket.requester_user %}
                 <span class="block text-xs text-slate-400 mt-1">@{{ ticket.requester_user.username }}</span>
                 {% endif %}

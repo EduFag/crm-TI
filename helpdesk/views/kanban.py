@@ -124,7 +124,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         
         # Aplica a regra de arquivar antigos antes de carregar o kanban
-        Ticket.archive_old_tickets(days_resolved=2, hours_rejected=24)
+        Ticket.archive_old_tickets(hours_resolved=24, hours_rejected=24)
         
         # Apenas tickets ativos e NÃO arquivados no Kanban
         tickets = filtrar_chamados_para_usuario(
