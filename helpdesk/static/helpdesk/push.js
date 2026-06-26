@@ -26,10 +26,6 @@
         return urlBaseHelpdesk() + 'push/subscribe/';
     }
 
-    function urlUnsubscribe() {
-        return urlBaseHelpdesk() + 'push/unsubscribe/';
-    }
-
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -52,20 +48,82 @@
         }
     }
 
-    function mostrarBanner() {
-        if (!suportaPush()) {
-            return;
-        }
-        if (Notification.permission !== 'default') {
-            return;
-        }
-        if (localStorage.getItem(STORAGE_KEY) === 'dismissed') {
-            return;
-        }
+    function textoAjudaNegado() {
+        return (
+            'No Chrome: clique no cadeado à esquerda do endereço → ' +
+            '<strong>Notificações</strong> → ligue a opção (ou clique em ' +
+            '<strong>Redefinir permissão</strong>) → depois clique em <strong>Verificar</strong> aqui. ' +
+            'O navegador não permite que sites abram essa tela automaticamente por segurança.'
+        );
+    }
+
+    function criarBotao(label, classes, onclick) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.className = classes;
+        btn.addEventListener('click', onclick);
+        return btn;
+    }
+
+    function renderizarBanner() {
         const banner = document.getElementById('helpdesk-push-banner');
-        if (banner) {
-            banner.classList.remove('hidden');
+        const texto = document.getElementById('helpdesk-push-texto');
+        const ajuda = document.getElementById('helpdesk-push-ajuda');
+        const acoes = document.getElementById('helpdesk-push-acoes');
+        if (!banner || !texto || !ajuda || !acoes) {
+            return;
         }
+
+        if (!suportaPush()) {
+            esconderBanner();
+            return;
+        }
+
+        const permissao = Notification.permission;
+
+        if (permissao === 'granted') {
+            esconderBanner();
+            return;
+        }
+
+        acoes.innerHTML = '';
+        banner.classList.remove('hidden', 'bg-blue-50', 'border-blue-200', 'text-blue-900');
+        banner.classList.remove('bg-amber-50', 'border-amber-300', 'text-amber-950');
+
+        if (permissao === 'denied') {
+            banner.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-950');
+            texto.textContent = 'Notificações bloqueadas neste site';
+            ajuda.innerHTML = textoAjudaNegado();
+            ajuda.classList.remove('hidden');
+            acoes.appendChild(criarBotao(
+                'Verificar',
+                'px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors',
+                verificarPermissao
+            ));
+            return;
+        }
+
+        // permission === 'default'
+        if (localStorage.getItem(STORAGE_KEY) === 'dismissed') {
+            esconderBanner();
+            return;
+        }
+
+        banner.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-900');
+        texto.textContent = 'Receba alertas de chamados mesmo com o navegador fechado — comentários, movimentações e alterações de prioridade.';
+        ajuda.classList.add('hidden');
+        ajuda.textContent = '';
+        acoes.appendChild(criarBotao(
+            'Ativar notificações',
+            'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors',
+            ativarNotificacoes
+        ));
+        acoes.appendChild(criarBotao(
+            'Agora não',
+            'px-4 py-2 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors',
+            dispensarBanner
+        ));
     }
 
     async function buscarChavePublica() {
@@ -112,11 +170,21 @@
             return;
         }
 
+        if (Notification.permission === 'denied') {
+            renderizarBanner();
+            return;
+        }
+
         const permissao = await Notification.requestPermission();
         localStorage.setItem(STORAGE_KEY, permissao === 'default' ? 'dismissed' : permissao);
 
+        if (permissao === 'denied') {
+            renderizarBanner();
+            return;
+        }
+
         if (permissao !== 'granted') {
-            esconderBanner();
+            renderizarBanner();
             return;
         }
 
@@ -127,6 +195,21 @@
             console.error('Erro ao ativar push:', err);
             alert('Não foi possível ativar as notificações. Verifique se o servidor está configurado com chaves VAPID.');
         }
+    }
+
+    async function verificarPermissao() {
+        if (Notification.permission === 'granted') {
+            localStorage.removeItem(STORAGE_KEY);
+            try {
+                await registrarSubscription();
+            } catch (err) {
+                console.error('Erro ao registrar push:', err);
+            }
+            esconderBanner();
+            return;
+        }
+        renderizarBanner();
+        alert('Notificações ainda estão desligadas. Siga os passos no banner (cadeado → Notificações → permitir) e clique em Verificar novamente.');
     }
 
     function dispensarBanner() {
@@ -162,18 +245,25 @@
 
     window.helpdeskPush = {
         ativar: ativarNotificacoes,
+        verificar: verificarPermissao,
         dispensar: dispensarBanner,
         suportaPush: suportaPush,
     };
 
     document.addEventListener('DOMContentLoaded', function() {
-        mostrarBanner();
+        renderizarBanner();
         abrirChamadoDaUrl();
 
         if (Notification.permission === 'granted' && suportaPush()) {
             registrarSubscription().catch(function() {
                 /* silencioso — chaves VAPID podem não estar configuradas em dev */
             });
+        }
+    });
+
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            renderizarBanner();
         }
     });
 })();
