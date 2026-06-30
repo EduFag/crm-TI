@@ -414,8 +414,7 @@
                     <tbody class="divide-y divide-slate-100">
                         {% for mov in recent_movements %}
                         <tr class="hover:bg-slate-50">
-                            <td class="px-6 py-3.5 text-slate-600 font-mono text-xs">{{ mov.timestamp|date:"d/m/Y H:i"
-                                }}</td>
+                            <td class="px-6 py-3.5 text-slate-600 font-mono text-xs">{{ mov.timestamp|date:"d/m/Y H:i" }}</td>
                             <td class="px-6 py-3.5 font-semibold text-slate-900">{{ mov.chip.line_number }} <span
                                     class="text-xs font-normal text-slate-500">({{ mov.chip.operator.name }})</span>
                             </td>
@@ -446,8 +445,7 @@
                 </table>
                 <!-- Pagination Movimentações -->
                 <div class="flex justify-between items-center px-6 py-3 border-t border-slate-200 bg-slate-50">
-                    <span class="text-xs text-slate-500">Página {{ recent_movements.number }} de {{
-                        recent_movements.paginator.num_pages }}</span>
+                    <span class="text-xs text-slate-500">Página {{ recent_movements.number }} de {{ recent_movements.paginator.num_pages }}</span>
                     <div class="flex gap-1">
                         {% if recent_movements.has_previous %}
                         <a href="?tab=chips&movs_page={{ recent_movements.previous_page_number }}{% if movs_line %}&movs_line={{ movs_line }}{% endif %}"
