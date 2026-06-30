@@ -127,18 +127,13 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             status=Chip.StatusChoices.LOST
         ).count()
 
-        hoje = timezone.localdate()
-        limite = hoje + timedelta(days=30)
+        from chips.queries import _calcular_ciclo
         vencendo = 0
         for chip in chips_com_anotacoes_operacionais(
             Chip.objects.filter(status=Chip.StatusChoices.IN_USE)
         ):
-            cycle_start = None
-            if chip.last_recharge_at:
-                cycle_start = _para_data(chip.last_recharge_at)
-            elif chip.activated_at:
-                cycle_start = chip.activated_at
-            if cycle_start and cycle_start + timedelta(days=90) <= limite:
+            _, _, status = _calcular_ciclo(chip)
+            if status in ('warning', 'danger'):
                 vencendo += 1
         context['recharge_due_soon'] = vencendo
 

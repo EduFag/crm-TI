@@ -80,7 +80,9 @@ def _calcular_ciclo(chip):
 
     if days_to_recharge < 0:
         status = 'overdue'
-    elif days_to_recharge <= 30:
+    elif days_to_recharge <= 5:
+        status = 'danger'
+    elif days_to_recharge <= 10:
         status = 'warning'
     else:
         status = 'ok'

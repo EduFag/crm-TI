@@ -13,45 +13,35 @@
         <div class="flex flex-wrap gap-2">
             <!-- Botões da aba Chips -->
             <div data-tab-actions="chips" class="flex flex-wrap gap-2">
-                <button type="button"
-                        hx-get="{% url 'chips:chip_create' %}"
-                        hx-target="#modal-container"
-                        hx-swap="innerHTML"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
+                <button type="button" hx-get="{% url 'chips:chip_create' %}" hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
                     + Novo Chip
                 </button>
-                <button type="button"
-                        hx-get="{% url 'chips:general_transfer' %}"
-                        hx-target="#modal-container"
-                        hx-swap="innerHTML"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
+                <button type="button" hx-get="{% url 'chips:general_transfer' %}" hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
                     Transferência
                 </button>
-                <button type="button"
-                        hx-get="{% url 'chips:recharge_create' %}"
-                        hx-target="#modal-container"
-                        hx-swap="innerHTML"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
+                <button type="button" hx-get="{% url 'chips:recharge_create' %}" hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
                     Nova Recarga
                 </button>
             </div>
             <!-- Botões da aba Operadoras -->
             <div data-tab-actions="operators" class="flex gap-2 hidden">
-                <button type="button"
-                        hx-get="{% url 'chips:operator_create' %}"
-                        hx-target="#modal-container"
-                        hx-swap="innerHTML"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                <button type="button" hx-get="{% url 'chips:operator_create' %}" hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
                     + Nova Operadora
                 </button>
             </div>
             <!-- Botões da aba Envelopes -->
             <div data-tab-actions="envelopes" class="flex gap-2 hidden">
-                <button type="button"
-                        hx-get="{% url 'chips:batch_create' %}"
-                        hx-target="#modal-container"
-                        hx-swap="innerHTML"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                <button type="button" hx-get="{% url 'chips:batch_create' %}" hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
                     + Novo envelope
                 </button>
             </div>
@@ -80,15 +70,15 @@
     <!-- Navegação de abas -->
     <nav class="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6" id="chips-tabs-nav" role="tablist">
         <button type="button" role="tab" data-tab="chips"
-                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
             Chips
         </button>
         <button type="button" role="tab" data-tab="operators"
-                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
             Operadoras
         </button>
         <button type="button" role="tab" data-tab="envelopes"
-                class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            class="chips-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
             Envelopes
         </button>
     </nav>
@@ -118,7 +108,7 @@
                     <h3 class="text-2xl font-bold text-emerald-600">{{ metric_available }}</h3>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-                    <p class="text-xs font-semibold text-slate-500 uppercase">Vencem em 30 dias</p>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Vencem em 10 dias</p>
                     <h3 class="text-2xl font-bold text-amber-600">{{ recharge_due_soon }}</h3>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
@@ -133,30 +123,35 @@
         </div>
 
         <div class="mb-4">
-            <p class="text-sm text-slate-500">Gerencie chips do inventário, registre novos, transfira posse ou devolva à TI. Ciclo de recarga: 90 dias.</p>
+            <p class="text-sm text-slate-500">Gerencie chips do inventário, registre novos, transfira posse ou devolva à
+                TI. Ciclo de recarga: 90 dias.</p>
         </div>
 
         <!-- Barra de Filtros -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-end gap-4">
             <div class="flex-1 min-w-[200px]">
-                <label for="filter-chip-text" class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Pesquisa rápida</label>
-                <input type="text" id="filter-chip-text" onkeyup="filterChips()" placeholder="Pesquise por linha, funcionário..."
-                       class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white">
+                <label for="filter-chip-text"
+                    class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Pesquisa rápida</label>
+                <input type="text" id="filter-chip-text" onkeyup="filterChips()"
+                    placeholder="Pesquise por linha, funcionário..."
+                    class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white">
             </div>
             <div class="w-48 flex-shrink-0">
-                <label for="filter-chip-operator" class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Operadora</label>
+                <label for="filter-chip-operator"
+                    class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Operadora</label>
                 <select id="filter-chip-operator" onchange="filterChips()"
-                        class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                    class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                     <option value="">Qualquer Operadora</option>
                     {% for op in operators_filter %}
-                        <option value="{{ op.id }}">{{ op.name }}</option>
+                    <option value="{{ op.id }}">{{ op.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="w-48 flex-shrink-0">
-                <label for="filter-chip-status" class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Status</label>
+                <label for="filter-chip-status"
+                    class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Status</label>
                 <select id="filter-chip-status" onchange="filterChips()"
-                        class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                    class="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                     <option value="">Qualquer Status</option>
                     <option value="AVAILABLE">Disponível</option>
                     <option value="IN_USE">Em Uso</option>
@@ -169,11 +164,13 @@
                 <span class="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Flags</span>
                 <div class="flex flex-col gap-1 justify-center h-[42px]">
                     <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 whitespace-nowrap">
-                        <input type="checkbox" id="filter-no-email" onchange="filterChips()" class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <input type="checkbox" id="filter-no-email" onchange="filterChips()"
+                            class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                         Sem e-mail vinculado
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 whitespace-nowrap">
-                        <input type="checkbox" id="filter-has-obs" onchange="filterChips()" class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <input type="checkbox" id="filter-has-obs" onchange="filterChips()"
+                            class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                         Com observação
                     </label>
                 </div>
@@ -190,28 +187,36 @@
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Envelope</th>
                         <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Funcionário</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(6, 'data-activated')">
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(6, 'data-activated')">
                             <span class="flex items-center gap-1">
                                 Data Ativação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group" onclick="sortTable(7, 'data-movement')">
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(7, 'data-movement')">
                             <span class="flex items-center gap-1">
-                                Data Última Movimentação
+                                Últ. Movimentação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-right">Ações</th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(8, 'data-recharge')">
+                            <span class="flex items-center gap-1">
+                                Recarga
+                                <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
+                            </span>
+                        </th>
+                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-left">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="chips-tbody" class="divide-y divide-slate-100">
                     {% for chip in chips %}
-                    <tr class="hover:bg-slate-50 transition-colors"
-                        data-operator="{{ chip.operator.id }}"
-                        data-status="{{ chip.status }}"
-                        data-activated="{{ chip.activated_at|date:'Y-m-d'|default:'' }}"
+                    <tr class="hover:bg-slate-50 transition-colors" data-operator="{{ chip.operator.id }}"
+                        data-status="{{ chip.status }}" data-activated="{{ chip.activated_at|date:'Y-m-d'|default:'' }}"
                         data-movement="{{ chip.last_movement_at|date:'Y-m-d'|default:'' }}"
+                        data-recharge="{{ chip.recharge_due_at|date:'Y-m-d'|default:'' }}"
                         data-email="{{ chip.email_vinculado|yesno:'true,false' }}"
                         data-obs="{{ chip.observacao|yesno:'true,false' }}">
                         <td class="px-6 py-4 font-mono font-bold text-slate-900 chip-linha">{{ chip.line_number }}</td>
@@ -219,24 +224,30 @@
                         <td class="px-6 py-4" id="email-td-{{ chip.id }}">
                             {% if chip.email_vinculado %}
                             <div class="flex items-center gap-1">
-                                <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700">SIM</span>
+                                <span
+                                    class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700">SIM</span>
                                 <button type="button" title="Remover Vínculo de E-mail"
-                                        hx-post="{% url 'chips:chip_toggle_email' chip.id %}"
-                                        hx-target="#email-td-{{ chip.id }}"
-                                        hx-swap="innerHTML"
-                                        class="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                                    hx-post="{% url 'chips:chip_toggle_email' chip.id %}"
+                                    hx-target="#email-td-{{ chip.id }}" hx-swap="innerHTML"
+                                    class="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path>
+                                    </svg>
                                 </button>
                             </div>
                             {% else %}
                             <div class="flex items-center gap-1">
-                                <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">NÃO</span>
+                                <span
+                                    class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">NÃO</span>
                                 <button type="button" title="Vincular E-mail"
-                                        hx-post="{% url 'chips:chip_toggle_email' chip.id %}"
-                                        hx-target="#email-td-{{ chip.id }}"
-                                        hx-swap="innerHTML"
-                                        class="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                                    hx-post="{% url 'chips:chip_toggle_email' chip.id %}"
+                                    hx-target="#email-td-{{ chip.id }}" hx-swap="innerHTML"
+                                    class="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                                    </svg>
                                 </button>
                             </div>
                             {% endif %}
@@ -255,50 +266,111 @@
                         <td class="px-6 py-4 font-medium text-slate-900 chip-funcionario">{{ chip.employee_name|default:"—" }}</td>
                         <td class="px-6 py-4 text-slate-600">{{ chip.activated_at|date:"d/m/Y"|default:"—" }}</td>
                         <td class="px-6 py-4 text-slate-600">{{ chip.last_movement_at|date:"d/m/Y"|default:"—" }}</td>
+                        <td class="px-6 py-4">
+                            {% if chip.recharge_due_at %}
+                            <div class="flex items-center gap-1.5">
+                                {% if chip.recharge_status == 'warning' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="w-3 h-3 text-amber-500 flex-shrink-0"
+                                    title="Vence em {{ chip.days_to_recharge }} dias">
+                                    <path
+                                        d="M12 9v4M12 17h.01M3.82 21h16.36a2 2 0 0 0 1.73-3L13.73 4a2 2 0 0 0-3.46 0L2.09 18a2 2 0 0 0 1.73 3z" />
+                                </svg>
+                                {% elif chip.recharge_status == 'danger' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="w-3 h-3 text-red-600 flex-shrink-0"
+                                    title="Vence em {{ chip.days_to_recharge }} dias">
+                                    <path
+                                        d="M12 9v4M12 17h.01M3.82 21h16.36a2 2 0 0 0 1.73-3L13.73 4a2 2 0 0 0-3.46 0L2.09 18a2 2 0 0 0 1.73 3z" />
+                                </svg>
+                                {% elif chip.recharge_status == 'overdue' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="w-3 h-3 text-slate-950 flex-shrink-0" title="Recarga vencida (atrasada)">
+                                    <path
+                                        d="M12 9v4M12 17h.01M3.82 21h16.36a2 2 0 0 0 1.73-3L13.73 4a2 2 0 0 0-3.46 0L2.09 18a2 2 0 0 0 1.73 3z" />
+                                </svg>
+                                {% else %}
+                                <div class="w-3 h-3 flex-shrink-0"></div>
+                                {% endif %}
+                                <span class="text-slate-600">{{ chip.recharge_due_at|date:"d/m/Y" }}</span>
+                            </div>
+                            {% else %}
+                            <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                             {% if chip.observacao %}
                             <button type="button" title="Observação"
-                                    hx-get="{% url 'chips:chip_observation_modal' chip.id %}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-blue-500 hover:text-blue-700 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M14 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M16.346 9.17l-.729 -1.261c-.16 -.248 -1.056 -.203 -1.117 .091l-.177 1.38" /><path d="M19.761 14.813l-2.84 -5.133c-.189 -.31 -.592 -.68 -1.421 -.68c-.828 0 -1.5 .448 -1.5 1v6" /><path d="M7.654 9.17l.729 -1.261c.16 -.249 1.056 -.203 1.117 .091l.177 1.38" /><path d="M4.239 14.813l2.84 -5.133c.189 -.31 -.592 -.68 1.421 -.68c.828 0 1.5 .448 1.5 1v6" /><path d="M10 12h4v2h-4l0 -2" /></svg>
+                                hx-get="{% url 'chips:chip_observation_modal' chip.id %}" hx-target="#modal-container"
+                                hx-swap="innerHTML" class="text-blue-500 hover:text-blue-700 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="w-5 h-5">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M4 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                                    <path d="M14 16a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                                    <path
+                                        d="M16.346 9.17l-.729 -1.261c-.16 -.248 -1.056 -.203 -1.117 .091l-.177 1.38" />
+                                    <path
+                                        d="M19.761 14.813l-2.84 -5.133c-.189 -.31 -.592 -.68 -1.421 -.68c-.828 0 -1.5 .448 -1.5 1v6" />
+                                    <path d="M7.654 9.17l.729 -1.261c.16 -.249 1.056 -.203 1.117 .091l.177 1.38" />
+                                    <path
+                                        d="M4.239 14.813l2.84 -5.133c.189 -.31 -.592 -.68 1.421 -.68c.828 0 1.5 .448 1.5 1v6" />
+                                    <path d="M10 12h4v2h-4l0 -2" />
+                                </svg>
                             </button>
                             {% endif %}
-                            <button type="button" title="Editar"
-                                    hx-get="{% url 'chips:chip_edit' chip.id %}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                            <button type="button" title="Editar" hx-get="{% url 'chips:chip_edit' chip.id %}"
+                                hx-target="#modal-container" hx-swap="innerHTML"
+                                class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                </svg>
                             </button>
                             {% if chip.status != 'CANCELED' and chip.status != 'LOST' %}
                             <button type="button" title="Transferir"
-                                    hx-get="{% url 'chips:grid_transfer_modal' chip.id %}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-indigo-600 hover:text-indigo-700 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+                                hx-get="{% url 'chips:grid_transfer_modal' chip.id %}" hx-target="#modal-container"
+                                hx-swap="innerHTML"
+                                class="text-indigo-600 hover:text-indigo-700 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                </svg>
                             </button>
                             {% endif %}
                             {% if chip.status == 'IN_USE' %}
                             <button type="button" title="Devolver TI"
-                                    onclick="devolverChip({{ chip.id }}, '{{ chip.line_number }}')"
-                                    class="text-orange-600 hover:text-orange-700 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                                onclick="devolverChip({{ chip.id }}, '{{ chip.line_number }}')"
+                                class="text-orange-600 hover:text-orange-700 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                </svg>
                             </button>
                             {% endif %}
                             <button type="button" title="Recarregar"
-                                    hx-get="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-emerald-600 hover:text-emerald-700 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                                hx-get="{% url 'chips:recharge_create' %}?chip_id={{ chip.id }}"
+                                hx-target="#modal-container" hx-swap="innerHTML"
+                                class="text-emerald-600 hover:text-emerald-700 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                </svg>
                             </button>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="9" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td></tr>
+                    <tr>
+                        <td colspan="10" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -309,25 +381,25 @@
 
         <!-- ========== ÚLTIMAS MOVIMENTAÇÕES ========== -->
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-8">
-            <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4 border-b border-slate-100 pb-4">
+            <div
+                class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4 border-b border-slate-100 pb-4">
                 <div>
                     <h4 class="font-bold text-slate-800 text-lg">Últimas 50 movimentações</h4>
                     <p class="text-xs text-slate-500">Histórico detalhado de entregas, transferências e devoluções.</p>
                 </div>
                 <form method="get" class="flex items-center gap-2">
                     <input type="hidden" name="tab" value="chips">
-                    <input type="text" 
-                           name="movs_line" 
-                           value="{{ movs_line|default:'' }}" 
-                           placeholder="Filtrar por linha..." 
-                           class="text-xs p-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none w-48">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold shadow-sm transition-colors">Filtrar</button>
+                    <input type="text" name="movs_line" value="{{ movs_line|default:'' }}"
+                        placeholder="Filtrar por linha..."
+                        class="text-xs p-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none w-48">
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold shadow-sm transition-colors">Filtrar</button>
                     {% if movs_line %}
                     <a href="?tab=chips" class="text-xs text-slate-500 hover:text-slate-800 underline ml-1">Limpar</a>
                     {% endif %}
                 </form>
             </div>
-            
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm whitespace-nowrap">
                     <thead class="bg-slate-50 border-b border-slate-200">
@@ -342,8 +414,11 @@
                     <tbody class="divide-y divide-slate-100">
                         {% for mov in recent_movements %}
                         <tr class="hover:bg-slate-50">
-                            <td class="px-6 py-3.5 text-slate-600 font-mono text-xs">{{ mov.timestamp|date:"d/m/Y H:i" }}</td>
-                            <td class="px-6 py-3.5 font-semibold text-slate-900">{{ mov.chip.line_number }} <span class="text-xs font-normal text-slate-500">({{ mov.chip.operator.name }})</span></td>
+                            <td class="px-6 py-3.5 text-slate-600 font-mono text-xs">{{ mov.timestamp|date:"d/m/Y H:i"
+                                }}</td>
+                            <td class="px-6 py-3.5 font-semibold text-slate-900">{{ mov.chip.line_number }} <span
+                                    class="text-xs font-normal text-slate-500">({{ mov.chip.operator.name }})</span>
+                            </td>
                             <td class="px-6 py-3.5">
                                 <span class="px-2.5 py-1 rounded text-xs font-bold 
                                     {% if mov.action == 'DELIVERY' %}bg-emerald-100 text-emerald-800
@@ -354,27 +429,33 @@
                             </td>
                             <td class="px-6 py-3.5 text-slate-800 font-medium">
                                 {% if mov.employee_user %}
-                                    {{ mov.employee_user.get_full_name|default:mov.employee_user.username }}
+                                {{ mov.employee_user.get_full_name|default:mov.employee_user.username }}
                                 {% else %}
-                                    {{ mov.employee_name|default:"—" }}
+                                {{ mov.employee_name|default:"—" }}
                                 {% endif %}
                             </td>
                             <td class="px-6 py-3.5 text-slate-500">{{ mov.registered_by.username|default:"—" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="p-6 text-center text-slate-400">Nenhuma movimentação registrada no período.</td></tr>
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-slate-400">Nenhuma movimentação registrada no
+                                período.</td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
                 <!-- Pagination Movimentações -->
                 <div class="flex justify-between items-center px-6 py-3 border-t border-slate-200 bg-slate-50">
-                    <span class="text-xs text-slate-500">Página {{ recent_movements.number }} de {{ recent_movements.paginator.num_pages }}</span>
+                    <span class="text-xs text-slate-500">Página {{ recent_movements.number }} de {{
+                        recent_movements.paginator.num_pages }}</span>
                     <div class="flex gap-1">
                         {% if recent_movements.has_previous %}
-                        <a href="?tab=chips&movs_page={{ recent_movements.previous_page_number }}{% if movs_line %}&movs_line={{ movs_line }}{% endif %}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
+                        <a href="?tab=chips&movs_page={{ recent_movements.previous_page_number }}{% if movs_line %}&movs_line={{ movs_line }}{% endif %}"
+                            class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
                         {% endif %}
                         {% if recent_movements.has_next %}
-                        <a href="?tab=chips&movs_page={{ recent_movements.next_page_number }}{% if movs_line %}&movs_line={{ movs_line }}{% endif %}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
+                        <a href="?tab=chips&movs_page={{ recent_movements.next_page_number }}{% if movs_line %}&movs_line={{ movs_line }}{% endif %}"
+                            class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
                         {% endif %}
                     </div>
                 </div>
@@ -403,32 +484,41 @@
                         <td class="px-6 py-4 font-mono text-slate-500">#{{ op.id }}</td>
                         <td class="px-6 py-4 font-bold text-slate-900">{{ op.name }}</td>
                         <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded text-xs font-bold {% if op.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">{{ op.get_status_display }}</span>
+                            <span
+                                class="px-2.5 py-1 rounded text-xs font-bold {% if op.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">{{
+                                op.get_status_display }}</span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button type="button" title="Editar"
-                                    hx-get="{% url 'chips:operator_edit' op.id %}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                            <button type="button" title="Editar" hx-get="{% url 'chips:operator_edit' op.id %}"
+                                hx-target="#modal-container" hx-swap="innerHTML"
+                                class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                </svg>
                             </button>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="p-6 text-center text-slate-400">Nenhuma operadora cadastrada.</td></tr>
+                    <tr>
+                        <td colspan="4" class="p-6 text-center text-slate-400">Nenhuma operadora cadastrada.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
             <!-- Pagination Operadoras -->
             <div class="flex justify-between items-center px-6 py-3 border-t border-slate-200 bg-slate-50">
-                <span class="text-xs text-slate-500">Página {{ operators.number }} de {{ operators.paginator.num_pages }}</span>
+                <span class="text-xs text-slate-500">Página {{ operators.number }} de {{ operators.paginator.num_pages
+                    }}</span>
                 <div class="flex gap-1">
                     {% if operators.has_previous %}
-                    <a href="?tab=operators&operators_page={{ operators.previous_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
+                    <a href="?tab=operators&operators_page={{ operators.previous_page_number }}"
+                        class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
                     {% endif %}
                     {% if operators.has_next %}
-                    <a href="?tab=operators&operators_page={{ operators.next_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
+                    <a href="?tab=operators&operators_page={{ operators.next_page_number }}"
+                        class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
                     {% endif %}
                 </div>
             </div>
@@ -457,35 +547,48 @@
                         <td class="px-6 py-4 text-slate-800">{{ batch.nome|default:"—" }}</td>
                         <td class="px-6 py-4 text-slate-600">{{ batch.received_at|date:"d/m/Y" }}</td>
                         <td class="px-6 py-4 text-right space-x-1">
-                            <button type="button" title="Editar"
-                                    hx-get="{% url 'chips:batch_edit' batch.id %}"
-                                    hx-target="#modal-container"
-                                    hx-swap="innerHTML"
-                                    class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                            <button type="button" title="Editar" hx-get="{% url 'chips:batch_edit' batch.id %}"
+                                hx-target="#modal-container" hx-swap="innerHTML"
+                                class="text-slate-500 hover:text-blue-600 px-1 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                </svg>
                             </button>
-                            <form method="post" action="{% url 'chips:batch_delete' batch.id %}" class="inline" onsubmit="return confirm('Deseja realmente excluir este envelope?')">
+                            <form method="post" action="{% url 'chips:batch_delete' batch.id %}" class="inline"
+                                onsubmit="return confirm('Deseja realmente excluir este envelope?')">
                                 {% csrf_token %}
-                                <button type="submit" title="Excluir" class="text-red-500 hover:text-red-700 px-1 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                <button type="submit" title="Excluir"
+                                    class="text-red-500 hover:text-red-700 px-1 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
                                 </button>
                             </form>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="p-6 text-center text-slate-400">Nenhum envelope cadastrado.</td></tr>
+                    <tr>
+                        <td colspan="4" class="p-6 text-center text-slate-400">Nenhum envelope cadastrado.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
             <!-- Pagination Envelopes -->
             <div class="flex justify-between items-center px-6 py-3 border-t border-slate-200 bg-slate-50">
-                <span class="text-xs text-slate-500">Página {{ batches.number }} de {{ batches.paginator.num_pages }}</span>
+                <span class="text-xs text-slate-500">Página {{ batches.number }} de {{ batches.paginator.num_pages
+                    }}</span>
                 <div class="flex gap-1">
                     {% if batches.has_previous %}
-                    <a href="?tab=envelopes&envelopes_page={{ batches.previous_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
+                    <a href="?tab=envelopes&envelopes_page={{ batches.previous_page_number }}"
+                        class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Anterior</a>
                     {% endif %}
                     {% if batches.has_next %}
-                    <a href="?tab=envelopes&envelopes_page={{ batches.next_page_number }}" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
+                    <a href="?tab=envelopes&envelopes_page={{ batches.next_page_number }}"
+                        class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Próxima</a>
                     {% endif %}
                 </div>
             </div>
@@ -497,54 +600,54 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
 <script>
-$(function() {
-    var activeTab = '{{ active_tab }}';
-    var csrfToken = '{{ csrf_token }}';
+    $(function () {
+        var activeTab = '{{ active_tab }}';
+        var csrfToken = '{{ csrf_token }}';
 
-    /* ---- Abas (jQuery) ---- */
-    function showTab(tabId, pushState) {
-        activeTab = tabId;
-        $('.chips-tab-panel').addClass('hidden');
-        $('.chips-tab-panel[data-tab-panel="' + tabId + '"]').removeClass('hidden');
+        /* ---- Abas (jQuery) ---- */
+        function showTab(tabId, pushState) {
+            activeTab = tabId;
+            $('.chips-tab-panel').addClass('hidden');
+            $('.chips-tab-panel[data-tab-panel="' + tabId + '"]').removeClass('hidden');
 
-        // Alternar botões de ação do cabeçalho
-        $('[data-tab-actions]').addClass('hidden');
-        $('[data-tab-actions="' + tabId + '"]').removeClass('hidden');
+            // Alternar botões de ação do cabeçalho
+            $('[data-tab-actions]').addClass('hidden');
+            $('[data-tab-actions="' + tabId + '"]').removeClass('hidden');
 
-        $('.chips-tab-btn')
-            .removeClass('text-blue-600 border-blue-600')
-            .addClass('text-slate-500 border-transparent')
-            .attr('aria-selected', 'false');
-        $('.chips-tab-btn[data-tab="' + tabId + '"]')
-            .removeClass('text-slate-500 border-transparent')
-            .addClass('text-blue-600 border-blue-600')
-            .attr('aria-selected', 'true');
+            $('.chips-tab-btn')
+                .removeClass('text-blue-600 border-blue-600')
+                .addClass('text-slate-500 border-transparent')
+                .attr('aria-selected', 'false');
+            $('.chips-tab-btn[data-tab="' + tabId + '"]')
+                .removeClass('text-slate-500 border-transparent')
+                .addClass('text-blue-600 border-blue-600')
+                .attr('aria-selected', 'true');
 
-        if (pushState !== false) {
-            var url = new URL(window.location.href);
-            url.searchParams.set('tab', tabId);
-            if (tabId !== 'chips') {
-                url.searchParams.delete('date_from');
-                url.searchParams.delete('date_to');
+            if (pushState !== false) {
+                var url = new URL(window.location.href);
+                url.searchParams.set('tab', tabId);
+                if (tabId !== 'chips') {
+                    url.searchParams.delete('date_from');
+                    url.searchParams.delete('date_to');
+                }
+                history.replaceState({ tab: tabId }, '', url.toString());
             }
-            history.replaceState({ tab: tabId }, '', url.toString());
+
+            if (tabId === 'chips' && window.chipsGrid) {
+                try { window.chipsGrid.redraw(true); } catch (e) { }
+            }
         }
 
-        if (tabId === 'chips' && window.chipsGrid) {
-            try { window.chipsGrid.redraw(true); } catch (e) {}
-        }
-    }
+        $('.chips-tab-btn').on('click', function () {
+            showTab($(this).data('tab'));
+        });
 
-    $('.chips-tab-btn').on('click', function() {
-        showTab($(this).data('tab'));
-    });
+        window.chipsShowTab = showTab;
+        showTab(activeTab, false);
 
-    window.chipsShowTab = showTab;
-    showTab(activeTab, false);
-
-    /* ---- Gestão de Chips (Tabela padrão) ---- */
-    var envelopes = [
-        {% for env in all_batches %}
+        /* ---- Gestão de Chips (Tabela padrão) ---- */
+        var envelopes = [
+            {% for env in all_batches %}
             { id: {{ env.id }}, label: "{{ env.label|escapejs }}" },
         {% endfor %}
     ];
@@ -565,7 +668,7 @@ $(function() {
         var noEmailOnly = $('#filter-no-email').is(':checked');
         var hasObsOnly = $('#filter-has-obs').is(':checked');
 
-        $('#chips-tbody tr').each(function() {
+        $('#chips-tbody tr').each(function () {
             var $row = $(this);
             if ($row.find('td').length === 1) return;
 
@@ -575,9 +678,9 @@ $(function() {
             var funcionario = ($row.find('.chip-funcionario').text() || '').toLowerCase();
 
             var matchText = linha.includes(textInput) ||
-                            operadora.includes(textInput) ||
-                            envelope.includes(textInput) ||
-                            funcionario.includes(textInput);
+                operadora.includes(textInput) ||
+                envelope.includes(textInput) ||
+                funcionario.includes(textInput);
 
             var matchOp = !opInput || $row.attr('data-operator') === opInput;
             var matchStatus = !statusInput || $row.attr('data-status') === statusInput;
@@ -609,7 +712,7 @@ $(function() {
         var header = $('thead th').eq(colIndex);
         header.find('.sort-icon').text(asc ? '▲' : '▼');
 
-        rows.sort(function(a, b) {
+        rows.sort(function (a, b) {
             var valA, valB;
             if (attrName) {
                 valA = a.getAttribute(attrName) || '';
@@ -627,13 +730,13 @@ $(function() {
             return asc ? 1 : -1;
         });
 
-        rows.forEach(function(row) {
+        rows.forEach(function (row) {
             tbody.appendChild(row);
         });
     }
     window.sortTable = sortTable;
 
-    document.body.addEventListener('htmx:afterRequest', function(evt) {
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
         if (evt.detail.successful && evt.detail.elt && evt.detail.elt.id === 'modal-container') {
             var xhr = evt.detail.xhr;
             if (xhr && xhr.status === 204) {
