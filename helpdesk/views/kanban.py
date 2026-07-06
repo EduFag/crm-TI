@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.db.models import Q
 from helpdesk.forms import TicketCreateForm, TicketUpdateForm
-from helpdesk.models import Ticket, TicketCategory, Comment, TicketContestation
+from helpdesk.models import Ticket, TicketCategory, Comment, TicketContestation, TicketUnread
 from helpdesk.audit import (
     log_atribuicao,
     log_chamado_criado,
@@ -44,6 +44,19 @@ from helpdesk.ticket_access import (
     usuarios_tecnicos_para_transferencia,
     usuario_pode_excluir_chamado,
 )
+from helpdesk.notifications import destinatarios_notificacao
+
+def adicionar_nao_lido(ticket, ator):
+    from django.db.models import F
+    destinatarios = destinatarios_notificacao(ticket, ator)
+    for usuario in destinatarios:
+        obj, created = TicketUnread.objects.get_or_create(
+            ticket=ticket, user=usuario,
+            defaults={'count': 1}
+        )
+        if not created:
+            obj.count = F('count') + 1
+            obj.save(update_fields=['count'])
 
 
 def _rotulo_prioridade(valor):
@@ -178,7 +191,17 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
             output_field=IntegerField()
         )
         
-        tickets_annotated = tickets.annotate(priority_order=priority_ordering)
+        from django.db.models import OuterRef, Subquery
+        from django.db.models.functions import Coalesce
+        unread_subquery = TicketUnread.objects.filter(
+            ticket_id=OuterRef('pk'),
+            user=self.request.user
+        ).values('count')[:1]
+        
+        tickets_annotated = tickets.annotate(
+            priority_order=priority_ordering,
+            user_unread_count=Coalesce(Subquery(unread_subquery, output_field=IntegerField()), 0)
+        )
         
         context['tickets_new'] = tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
         
@@ -411,9 +434,8 @@ def ticket_finalize(request, pk):
         ticket.assigned_to = request.user
 
     ticket.resolved_by = request.user
-    ticket.unread_by_user = True
-    ticket.unread_count_user += 1
     ticket.save()
+    adicionar_nao_lido(ticket, request.user)
     
     if status_anterior != Ticket.StatusChoices.RESOLVED:
         log_status_alterado(
@@ -478,9 +500,8 @@ def ticket_contest(request, pk):
     ticket.status = Ticket.StatusChoices.NEW
     ticket.is_rejected = False
     ticket.rejection_reason = ''
-    ticket.unread_by_tech = True
-    ticket.unread_count_tech += 1
     ticket.save()
+    adicionar_nao_lido(ticket, request.user)
 
     log_status_alterado(
         ticket,
@@ -512,20 +533,11 @@ def ticket_drawer(request, pk):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
         
     is_ti = usuario_eh_operador_helpdesk(request.user)
-    changed = False
-    if is_ti and (ticket.unread_by_tech or ticket.unread_count_tech > 0):
-        ticket.unread_by_tech = False
-        ticket.unread_count_tech = 0
-        changed = True
-    elif not is_ti and (ticket.unread_by_user or ticket.unread_count_user > 0):
-        ticket.unread_by_user = False
-        ticket.unread_count_user = 0
-        changed = True
-        
-    if changed:
-        ticket.save(update_fields=['unread_by_tech', 'unread_by_user', 'unread_count_tech', 'unread_count_user', 'updated_at'])
+    
+    deleted, _ = TicketUnread.objects.filter(ticket=ticket, user=request.user).delete()
+    if deleted:
         response = render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
-        response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+        response['HX-Trigger'] = json.dumps({'ticketUpdated': True, 'ticketRead': True})
         return response
         
     return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
@@ -585,9 +597,8 @@ def ticket_edit(request, pk):
                 msg_triagem,
             )
 
-        ticket.unread_by_user = True
-        ticket.unread_count_user += 1
-        ticket.save(update_fields=['unread_by_user', 'unread_count_user'])
+        ticket.save()
+        adicionar_nao_lido(ticket, request.user)
         
         ticket.refresh_from_db()
         response = render(
@@ -642,9 +653,8 @@ def ticket_transfer(request, pk):
         _nome_usuario(anterior),
         _nome_usuario(tecnico),
     )
-    ticket.unread_by_user = True
-    ticket.unread_count_user += 1
-    ticket.save(update_fields=['unread_by_user', 'unread_count_user', 'updated_at'])
+    ticket.save(update_fields=['updated_at'])
+    adicionar_nao_lido(ticket, request.user)
     ticket.refresh_from_db()
     response = render(
         request,
@@ -677,14 +687,8 @@ def ticket_add_comment(request, pk):
         else:
             log_comentario(ticket, request.user, 'Anexou uma imagem.')
         
-        is_ti = usuario_eh_operador_helpdesk(request.user)
-        if is_ti:
-            ticket.unread_by_user = True
-            ticket.unread_count_user += 1
-        else:
-            ticket.unread_by_tech = True
-            ticket.unread_count_tech += 1
-        ticket.save(update_fields=['unread_by_user', 'unread_by_tech', 'unread_count_user', 'unread_count_tech', 'updated_at'])
+        ticket.save(update_fields=['updated_at'])
+        adicionar_nao_lido(ticket, request.user)
 
         preview = text[:120] if text else 'Nova imagem anexada.'
         agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
@@ -700,8 +704,13 @@ def ticket_comments(request, pk):
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão.')
         
+    deleted, _ = TicketUnread.objects.filter(ticket=ticket, user=request.user).delete()
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    return render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    
+    response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    if deleted:
+        response['HX-Trigger'] = json.dumps({'ticketRead': True})
+    return response
 
 class KanbanBoardPartialView(KanbanView):
     """Retorna apenas o HTML do quadro para ser injetado via HTMX no evento SSE."""

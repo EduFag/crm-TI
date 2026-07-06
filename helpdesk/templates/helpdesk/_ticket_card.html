@@ -10,20 +10,11 @@
     <div class="flex items-center justify-between mb-3">
         <div class="flex flex-wrap items-center gap-2">
             <!-- Notification Badge -->
-            {% if eh_operador_helpdesk %}
-                {% if ticket.unread_count_tech > 0 %}
-                <span class="relative flex h-5 w-5" title="{{ ticket.unread_count_tech }} interação(ões) não lida(s)">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span class="relative inline-flex items-center justify-center rounded-full h-5 w-5 bg-red-500 ring-2 ring-white text-[10px] font-bold text-white z-10">{{ ticket.unread_count_tech }}</span>
-                </span>
-                {% endif %}
-            {% else %}
-                {% if ticket.unread_count_user > 0 %}
-                <span class="relative flex h-5 w-5" title="{{ ticket.unread_count_user }} interação(ões) não lida(s)">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span class="relative inline-flex items-center justify-center rounded-full h-5 w-5 bg-red-500 ring-2 ring-white text-[10px] font-bold text-white z-10">{{ ticket.unread_count_user }}</span>
-                </span>
-                {% endif %}
+            {% if ticket.user_unread_count > 0 %}
+            <span class="relative flex h-5 w-5" title="{{ ticket.user_unread_count }} interação(ões) não lida(s)">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span class="relative inline-flex items-center justify-center rounded-full h-5 w-5 bg-red-500 ring-2 ring-white text-[10px] font-bold text-white z-10">{{ ticket.user_unread_count }}</span>
+            </span>
             {% endif %}
 
             <!-- Sector/Team Badge -->

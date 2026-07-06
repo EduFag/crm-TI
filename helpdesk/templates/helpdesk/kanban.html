@@ -47,7 +47,7 @@
     <div class="flex-1 overflow-x-auto overflow-y-hidden pb-4">
         {% include "helpdesk/_poll.html" %}
         <div id="kanban-board-container"
-             hx-trigger="ticketUpdated from:body"
+             hx-trigger="ticketUpdated from:body, ticketRead from:body"
              hx-get="{% url 'helpdesk:kanban_board' %}"
              hx-swap="innerHTML"
              class="h-full">

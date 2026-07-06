@@ -273,3 +273,6 @@ def _carregar_vapid_private_key(valor: str) -> str:
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
 VAPID_PRIVATE_KEY = _carregar_vapid_private_key(os.environ.get('VAPID_PRIVATE_KEY', ''))
 VAPID_ADMIN_EMAIL = os.environ.get('VAPID_ADMIN_EMAIL', 'mailto:ti@localhost')
+
+# Evitar migrações indesejadas de chaves primárias
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

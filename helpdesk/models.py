@@ -372,3 +372,18 @@ class PushSubscription(models.Model):
 
     def __str__(self) -> str:
         return f'Push #{self.pk} — {self.user}'
+
+
+class TicketUnread(models.Model):
+    """Controle individual de interações não lidas por usuário."""
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='unreads')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='unread_tickets_link')
+    count = models.IntegerField(default=1)
+
+    class Meta:
+        unique_together = ('ticket', 'user')
+        verbose_name = 'notificação não lida'
+        verbose_name_plural = 'notificações não lidas'
+
+    def __str__(self):
+        return f'{self.user.username} tem {self.count} não lida(s) no chamado #{self.ticket.id}'
