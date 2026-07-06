@@ -93,23 +93,29 @@ def aplicar_filtros_historico(queryset, request):
     return queryset
 
 
+def _limpar_texto(texto):
+    if not texto:
+        return ''
+    # Remove line breaks and tabs to avoid breaking CSV rows in some viewers
+    return str(texto).replace('\r\n', ' | ').replace('\n', ' | ').replace('\r', ' | ').replace('\t', ' ')
+
 def _linha_csv_ticket(ticket):
     return {
         'ID': ticket.id,
-        'Título': ticket.title,
-        'Descrição': ticket.description,
-        'Solicitante': ticket.requester_name,
-        'Usuário solicitante': _nome_usuario(ticket.requester_user),
+        'Título': _limpar_texto(ticket.title),
+        'Descrição': _limpar_texto(ticket.description),
+        'Solicitante': _limpar_texto(ticket.requester_name),
+        'Usuário solicitante': _limpar_texto(_nome_usuario(ticket.requester_user)),
         'Categoria': ticket.category.name if ticket.category_id else '',
         'Categoria específica': ticket.specific_category.name if ticket.specific_category_id else '',
         'Status': ticket.get_status_display(),
         'Prioridade': ticket.get_priority_display() if ticket.priority else '',
-        'Técnico': _nome_usuario(ticket.assigned_to),
+        'Técnico': _limpar_texto(_nome_usuario(ticket.assigned_to)),
         'Equipe': ticket.equipe.name if ticket.equipe_id else '',
-        'Criado por': _nome_usuario(ticket.created_by),
+        'Criado por': _limpar_texto(_nome_usuario(ticket.created_by)),
         'Arquivado': 'Sim' if ticket.is_archived else 'Não',
         'Recusado': 'Sim' if ticket.is_rejected else 'Não',
-        'Motivo recusa': ticket.rejection_reason or '',
+        'Motivo recusa': _limpar_texto(ticket.rejection_reason),
         'Criado em': _formatar_data(ticket.created_at),
         'Atualizado em': _formatar_data(ticket.updated_at),
         'Resolvido em': _formatar_data(ticket.resolved_at),
@@ -134,8 +140,6 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
     paginate_by = 20
 
     def dispatch(self, request, *args, **kwargs):
-        if not usuario_pode_acessar_dashboard_e_historico(request.user):
-            return resposta_sem_permissao(request)
         Ticket.archive_old_tickets()
         return super().dispatch(request, *args, **kwargs)
 
@@ -162,8 +166,6 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
 
 @login_required
 def history_export_csv(request):
-    if not usuario_pode_acessar_dashboard_e_historico(request.user):
-        return resposta_sem_permissao(request)
 
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')

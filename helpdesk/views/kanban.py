@@ -1,4 +1,5 @@
 import json
+import os
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
@@ -180,7 +181,7 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets = filtrar_chamados_para_usuario(
             Ticket.objects.filter(is_active=True, is_archived=False),
             self.request.user,
-        ).select_related('assigned_to', 'created_by', 'requester_user', 'category').prefetch_related('co_authors')
+        ).select_related('assigned_to', 'created_by', 'requester_user', 'category', 'specific_category', 'equipe').prefetch_related('co_authors', 'attachments')
         
         priority_ordering = Case(
             When(priority='URGENT', then=Value(4)),
@@ -735,9 +736,6 @@ def ticket_delete(request, pk):
     return redirect('helpdesk:kanban')
 
 
-
-
-
 @requer_modulo(MODULO_HELPDESK)
 def ticket_attachments(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
@@ -746,20 +744,49 @@ def ticket_attachments(request, pk):
         
     attachments = []
     comment_id = request.GET.get('comment_id')
+
+    class MockAttachment:
+        def __init__(self, file, created_at):
+            self.file = file
+            self.file_name = file.name.split('/')[-1] if file and file.name else 'anexo_comentario'
+            self.created_at = created_at
+        
+        @property
+        def is_image(self):
+            ext = os.path.splitext(self.file.name)[1].lower() if self.file and self.file.name else ''
+            return ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+
+        @property
+        def is_audio(self):
+            ext = os.path.splitext(self.file.name)[1].lower() if self.file and self.file.name else ''
+            return ext in ['.mp3', '.wav', '.ogg', '.m4a']
+
+        @property
+        def extension(self):
+            ext = os.path.splitext(self.file.name)[1].lower() if self.file and self.file.name else ''
+            return ext[1:] if ext else ''
+
     if comment_id:
         from helpdesk.models import Comment
         comment = get_object_or_404(Comment, pk=comment_id, ticket=ticket)
-        class MockAttachment:
-            def __init__(self, file, created_at):
-                self.file = file
-                self.file_name = file.name.split('/')[-1] if file and file.name else 'anexo_comentario'
-                self.created_at = created_at
         if comment.attachment:
             attachments = [MockAttachment(comment.attachment, comment.created_at)]
     else:
-        attachments = ticket.attachments.all().order_by('-created_at')
+        tipo = request.GET.get('type')
+        qs = ticket.attachments.all().order_by('-created_at')
+        if tipo == 'images':
+            attachments = [att for att in qs if att.is_image]
+        elif tipo == 'audios':
+            attachments = [att for att in qs if att.is_audio]
+        elif tipo == 'docs':
+            attachments = [att for att in qs if not att.is_image and not att.is_audio]
+        else:
+            attachments = list(qs)
+            
+    has_images = any(a.is_image for a in attachments)
     
     return render(request, 'helpdesk/_attachments_modal.html', {
         'ticket': ticket,
-        'attachments': attachments
+        'attachments': attachments,
+        'has_images': has_images,
     })

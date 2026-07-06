@@ -2,7 +2,7 @@
 <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 transition-opacity">
     
     <!-- Modal -->
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div class="bg-white rounded-2xl shadow-xl w-full {% if has_images %}max-w-6xl{% elif attachments|length == 1 %}max-w-md{% else %}max-w-3xl{% endif %} max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         <!-- Cabeçalho -->
         <div class="flex items-center justify-between p-4 border-b border-slate-100">
@@ -20,10 +20,25 @@
                 {% for attachment in attachments %}
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <div class="flex-1 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center mb-3 group relative cursor-pointer min-h-[200px]">
-                        <img src="{{ attachment.file.url }}" alt="{{ attachment.file_name }}" class="object-contain w-full h-full {% if attachments|length == 1 %}max-h-[75vh]{% else %}max-h-[400px]{% endif %}">
+                        {% if attachment.is_image %}
+                            <img src="{{ attachment.file.url }}" alt="{{ attachment.file_name }}" class="object-contain w-full h-full {% if attachments|length == 1 %}max-h-[75vh]{% else %}max-h-[400px]{% endif %}">
+                        {% elif attachment.is_audio %}
+                            <div class="flex flex-col items-center justify-center gap-3 w-full p-6">
+                                <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                                <audio controls class="w-full mt-2">
+                                    <source src="{{ attachment.file.url }}">
+                                    Seu navegador não suporta a tag de áudio.
+                                </audio>
+                            </div>
+                        {% else %}
+                            <div class="flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                <span class="font-bold text-lg uppercase tracking-wider">{{ attachment.extension|default:"ARQUIVO" }}</span>
+                            </div>
+                        {% endif %}
                         <!-- Overlay on hover -->
-                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <a href="{{ attachment.file.url }}" target="_blank" class="px-4 py-2 bg-white rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors">
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <a href="{{ attachment.file.url }}" target="_blank" class="px-4 py-2 bg-white rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors pointer-events-auto">
                                 Abrir original
                             </a>
                         </div>

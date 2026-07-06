@@ -12,3 +12,6 @@ pywebpush>=2.0,<3
 
 # MySQL/MariaDB — só se DB_ENGINE=mysql
 # mysqlclient>=2.2,<3
+
+# Processamento de imagem (compressão)
+Pillow>=10.0,<11

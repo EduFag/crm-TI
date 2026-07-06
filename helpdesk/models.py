@@ -1,3 +1,4 @@
+import os
 from django.db import models
 from django.db.models import Q, OuterRef, Subquery, DateTimeField, Case, When
 from django.db.models.functions import Coalesce, Least
@@ -244,18 +245,33 @@ class Ticket(models.Model):
     def __str__(self) -> str:
         return f"[{self.get_status_display()}] {self.title} - {self.requester_name}"
 
+    @property
+    def attachment_counts(self):
+        images, audios, docs = 0, 0, 0
+        for att in self.attachments.all():
+            if att.is_image:
+                images += 1
+            elif att.is_audio:
+                audios += 1
+            else:
+                docs += 1
+        return {'images': images, 'audios': audios, 'docs': docs}
+
 
 import os
 import uuid
 from django.core.exceptions import ValidationError
 
-def validate_image_attachment(value):
+def validate_file_attachment(value):
     ext = os.path.splitext(value.name)[1].lower()
-    valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.txt', '.csv', '.mp3', '.wav', '.ogg', '.m4a']
     if ext not in valid_extensions:
-        raise ValidationError('Apenas imagens (JPEG, PNG, WEBP) são permitidas.')
+        raise ValidationError('Tipo de arquivo não permitido (apenas imagens, áudios, PDF, Word, Excel, ZIP, RAR, TXT, CSV).')
     if value.size > 5 * 1024 * 1024:
         raise ValidationError('O arquivo não pode ser maior que 5MB.')
+
+# Mantido para compatibilidade com migrations antigas
+validate_image_attachment = validate_file_attachment
 
 def attachment_upload_path(instance, filename):
     ext = filename.split('.')[-1]
@@ -266,11 +282,26 @@ class TicketAttachment(models.Model):
     """Anexos de imagens para os chamados."""
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='attachments')
     file_name = models.CharField(max_length=255, help_text='Nome original do arquivo.')
-    file = models.FileField(upload_to=attachment_upload_path, validators=[validate_image_attachment])
+    file = models.FileField(upload_to=attachment_upload_path, validators=[validate_file_attachment])
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Anexo do chamado #{self.ticket.id}: {self.file_name}"
+
+    @property
+    def is_image(self):
+        ext = os.path.splitext(self.file.name)[1].lower()
+        return ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+
+    @property
+    def is_audio(self):
+        ext = os.path.splitext(self.file.name)[1].lower()
+        return ext in ['.mp3', '.wav', '.ogg', '.m4a']
+
+    @property
+    def extension(self):
+        ext = os.path.splitext(self.file.name)[1].lower()
+        return ext[1:] if ext else ''
 
 
 class Comment(models.Model):
@@ -292,10 +323,10 @@ class Comment(models.Model):
     text = models.TextField(help_text='Texto do comentário ou atualização do histórico.')
     attachment = models.FileField(
         upload_to=attachment_upload_path, 
-        validators=[validate_image_attachment], 
+        validators=[validate_file_attachment], 
         null=True, 
         blank=True, 
-        help_text='Imagem anexada ao comentário.'
+        help_text='Arquivo anexado ao comentário.'
     )
     
     # Soft delete e timestamps
@@ -303,7 +334,21 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
-        return f"Comentário de {self.author} em {self.ticket.title}"
+        return f"Comment by {self.author.username} on Ticket {self.ticket.id}"
+
+    @property
+    def is_image(self):
+        if not self.attachment:
+            return False
+        ext = os.path.splitext(self.attachment.name)[1].lower()
+        return ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+
+    @property
+    def is_audio(self):
+        if not self.attachment:
+            return False
+        ext = os.path.splitext(self.attachment.name)[1].lower()
+        return ext in ['.mp3', '.wav', '.ogg', '.m4a']
 
 
 class TicketContestation(models.Model):

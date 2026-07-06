@@ -2,7 +2,7 @@ from django import forms
 from django.utils.safestring import mark_safe
 
 from core.models import CustomUser
-from helpdesk.models import Ticket, TicketCategory, validate_image_attachment
+from helpdesk.models import Ticket, TicketCategory, validate_file_attachment
 from helpdesk.ticket_access import (
     buscar_membro_equipe_por_nome,
     usuario_pode_definir_prioridade,
@@ -66,12 +66,12 @@ class TicketCreateForm(forms.ModelForm):
     )
     attachment = MultipleFileField(
         required=False,
-        label='Anexar Imagem (Opcional)',
-        help_text='Apenas JPEG, PNG ou WEBP. Máx: 5MB por imagem. Limite de 4 imagens.',
-        validators=[validate_image_attachment],
+        label='Anexos (Opcional)',
+        help_text='Máx: 5MB por arquivo. Limite de 4 arquivos (PDF, imagens, áudios, Word, Excel, ZIP, etc).',
+        validators=[validate_file_attachment],
         widget=MultipleFileInput(attrs={
             'class': 'w-full text-sm p-2 border border-slate-300 rounded-lg bg-white',
-            'accept': 'image/png, image/jpeg, image/webp',
+            'accept': 'image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a',
             'multiple': True
         })
     )
@@ -278,11 +278,14 @@ class TicketCreateForm(forms.ModelForm):
                     attachments = [attachments]
                 
                 from helpdesk.models import TicketAttachment
+                from helpdesk.image_utils import optimize_image_to_webp
+                
                 for attachment_file in attachments[:4]:
+                    optimized_file = optimize_image_to_webp(attachment_file)
                     TicketAttachment.objects.create(
                         ticket=ticket,
-                        file_name=attachment_file.name,
-                        file=attachment_file
+                        file_name=optimized_file.name,
+                        file=optimized_file
                     )
         return ticket
 
