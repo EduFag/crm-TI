@@ -144,6 +144,7 @@ class RbacHelpdeskTestCase(TestCase):
         )
 
         self.team_leader.equipes.add(self.equipe)
+        self.supervisor.equipes.add(self.equipe)
         self.multiplier.equipes.add(self.equipe)
         self.colega.equipes.add(self.equipe)
 
@@ -165,10 +166,11 @@ class RbacHelpdeskTestCase(TestCase):
             requester_user=self.standard,
         )
 
-    def test_supervisor_ve_todos_chamados(self):
-        self.assertTrue(usuario_ve_todos_chamados(self.supervisor))
+    def test_supervisor_ve_apenas_equipe(self):
+        self.assertFalse(usuario_ve_todos_chamados(self.supervisor))
         qs = filtrar_chamados_para_usuario(Ticket.objects.all(), self.supervisor)
-        self.assertEqual(qs.count(), 2)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().pk, self.ticket_equipe.pk)
 
     def test_lider_ve_apenas_equipe(self):
         qs = filtrar_chamados_para_usuario(Ticket.objects.all(), self.team_leader)
@@ -184,8 +186,9 @@ class RbacHelpdeskTestCase(TestCase):
         self.ticket_equipe.save(update_fields=['created_by'])
         self.assertTrue(usuario_pode_comentar_chamado(self.team_leader, self.ticket_equipe))
 
-    def test_supervisor_comenta_qualquer(self):
-        self.assertTrue(usuario_pode_comentar_chamado(self.supervisor, self.ticket_outro))
+    def test_supervisor_comenta_apenas_visiveis(self):
+        self.assertFalse(usuario_pode_comentar_chamado(self.supervisor, self.ticket_outro))
+        self.assertTrue(usuario_pode_comentar_chamado(self.supervisor, self.ticket_equipe))
 
     def test_supervisor_nao_move_kanban(self):
         self.assertFalse(usuario_pode_operar_kanban(self.supervisor))

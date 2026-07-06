@@ -13,7 +13,7 @@ Registrar tickets (título, prioridade, categoria, solicitante, co-autores), mov
 | Superuser | `is_superuser` | Todos | Todos | Sim | Sim | Todos | Não |
 | Membro Equipe (TI) | `IT_USER` | chips, emails, equipment, discador, helpdesk | Todos | Sim | Sim | Todos | Não |
 | Administrador | `ADMIN` | helpdesk | Todos | Sim | Sim | Todos | Não |
-| Supervisor | `SUPERVISOR` | helpdesk | Todos ativos | Não | Não | Qualquer visível* | Não |
+| Supervisor | `SUPERVISOR` | helpdesk | Equipes do usuário | Não | Não | Qualquer visível* | Não |
 | Líder de Equipe | `TEAM_LEADER` | helpdesk | Equipes do usuário | Não | Não | Só autor/solicitante/co-autor* | Não |
 | Multiplicador | `MULTIPLIER` | helpdesk | Próprios + co-autor | Não | Não | Só autor/solicitante/co-autor* | Não |
 | Usuário Padrão | `STANDARD` | helpdesk | Próprios | Não | Não | Próprios* | Sim** |

@@ -52,7 +52,7 @@ def usuario_pode_operar_kanban(user) -> bool:
 
 
 def usuario_ve_todos_chamados(user) -> bool:
-    """Visão global no Kanban: operadores, supervisor e superuser."""
+    """Visão global no Kanban: operadores e superuser."""
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
@@ -60,7 +60,6 @@ def usuario_ve_todos_chamados(user) -> bool:
     return _role(user) in (
         CustomUser.RoleChoices.ADMIN,
         CustomUser.RoleChoices.IT_USER,
-        CustomUser.RoleChoices.SUPERVISOR,
     )
 
 
@@ -126,7 +125,7 @@ def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
     if usuario_ve_todos_chamados(user):
         return queryset
     role = _role(user)
-    if role == CustomUser.RoleChoices.TEAM_LEADER:
+    if role in (CustomUser.RoleChoices.TEAM_LEADER, CustomUser.RoleChoices.SUPERVISOR):
         filtro = _filtro_chamados_equipe(user) | _filtro_chamados_proprios(user)
     else:
         filtro = _filtro_chamados_proprios(user)

@@ -15,7 +15,7 @@ Consulte também [helpdesk/DOCUMENTACAO.md](../../helpdesk/DOCUMENTACAO.md).
 | Superuser | `is_superuser` | Tudo | Tudo | Sim |
 | Membro TI | `IT_USER` | Todos + arquivados | Todos | Sim |
 | Administrador | `ADMIN` | Todos + arquivados | Todos | Sim |
-| Supervisor | `SUPERVISOR` | Todos ativos | Qualquer visível | Não |
+| Supervisor | `SUPERVISOR` | Equipes do usuário | Qualquer visível | Não |
 | Líder Equipe | `TEAM_LEADER` | Equipes do usuário | Autor/solicitante/co-autor | Não |
 | Multiplicador | `MULTIPLIER` | Próprios + co-autor | Autor/solicitante/co-autor | Não |
 | Padrão | `STANDARD` | Próprios | Próprios | Não |
