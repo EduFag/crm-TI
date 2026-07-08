@@ -40,6 +40,20 @@ def destinatarios_notificacao(ticket: Ticket, actor):
         candidatos.append(ticket.requester_user_id)
     if ticket.assigned_to_id:
         candidatos.append(ticket.assigned_to_id)
+    else:
+        # Se não está atribuído a ninguém (ex: coluna Novos), todos os operadores que podem ver
+        # o chamado devem ser notificados.
+        from django.db.models import Q
+        roles_operadores = [
+            CustomUser.RoleChoices.ADMIN,
+            CustomUser.RoleChoices.IT_USER,
+            CustomUser.RoleChoices.SUPERVISOR,
+        ]
+        operadores_ids = list(CustomUser.objects.filter(
+            Q(role__in=roles_operadores) | Q(is_superuser=True),
+            is_active=True
+        ).values_list('pk', flat=True))
+        candidatos.extend(operadores_ids)
 
     co_author_ids = list(ticket.co_authors.values_list('pk', flat=True))
     user_ids = set(candidatos + co_author_ids)
@@ -123,10 +137,18 @@ def agendar_notificacao_chamado(ticket: Ticket, actor, tipo: str, mensagem: str)
     ticket_id = ticket.pk
 
     def _disparar():
+        from django.db import close_old_connections
+        close_old_connections()
         try:
             ticket_atual = Ticket.objects.get(pk=ticket_id)
+            notificar_evento_chamado(ticket_atual, actor, tipo, mensagem)
         except Ticket.DoesNotExist:
-            return
-        notificar_evento_chamado(ticket_atual, actor, tipo, mensagem)
+            pass
+        finally:
+            close_old_connections()
 
-    transaction.on_commit(_disparar)
+    def _disparar_async():
+        import threading
+        threading.Thread(target=_disparar, daemon=True).start()
+
+    transaction.on_commit(_disparar_async)

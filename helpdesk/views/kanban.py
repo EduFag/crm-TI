@@ -259,6 +259,7 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
                 text=f'Chamado aberto por {autor_nome}.',
             )
             log_chamado_criado(ticket, request.user)
+            adicionar_nao_lido(ticket, request.user)
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
                 'ticketUpdated': True,
