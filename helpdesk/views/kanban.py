@@ -53,12 +53,20 @@ from helpdesk.ticket_access import (
 )
 
 
-def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False):
+def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False, usuarios_extra=None):
+    """Incrementa badge não-lido. usuarios_extra sempre recebe (ex.: @menções TI↔TI)."""
     from django.db.models import F
     if somente_nao_operadores:
-        destinatarios = destinatarios_finalizacao(ticket, ator)
+        destinatarios = list(destinatarios_finalizacao(ticket, ator))
     else:
-        destinatarios = destinatarios_notificacao(ticket, ator)
+        destinatarios = list(destinatarios_notificacao(ticket, ator))
+
+    ja_incluidos = {u.pk for u in destinatarios}
+    for extra in usuarios_extra or []:
+        if extra and extra.pk not in ja_incluidos and extra.is_active:
+            destinatarios.append(extra)
+            ja_incluidos.add(extra.pk)
+
     for usuario in destinatarios:
         obj, created = TicketUnread.objects.get_or_create(
             ticket=ticket, user=usuario,
@@ -723,15 +731,17 @@ def ticket_add_comment(request, pk):
         else:
             log_comentario(ticket, request.user, 'Anexou uma imagem.')
 
-        # Menções @: só operadores; concede co_authors + push dedicado
+        # Menções @: só operadores; concede co_authors + notifica (inclui TI↔TI)
         mencionados = processar_mencoes(ticket, comment, request.user) if text else []
 
         ticket.save(update_fields=['updated_at'])
-        adicionar_nao_lido(ticket, request.user)
+        # Badge geral + mencionados (silêncio TI não se aplica a quem foi @mencionado)
+        adicionar_nao_lido(ticket, request.user, usuarios_extra=mencionados)
 
         preview = text[:120] if text else 'Nova imagem anexada.'
         agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
         if mencionados:
+            # Push dedicado de menção — ignora silêncio TI↔TI
             agendar_notificacao_mencoes(ticket, mencionados, preview)
 
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')

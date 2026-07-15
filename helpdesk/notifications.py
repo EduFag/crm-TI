@@ -212,11 +212,18 @@ def agendar_notificacao_chamado(
 
 
 def agendar_notificacao_mencoes(ticket: Ticket, usuarios, mensagem: str) -> None:
-    """Agenda push de menção para usuários específicos após o commit."""
+    """
+    Agenda push de menção para usuários específicos após o commit.
+
+    Sempre notifica quem foi @mencionado — inclusive outro membro TI / admin.
+    """
     from django.db import transaction
 
     ticket_id = ticket.pk
-    user_ids = [u.pk for u in usuarios]
+    user_ids = [u.pk for u in usuarios if u is not None]
+
+    if not user_ids:
+        return
 
     def _disparar():
         from django.db import close_old_connections
@@ -225,7 +232,8 @@ def agendar_notificacao_mencoes(ticket: Ticket, usuarios, mensagem: str) -> None
         try:
             ticket_atual = Ticket.objects.get(pk=ticket_id)
             users = list(CustomUser.objects.filter(pk__in=user_ids, is_active=True))
-            notificar_usuarios_direto(ticket_atual, users, EVENTO_MENTION, mensagem)
+            if users:
+                notificar_usuarios_direto(ticket_atual, users, EVENTO_MENTION, mensagem)
         except Ticket.DoesNotExist:
             pass
         finally:

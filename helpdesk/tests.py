@@ -753,6 +753,30 @@ class MentionAccessTestCase(TestCase):
         self.assertEqual(mencionados, [])
         self.assertFalse(usuario_pode_acessar_chamado(self.standard, self.ticket))
 
+    def test_ti_menciona_outro_ti_entra_no_nao_lido(self):
+        """Menção TI→TI gera badge mesmo com silêncio geral entre operadores."""
+        from helpdesk.models import TicketUnread
+        from helpdesk.views.kanban import adicionar_nao_lido
+
+        it_alvo = CustomUser.objects.create_user(
+            username='mention_it_alvo',
+            password='pass',
+            role=CustomUser.RoleChoices.IT_USER,
+        )
+        comment = Comment.objects.create(
+            ticket=self.ticket,
+            author=self.admin,
+            text='Ei @mention_it_alvo, olha isso',
+        )
+        from helpdesk.mentions import processar_mencoes
+        mencionados = processar_mencoes(self.ticket, comment, self.admin)
+        self.assertEqual([u.pk for u in mencionados], [it_alvo.pk])
+
+        adicionar_nao_lido(self.ticket, self.admin, usuarios_extra=mencionados)
+        self.assertTrue(
+            TicketUnread.objects.filter(ticket=self.ticket, user=it_alvo).exists()
+        )
+
 
 class FilaPosicaoTestCase(TestCase):
     def setUp(self):
@@ -835,3 +859,53 @@ class FilaPosicaoTestCase(TestCase):
         aplicar_posicoes_fila([meu], [])
         self.assertEqual(meu.queue_position, posicoes_globais[meu.pk])
         self.assertEqual(meu.queue_position, len(outros) + 1)
+
+
+class ChamadoRestritoCriador25TestCase(TestCase):
+    """Chamados do criador restrito só aparecem para o TI exclusivo (e stakeholders)."""
+
+    def setUp(self):
+        from unittest.mock import patch
+        self.categoria = TicketCategory.objects.create(name='Cat Restrito', is_active=True)
+        self.criador = CustomUser.objects.create_user(
+            username='criador_restrito', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.ti_exclusivo = CustomUser.objects.create_user(
+            username='ti_exclusivo', password='pass', role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.outro_ti = CustomUser.objects.create_user(
+            username='outro_ti', password='pass', role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.admin = CustomUser.objects.create_user(
+            username='admin_restrito', password='pass', role=CustomUser.RoleChoices.ADMIN,
+        )
+        self.ticket = Ticket.objects.create(
+            title='Chamado restrito',
+            description='d',
+            category=self.categoria,
+            created_by=self.criador,
+            requester_user=self.criador,
+            requester_name='Criador',
+        )
+        self._patcher = patch.multiple(
+            'helpdesk.ticket_access',
+            CRIADOR_CHAMADOS_RESTRITOS_ID=self.criador.pk,
+            TI_VISUALIZADOR_EXCLUSIVO_ID=self.ti_exclusivo.pk,
+        )
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
+
+    def test_ti_exclusivo_ve_e_outro_ti_nao(self):
+        self.assertTrue(usuario_pode_acessar_chamado(self.ti_exclusivo, self.ticket))
+        self.assertFalse(usuario_pode_acessar_chamado(self.outro_ti, self.ticket))
+        self.assertFalse(usuario_pode_acessar_chamado(self.admin, self.ticket))
+
+        qs_ti = filtrar_chamados_para_usuario(Ticket.objects.all(), self.ti_exclusivo)
+        qs_outro = filtrar_chamados_para_usuario(Ticket.objects.all(), self.outro_ti)
+        self.assertIn(self.ticket, qs_ti)
+        self.assertNotIn(self.ticket, qs_outro)
+
+    def test_criador_ainda_ve_proprio_chamado(self):
+        self.assertTrue(usuario_pode_acessar_chamado(self.criador, self.ticket))

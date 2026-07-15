@@ -8,11 +8,40 @@ from django.db.models import Q, QuerySet
 
 from core.models import CustomUser
 
+# Chamados abertos por este usuário só são visíveis ao TI abaixo (além dos stakeholders).
+CRIADOR_CHAMADOS_RESTRITOS_ID = 25
+TI_VISUALIZADOR_EXCLUSIVO_ID = 2
+
 
 def _role(user) -> Optional[str]:
     if not user or not user.is_authenticated:
         return None
     return getattr(user, 'role', None)
+
+
+def _eh_ti_visualizador_exclusivo(user) -> bool:
+    return bool(user and getattr(user, 'pk', None) == TI_VISUALIZADOR_EXCLUSIVO_ID)
+
+
+def _filtro_excluir_chamados_restritos_para(user) -> Q:
+    """
+    Remove chamados do criador restrito, exceto se o user for stakeholder
+    (criador, solicitante ou co-autor). O TI exclusivo não usa este filtro.
+    """
+    return (
+        ~Q(created_by_id=CRIADOR_CHAMADOS_RESTRITOS_ID)
+        | Q(created_by=user)
+        | Q(requester_user=user)
+        | Q(co_authors=user)
+    )
+
+
+def _aplicar_restricao_criador_25(queryset: QuerySet, user) -> QuerySet:
+    """Chamados do user 25: só o TI id 2 enxerga (entre operadores); stakeholders mantêm acesso."""
+    if _eh_ti_visualizador_exclusivo(user):
+        return queryset
+    ids = queryset.filter(_filtro_excluir_chamados_restritos_para(user)).values_list('pk', flat=True).distinct()
+    return queryset.filter(pk__in=ids)
 
 
 def usuario_eh_operador_helpdesk(user) -> bool:
@@ -123,7 +152,7 @@ def _filtro_chamados_equipe(user) -> Q:
 def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
     """Restringe queryset conforme papel do usuário."""
     if usuario_ve_todos_chamados(user):
-        return queryset
+        return _aplicar_restricao_criador_25(queryset, user)
     role = _role(user)
     if role in (CustomUser.RoleChoices.TEAM_LEADER, CustomUser.RoleChoices.SUPERVISOR):
         filtro = _filtro_chamados_equipe(user) | _filtro_chamados_proprios(user)
@@ -131,13 +160,21 @@ def filtrar_chamados_para_usuario(queryset: QuerySet, user) -> QuerySet:
         filtro = _filtro_chamados_proprios(user)
     # distinct() + order_by com M2M quebra no PostgreSQL — filtra por PK
     ids = queryset.filter(filtro).values_list('pk', flat=True).distinct()
-    return queryset.filter(pk__in=ids)
+    filtrado = queryset.filter(pk__in=ids)
+    return _aplicar_restricao_criador_25(filtrado, user)
 
 
 def usuario_pode_acessar_chamado(user, ticket) -> bool:
     """Verifica se o usuário pode visualizar um chamado específico."""
     if not user or not user.is_authenticated:
         return False
+
+    # Chamados do user 25: somente TI id 2 ou stakeholders do chamado
+    if ticket.created_by_id == CRIADOR_CHAMADOS_RESTRITOS_ID:
+        if _eh_ti_visualizador_exclusivo(user):
+            return True
+        return usuario_eh_autor_ou_coautor(user, ticket)
+
     if usuario_ve_todos_chamados(user):
         return True
     qs = type(ticket).objects.filter(pk=ticket.pk)
