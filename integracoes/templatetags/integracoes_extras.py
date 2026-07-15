@@ -12,3 +12,14 @@ def get_item(mapping, key):
         return mapping.get(key, '')
     except AttributeError:
         return ''
+
+
+@register.filter
+def contains(seq, item):
+    """True se item está na sequência (checklist de modelos)."""
+    if not seq:
+        return False
+    try:
+        return item in seq
+    except TypeError:
+        return False

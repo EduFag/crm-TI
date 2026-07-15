@@ -12,11 +12,32 @@ from core.audit import MODULO_CORE, registrar_acao
 from core.models import RegistroAcao
 from core.permissions import MODULO_INTEGRACOES, ModuloObrigatorioMixin, requer_modulo
 from integracoes.models import IntegracaoIA
-from integracoes.providers import CAMPOS_META, campos_do_provedor, lista_provedores
+from integracoes.providers import (
+    CAMPOS_META,
+    base_url_do_provedor,
+    campos_do_provedor,
+    ids_modelos_permitidos,
+    lista_provedores,
+    modelos_do_provedor,
+    modelos_padrao,
+    normalizar_modelos_salvos,
+)
+
+
+def _valores_formulario(request) -> dict:
+    """Valores para reexibir o formulário após erro."""
+    valores = {k: request.POST.get(k, '') for k in request.POST.keys()}
+    valores['models'] = request.POST.getlist('models')
+    valores.pop('api_key', None)
+    return valores
 
 
 def _extrair_payload(request, provider: str, *, exigindo_api_key: bool):
-    """Valida POST e devolve (name, credentials_dict, erros)."""
+    """Valida POST e devolve (name, credentials_dict, erros).
+
+    base_url vem sempre do catálogo do sistema.
+    models só aceita ids liberados para o provedor.
+    """
     erros = []
     fields = campos_do_provedor(provider)
     if not fields:
@@ -34,12 +55,24 @@ def _extrair_payload(request, provider: str, *, exigindo_api_key: bool):
         valor = (request.POST.get(fname) or '').strip()
         if valor:
             credentials[fname] = valor
-        elif field.get('default'):
-            credentials[fname] = field['default']
 
     api_key = (credentials.get('api_key') or '').strip()
     if exigindo_api_key and not api_key:
         erros.append('Informe a API Key.')
+
+    # URL definida pelo sistema — nunca vem do usuário
+    credentials['base_url'] = base_url_do_provedor(provider)
+
+    permitidos = ids_modelos_permitidos(provider)
+    selecionados = [
+        m.strip()
+        for m in request.POST.getlist('models')
+        if m and m.strip() in permitidos
+    ]
+    if not selecionados:
+        erros.append('Selecione ao menos um modelo permitido pelo sistema.')
+    else:
+        credentials['models'] = selecionados
 
     return name, credentials, erros
 
@@ -65,6 +98,7 @@ class IAWizardCreateView(ModuloObrigatorioMixin, View):
             'provedores': lista_provedores(),
             'modo': 'create',
             'form_action': reverse('integracoes:ia_create'),
+            'modelos_selecionados': {},
         })
 
     def post(self, request):
@@ -76,6 +110,7 @@ class IAWizardCreateView(ModuloObrigatorioMixin, View):
                 'form_action': reverse('integracoes:ia_create'),
                 'erro': 'Selecione um provedor de IA.',
                 'provider_selecionado': provider,
+                'modelos_selecionados': {},
             }, status=422)
 
         name, credentials, erros = _extrair_payload(request, provider, exigindo_api_key=True)
@@ -86,7 +121,8 @@ class IAWizardCreateView(ModuloObrigatorioMixin, View):
                 'form_action': reverse('integracoes:ia_create'),
                 'erro': ' '.join(erros),
                 'provider_selecionado': provider,
-                'valores': {k: request.POST.get(k, '') for k in request.POST.keys()},
+                'valores': _valores_formulario(request),
+                'modelos_selecionados': {provider: request.POST.getlist('models')},
             }, status=422)
 
         obj = IntegracaoIA(name=name, provider=provider, created_by=request.user)
@@ -117,11 +153,13 @@ class IAUpdateView(ModuloObrigatorioMixin, View):
         integracao = get_object_or_404(IntegracaoIA, pk=pk)
         creds = integracao.get_credentials()
         valores = {'name': integracao.name, **creds}
-        # Não envia api_key real ao browser
         valores.pop('api_key', None)
+        modelos_sel = normalizar_modelos_salvos(creds) or modelos_padrao(integracao.provider)
         return render(request, 'integracoes/_ia_edit_modal.html', {
             'integracao': integracao,
             'campos': campos_do_provedor(integracao.provider),
+            'modelos': modelos_do_provedor(integracao.provider),
+            'modelos_selecionados': modelos_sel,
             'valores': valores,
             'form_action': reverse('integracoes:ia_update', args=[pk]),
         })
@@ -131,25 +169,24 @@ class IAUpdateView(ModuloObrigatorioMixin, View):
         name, credentials, erros = _extrair_payload(
             request, integracao.provider, exigindo_api_key=False,
         )
-        # Na edição, api_key em branco mantém a atual
         atual = integracao.get_credentials()
         if not credentials.get('api_key'):
             if atual.get('api_key'):
                 credentials['api_key'] = atual['api_key']
             else:
                 erros.append('Informe a API Key.')
-        # Merge defaults / campos omitidos
-        for k, v in atual.items():
-            if k not in credentials:
-                credentials[k] = v
+
+        # Remove campo legado "model" (texto livre)
+        credentials.pop('model', None)
 
         if erros:
-            valores_erro = {k: request.POST.get(k, '') for k in request.POST.keys()}
-            valores_erro.pop('api_key', None)
+            valores_erro = _valores_formulario(request)
             valores_erro['name'] = name or request.POST.get('name', '')
             return render(request, 'integracoes/_ia_edit_modal.html', {
                 'integracao': integracao,
                 'campos': campos_do_provedor(integracao.provider),
+                'modelos': modelos_do_provedor(integracao.provider),
+                'modelos_selecionados': request.POST.getlist('models'),
                 'valores': valores_erro,
                 'erro': ' '.join(erros),
                 'form_action': reverse('integracoes:ia_update', args=[pk]),

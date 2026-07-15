@@ -45,6 +45,28 @@
                            autocomplete="{% if field.sensitive %}new-password{% else %}off{% endif %}">
                 </div>
                 {% endfor %}
+
+                <div>
+                    <p class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Modelos permitidos<span class="text-red-500">*</span>
+                    </p>
+                    <p class="text-[11px] text-slate-400 mb-2">Marque apenas os modelos que esta integração poderá usar.</p>
+                    <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                        {% for m in modelos %}
+                        <label class="flex items-start gap-2.5 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-white transition-colors">
+                            <input type="checkbox"
+                                   name="models"
+                                   value="{{ m.id }}"
+                                   class="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                   {% if modelos_selecionados|contains:m.id %}checked{% endif %}>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-slate-800">{{ m.label }}</span>
+                                <span class="block text-[11px] font-mono text-slate-400">{{ m.id }}</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2 shrink-0">
