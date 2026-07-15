@@ -8,7 +8,7 @@ from django.db.models import Q, QuerySet
 
 from core.models import CustomUser
 
-# Chamados abertos por este usuário só são visíveis ao TI abaixo (além dos stakeholders).
+# Chamados em que este usuário é criador OU solicitante: só o TI abaixo vê (além dos stakeholders).
 CRIADOR_CHAMADOS_RESTRITOS_ID = 25
 TI_VISUALIZADOR_EXCLUSIVO_ID = 2
 
@@ -23,13 +23,29 @@ def _eh_ti_visualizador_exclusivo(user) -> bool:
     return bool(user and getattr(user, 'pk', None) == TI_VISUALIZADOR_EXCLUSIVO_ID)
 
 
+def _q_chamado_restrito() -> Q:
+    """Restrito se o user 25 for quem abriu ou o solicitante vinculado."""
+    return (
+        Q(created_by_id=CRIADOR_CHAMADOS_RESTRITOS_ID)
+        | Q(requester_user_id=CRIADOR_CHAMADOS_RESTRITOS_ID)
+    )
+
+
+def _chamado_eh_restrito(ticket) -> bool:
+    return (
+        ticket.created_by_id == CRIADOR_CHAMADOS_RESTRITOS_ID
+        or ticket.requester_user_id == CRIADOR_CHAMADOS_RESTRITOS_ID
+    )
+
+
 def _filtro_excluir_chamados_restritos_para(user) -> Q:
     """
-    Remove chamados do criador restrito, exceto se o user for stakeholder
-    (criador, solicitante ou co-autor). O TI exclusivo não usa este filtro.
+    Remove chamados restritos (criador ou solicitante = user 25),
+    exceto se o user for stakeholder (criador, solicitante ou co-autor).
+    O TI exclusivo não usa este filtro.
     """
     return (
-        ~Q(created_by_id=CRIADOR_CHAMADOS_RESTRITOS_ID)
+        ~_q_chamado_restrito()
         | Q(created_by=user)
         | Q(requester_user=user)
         | Q(co_authors=user)
@@ -37,7 +53,7 @@ def _filtro_excluir_chamados_restritos_para(user) -> Q:
 
 
 def _aplicar_restricao_criador_25(queryset: QuerySet, user) -> QuerySet:
-    """Chamados do user 25: só o TI id 2 enxerga (entre operadores); stakeholders mantêm acesso."""
+    """Chamados do user 25 (criador/solicitante): só TI id 2; stakeholders mantêm acesso."""
     if _eh_ti_visualizador_exclusivo(user):
         return queryset
     ids = queryset.filter(_filtro_excluir_chamados_restritos_para(user)).values_list('pk', flat=True).distinct()
@@ -169,8 +185,8 @@ def usuario_pode_acessar_chamado(user, ticket) -> bool:
     if not user or not user.is_authenticated:
         return False
 
-    # Chamados do user 25: somente TI id 2 ou stakeholders do chamado
-    if ticket.created_by_id == CRIADOR_CHAMADOS_RESTRITOS_ID:
+    # Chamados do user 25 (criador ou solicitante): somente TI id 2 ou stakeholders
+    if _chamado_eh_restrito(ticket):
         if _eh_ti_visualizador_exclusivo(user):
             return True
         return usuario_eh_autor_ou_coautor(user, ticket)

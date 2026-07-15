@@ -932,3 +932,24 @@ class ChamadoRestritoCriador25TestCase(TestCase):
 
     def test_criador_ainda_ve_proprio_chamado(self):
         self.assertTrue(usuario_pode_acessar_chamado(self.criador, self.ticket))
+
+    def test_solicitante_restrito_mesmo_com_outro_criador(self):
+        """User 25 como solicitante também esconde o chamado dos outros TI."""
+        outro_user = CustomUser.objects.create_user(
+            username='abre_para_restrito', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        ticket = Ticket.objects.create(
+            title='Aberto para solicitante restrito',
+            description='d',
+            category=self.categoria,
+            created_by=outro_user,
+            requester_user=self.criador,
+            requester_name='Criador Restrito',
+        )
+        self.assertTrue(usuario_pode_acessar_chamado(self.ti_exclusivo, ticket))
+        self.assertFalse(usuario_pode_acessar_chamado(self.outro_ti, ticket))
+        self.assertTrue(usuario_pode_acessar_chamado(self.criador, ticket))
+        self.assertTrue(usuario_pode_acessar_chamado(outro_user, ticket))
+
+        qs_outro = filtrar_chamados_para_usuario(Ticket.objects.all(), self.outro_ti)
+        self.assertNotIn(ticket, qs_outro)
