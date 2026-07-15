@@ -1,5 +1,8 @@
 from django import template
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 
+from helpdesk.mentions import MENTION_RE
 from helpdesk.ticket_access import usuario_pode_contestar_chamado
 
 register = template.Library()
@@ -12,3 +15,22 @@ def pode_contestar_chamado(context, ticket):
     if not request or not request.user.is_authenticated:
         return False
     return usuario_pode_contestar_chamado(request.user, ticket)
+
+
+@register.filter(name='highlight_mentions')
+def highlight_mentions(text):
+    """Destaca @username no texto do comentário (HTML seguro)."""
+    if not text:
+        return ''
+    escaped = escape(text)
+
+    def _repl(match):
+        username = match.group(1)
+        return (
+            f'<span class="font-semibold text-sky-600 bg-sky-50 px-0.5 rounded">'
+            f'@{escape(username)}</span>'
+        )
+
+    # reaplicamos no texto já escapado; padrão não contém HTML
+    highlighted = MENTION_RE.sub(_repl, escaped)
+    return mark_safe(highlighted.replace('\n', '<br>'))

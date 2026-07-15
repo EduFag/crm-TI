@@ -1,7 +1,7 @@
 {% load helpdesk_permissions %}
 <div id="ticket-{{ ticket.id }}"
      {% if pode_operar_kanban %}draggable="true" ondragstart="drag(event)" ondragend="dragEnd(event)"{% endif %}
-     class="relative bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group"
+     class="relative bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group {% if ticket.has_unread_mention %}ticket-mention-alert border-cyan-400{% else %}border-slate-200{% endif %}"
      hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-trigger="click" hx-target="#drawer-container" hx-swap="innerHTML">
     
 
@@ -9,6 +9,14 @@
     <!-- Cabeçalho do Card (Tags) -->
     <div class="flex items-center justify-between mb-3">
         <div class="flex flex-wrap items-center gap-2">
+            <!-- Posição na fila (apenas coluna Novos) -->
+            {% if ticket.status == 'NEW' and ticket.queue_position %}
+            <span class="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200"
+                  title="Posição {{ ticket.queue_position }} na fila (Novos + Em Atendimento)">
+                #{{ ticket.queue_position }}
+            </span>
+            {% endif %}
+
             <!-- Notification Badge -->
             {% if ticket.user_unread_count > 0 %}
             <span class="relative flex h-5 w-5" title="{{ ticket.user_unread_count }} interação(ões) não lida(s)">

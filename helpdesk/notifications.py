@@ -5,9 +5,10 @@ import logging
 import time
 
 from django.conf import settings
+from django.db.models import Q
 
 from helpdesk.models import PushSubscription, Ticket
-from helpdesk.ticket_access import usuario_pode_acessar_chamado
+from helpdesk.ticket_access import usuario_eh_operador_helpdesk, usuario_pode_acessar_chamado
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,16 @@ EVENTO_COMMENT = 'COMMENT'
 EVENTO_STATUS_CHANGED = 'STATUS_CHANGED'
 EVENTO_PRIORITY_CHANGED = 'PRIORITY_CHANGED'
 EVENTO_TRIAGE_CHANGED = 'TRIAGE_CHANGED'
+EVENTO_CREATED = 'CREATED'
+EVENTO_MENTION = 'MENTION'
 
 _TITULOS_EVENTO = {
     EVENTO_COMMENT: 'Novo comentário',
     EVENTO_STATUS_CHANGED: 'Chamado movido',
     EVENTO_PRIORITY_CHANGED: 'Prioridade alterada',
     EVENTO_TRIAGE_CHANGED: 'Triagem alterada',
+    EVENTO_CREATED: 'Novo chamado',
+    EVENTO_MENTION: 'Você foi mencionado',
 }
 
 
@@ -29,8 +34,15 @@ def _vapid_configurado() -> bool:
     return bool(settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY)
 
 
-def destinatarios_notificacao(ticket: Ticket, actor):
-    """Usuários com acesso ao chamado que devem receber push (exceto o ator)."""
+def destinatarios_notificacao(ticket: Ticket, actor, *, somente_nao_operadores: bool = False):
+    """
+    Usuários com acesso ao chamado que devem receber push (exceto o ator).
+
+    - Broadcast em chamados sem assigned: apenas ADMIN / IT_USER (não SUPERVISOR).
+    - Silêncio TI↔TI: se o ator é operador, remove outros operadores (exceto finalize
+      que já usa somente_nao_operadores).
+    - somente_nao_operadores: usado na finalização — nunca notifica operadores.
+    """
     from core.models import CustomUser
 
     candidatos = []
@@ -41,17 +53,14 @@ def destinatarios_notificacao(ticket: Ticket, actor):
     if ticket.assigned_to_id:
         candidatos.append(ticket.assigned_to_id)
     else:
-        # Se não está atribuído a ninguém (ex: coluna Novos), todos os operadores que podem ver
-        # o chamado devem ser notificados.
-        from django.db.models import Q
+        # Sem atribuição (ex.: coluna Novos): notifica só equipe TI / admin
         roles_operadores = [
             CustomUser.RoleChoices.ADMIN,
             CustomUser.RoleChoices.IT_USER,
-            CustomUser.RoleChoices.SUPERVISOR,
         ]
         operadores_ids = list(CustomUser.objects.filter(
             Q(role__in=roles_operadores) | Q(is_superuser=True),
-            is_active=True
+            is_active=True,
         ).values_list('pk', flat=True))
         candidatos.extend(operadores_ids)
 
@@ -63,10 +72,24 @@ def destinatarios_notificacao(ticket: Ticket, actor):
         user_ids.discard(actor_id)
 
     if not user_ids:
-        return CustomUser.objects.none()
+        return []
 
-    usuarios = CustomUser.objects.filter(pk__in=user_ids, is_active=True)
-    return [u for u in usuarios if usuario_pode_acessar_chamado(u, ticket)]
+    usuarios = list(CustomUser.objects.filter(pk__in=user_ids, is_active=True))
+    resultado = [u for u in usuarios if usuario_pode_acessar_chamado(u, ticket)]
+
+    if somente_nao_operadores:
+        return [u for u in resultado if not usuario_eh_operador_helpdesk(u)]
+
+    # Membro TI / admin não notifica outro TI / admin em eventos gerais
+    if actor and usuario_eh_operador_helpdesk(actor):
+        resultado = [u for u in resultado if not usuario_eh_operador_helpdesk(u)]
+
+    return resultado
+
+
+def destinatarios_finalizacao(ticket: Ticket, actor):
+    """Finalizados: notifica apenas quem não é membro TI / administrador."""
+    return destinatarios_notificacao(ticket, actor, somente_nao_operadores=True)
 
 
 def _url_chamado(ticket_id: int) -> str:
@@ -117,7 +140,14 @@ def enviar_push_usuario(user, titulo: str, corpo: str, url: str, tag: str) -> No
             logger.warning('Erro inesperado ao enviar push: %s', exc)
 
 
-def notificar_evento_chamado(ticket: Ticket, actor, tipo: str, mensagem: str) -> None:
+def notificar_evento_chamado(
+    ticket: Ticket,
+    actor,
+    tipo: str,
+    mensagem: str,
+    *,
+    somente_nao_operadores: bool = False,
+) -> None:
     """Dispara push para stakeholders do chamado conforme o tipo de evento."""
     titulo_base = _TITULOS_EVENTO.get(tipo, 'Atualização no helpdesk')
     titulo = f'{titulo_base}: #{ticket.pk}'
@@ -126,11 +156,32 @@ def notificar_evento_chamado(ticket: Ticket, actor, tipo: str, mensagem: str) ->
     # Tag única por evento — mesma tag faz Chrome/Windows substituir sem novo toast
     tag = f'helpdesk-{ticket.pk}-{tipo}-{int(time.time() * 1000)}'
 
-    for usuario in destinatarios_notificacao(ticket, actor):
+    destinatarios = destinatarios_notificacao(
+        ticket, actor, somente_nao_operadores=somente_nao_operadores,
+    )
+    for usuario in destinatarios:
         enviar_push_usuario(usuario, titulo, corpo, url, tag)
 
 
-def agendar_notificacao_chamado(ticket: Ticket, actor, tipo: str, mensagem: str) -> None:
+def notificar_usuarios_direto(ticket: Ticket, usuarios, tipo: str, mensagem: str) -> None:
+    """Push para lista explícita (ex.: mencões @) — ignora filtro TI↔TI."""
+    titulo_base = _TITULOS_EVENTO.get(tipo, 'Atualização no helpdesk')
+    titulo = f'{titulo_base}: #{ticket.pk}'
+    corpo = f'{ticket.title}\n{mensagem}' if mensagem else ticket.title
+    url = _url_chamado(ticket.pk)
+    tag = f'helpdesk-{ticket.pk}-{tipo}-{int(time.time() * 1000)}'
+    for usuario in usuarios:
+        enviar_push_usuario(usuario, titulo, corpo, url, tag)
+
+
+def agendar_notificacao_chamado(
+    ticket: Ticket,
+    actor,
+    tipo: str,
+    mensagem: str,
+    *,
+    somente_nao_operadores: bool = False,
+) -> None:
     """Agenda push após commit da transação atual."""
     from django.db import transaction
 
@@ -141,7 +192,40 @@ def agendar_notificacao_chamado(ticket: Ticket, actor, tipo: str, mensagem: str)
         close_old_connections()
         try:
             ticket_atual = Ticket.objects.get(pk=ticket_id)
-            notificar_evento_chamado(ticket_atual, actor, tipo, mensagem)
+            notificar_evento_chamado(
+                ticket_atual,
+                actor,
+                tipo,
+                mensagem,
+                somente_nao_operadores=somente_nao_operadores,
+            )
+        except Ticket.DoesNotExist:
+            pass
+        finally:
+            close_old_connections()
+
+    def _disparar_async():
+        import threading
+        threading.Thread(target=_disparar, daemon=True).start()
+
+    transaction.on_commit(_disparar_async)
+
+
+def agendar_notificacao_mencoes(ticket: Ticket, usuarios, mensagem: str) -> None:
+    """Agenda push de menção para usuários específicos após o commit."""
+    from django.db import transaction
+
+    ticket_id = ticket.pk
+    user_ids = [u.pk for u in usuarios]
+
+    def _disparar():
+        from django.db import close_old_connections
+        from core.models import CustomUser
+        close_old_connections()
+        try:
+            ticket_atual = Ticket.objects.get(pk=ticket_id)
+            users = list(CustomUser.objects.filter(pk__in=user_ids, is_active=True))
+            notificar_usuarios_direto(ticket_atual, users, EVENTO_MENTION, mensagem)
         except Ticket.DoesNotExist:
             pass
         finally:

@@ -432,3 +432,48 @@ class TicketUnread(models.Model):
 
     def __str__(self):
         return f'{self.user.username} tem {self.count} não lida(s) no chamado #{self.ticket.id}'
+
+
+class TicketMention(models.Model):
+    """Menção @username em comentário — concede acesso e alerta visual até vista."""
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name='mentions',
+        help_text='Chamado em que a menção ocorreu.',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ticket_mentions',
+        help_text='Usuário mencionado.',
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.CASCADE,
+        related_name='mentions',
+        help_text='Comentário que contém a menção.',
+    )
+    mentioned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mentions_made',
+        help_text='Operador que fez a menção.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    seen_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Momento em que o mencionado abriu o chamado (null = não visto).',
+    )
+
+    class Meta:
+        unique_together = ('ticket', 'user', 'comment')
+        ordering = ['-created_at']
+        verbose_name = 'menção em chamado'
+        verbose_name_plural = 'menções em chamados'
+
+    def __str__(self):
+        return f'@{self.user.username} em chamado #{self.ticket_id}'

@@ -643,3 +643,179 @@ class ContestacaoChamadoTestCase(TestCase):
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 403)
+
+
+class DestinatariosNotificacaoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name='Cat Notif', is_active=True)
+        self.admin = CustomUser.objects.create_user(
+            username='notif_admin', password='pass', role=CustomUser.RoleChoices.ADMIN,
+        )
+        self.it_user = CustomUser.objects.create_user(
+            username='notif_it', password='pass', role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.it_user2 = CustomUser.objects.create_user(
+            username='notif_it2', password='pass', role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.supervisor = CustomUser.objects.create_user(
+            username='notif_sup', password='pass', role=CustomUser.RoleChoices.SUPERVISOR,
+        )
+        self.standard = CustomUser.objects.create_user(
+            username='notif_std', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.ticket = Ticket.objects.create(
+            title='Chamado notif',
+            description='Desc',
+            category=self.categoria,
+            created_by=self.standard,
+            requester_user=self.standard,
+            requester_name='Std',
+            status=Ticket.StatusChoices.NEW,
+        )
+
+    def test_broadcast_novos_so_operadores_ti_sem_supervisor(self):
+        from helpdesk.notifications import destinatarios_notificacao
+        ids = {u.pk for u in destinatarios_notificacao(self.ticket, self.standard)}
+        self.assertIn(self.admin.pk, ids)
+        self.assertIn(self.it_user.pk, ids)
+        self.assertNotIn(self.supervisor.pk, ids)
+        self.assertNotIn(self.standard.pk, ids)
+
+    def test_silencio_ti_nao_notifica_outro_ti(self):
+        from helpdesk.notifications import destinatarios_notificacao
+        self.ticket.assigned_to = self.it_user
+        self.ticket.save(update_fields=['assigned_to'])
+        ids = {u.pk for u in destinatarios_notificacao(self.ticket, self.it_user2)}
+        self.assertNotIn(self.admin.pk, ids)
+        self.assertNotIn(self.it_user.pk, ids)
+        self.assertIn(self.standard.pk, ids)
+
+    def test_finalizacao_so_nao_operadores(self):
+        from helpdesk.notifications import destinatarios_finalizacao
+        self.ticket.assigned_to = self.it_user
+        self.ticket.save(update_fields=['assigned_to'])
+        ids = {u.pk for u in destinatarios_finalizacao(self.ticket, self.it_user)}
+        self.assertIn(self.standard.pk, ids)
+        self.assertNotIn(self.admin.pk, ids)
+        self.assertNotIn(self.it_user2.pk, ids)
+
+
+class MentionAccessTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name='Cat Mention', is_active=True)
+        self.admin = CustomUser.objects.create_user(
+            username='mention_admin', password='pass', role=CustomUser.RoleChoices.ADMIN,
+        )
+        self.standard = CustomUser.objects.create_user(
+            username='mention_alvo', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.outro = CustomUser.objects.create_user(
+            username='mention_outro', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.ticket = Ticket.objects.create(
+            title='Chamado menção',
+            description='Desc',
+            category=self.categoria,
+            created_by=self.outro,
+            requester_user=self.outro,
+            requester_name='Outro',
+            status=Ticket.StatusChoices.IN_PROGRESS,
+        )
+
+    def test_mencao_concede_acesso_e_cria_ticketmention(self):
+        from helpdesk.mentions import processar_mencoes
+        from helpdesk.models import TicketMention
+
+        self.assertFalse(usuario_pode_acessar_chamado(self.standard, self.ticket))
+        comment = Comment.objects.create(
+            ticket=self.ticket,
+            author=self.admin,
+            text='Olá @mention_alvo, pode verificar?',
+        )
+        mencionados = processar_mencoes(self.ticket, comment, self.admin)
+        self.assertEqual(len(mencionados), 1)
+        self.assertEqual(mencionados[0].pk, self.standard.pk)
+        self.assertTrue(usuario_pode_acessar_chamado(self.standard, self.ticket))
+        self.assertTrue(
+            TicketMention.objects.filter(
+                ticket=self.ticket, user=self.standard, comment=comment, seen_at__isnull=True,
+            ).exists()
+        )
+
+    def test_usuario_nao_operador_nao_processa_mencao(self):
+        from helpdesk.mentions import processar_mencoes
+        comment = Comment.objects.create(
+            ticket=self.ticket,
+            author=self.outro,
+            text='@mention_alvo teste',
+        )
+        mencionados = processar_mencoes(self.ticket, comment, self.outro)
+        self.assertEqual(mencionados, [])
+        self.assertFalse(usuario_pode_acessar_chamado(self.standard, self.ticket))
+
+
+class FilaPosicaoTestCase(TestCase):
+    def setUp(self):
+        self.categoria = TicketCategory.objects.create(name='Cat Fila', is_active=True)
+        self.user = CustomUser.objects.create_user(
+            username='fila_user', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+
+    def _criar(self, pk_force, priority, status=Ticket.StatusChoices.NEW):
+        t = Ticket(
+            title=f'T{pk_force}',
+            description='d',
+            category=self.categoria,
+            created_by=self.user,
+            requester_name='u',
+            priority=priority,
+            status=status,
+        )
+        t.save()
+        # Ajusta pk via update só se necessário — usamos ordem natural dos ids criados
+        return t
+
+    def test_ordem_exemplo_plano(self):
+        from helpdesk.queue import calcular_posicoes_fila
+
+        # Cria na ordem dos números do exemplo (mais antigo primeiro)
+        t123 = self._criar(123, Ticket.PriorityChoices.HIGH)
+        t234 = self._criar(234, Ticket.PriorityChoices.LOW)
+        t456 = self._criar(456, Ticket.PriorityChoices.MEDIUM)
+        t567 = self._criar(567, Ticket.PriorityChoices.MEDIUM)
+        t789 = self._criar(789, Ticket.PriorityChoices.URGENT)
+
+        # Garante pks relativos iguais à ordem de criação
+        tickets = [t123, t234, t456, t567, t789]
+        self.assertEqual(
+            [t.pk for t in tickets],
+            sorted(t.pk for t in tickets),
+        )
+
+        posicoes = calcular_posicoes_fila(tickets)
+        # Urgente (último criado = maior pk) em 1º; depois High; Medias por pk; Low por último
+        ordem = sorted(tickets, key=lambda t: posicoes[t.pk])
+        self.assertEqual(
+            [t.priority for t in ordem],
+            [
+                Ticket.PriorityChoices.URGENT,
+                Ticket.PriorityChoices.HIGH,
+                Ticket.PriorityChoices.MEDIUM,
+                Ticket.PriorityChoices.MEDIUM,
+                Ticket.PriorityChoices.LOW,
+            ],
+        )
+        self.assertEqual(ordem[0].pk, t789.pk)
+        self.assertEqual(ordem[1].pk, t123.pk)
+        self.assertEqual(ordem[2].pk, t456.pk)
+        self.assertEqual(ordem[3].pk, t567.pk)
+        self.assertEqual(ordem[4].pk, t234.pk)
+
+    def test_in_progress_entra_no_ranking(self):
+        from helpdesk.queue import calcular_posicoes_fila
+
+        novo = self._criar(1, Ticket.PriorityChoices.HIGH, Ticket.StatusChoices.NEW)
+        andamento = self._criar(2, Ticket.PriorityChoices.URGENT, Ticket.StatusChoices.IN_PROGRESS)
+        posicoes = calcular_posicoes_fila([novo, andamento])
+        self.assertEqual(posicoes[andamento.pk], 1)
+        self.assertEqual(posicoes[novo.pk], 2)

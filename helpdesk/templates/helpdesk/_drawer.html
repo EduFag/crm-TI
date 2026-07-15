@@ -218,8 +218,16 @@
     <!-- Input de Comentário (Fixo no Rodapé) -->
     <div class="p-4 border-t border-slate-200 bg-slate-50">
         {% if pode_comentar %}
-        <form id="comment-form-{{ ticket.id }}" hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-encoding="multipart/form-data" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset(); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.add('hidden'); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.remove('flex');" class="flex flex-col gap-3">
-            <textarea name="text" rows="2" placeholder="Adicione uma nota ou atualização..." class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
+        <form id="comment-form-{{ ticket.id }}" hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-encoding="multipart/form-data" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset(); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.add('hidden'); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.remove('flex'); var _m=document.getElementById('mention-dropdown-{{ ticket.id }}'); if(_m) _m.classList.add('hidden');" class="flex flex-col gap-3">
+            <div class="relative">
+                <textarea id="comment-text-{{ ticket.id }}" name="text" rows="2" placeholder="{% if eh_operador_helpdesk %}Adicione uma nota… Use @ para mencionar{% else %}Adicione uma nota ou atualização...{% endif %}" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
+                {% if eh_operador_helpdesk %}
+                <ul id="mention-dropdown-{{ ticket.id }}"
+                    class="hidden absolute left-0 right-0 bottom-full mb-1 z-30 max-h-40 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm"
+                    role="listbox"></ul>
+                {% endif %}
+            </div>
+
             
             <div id="comment-attachment-preview-{{ ticket.id }}" class="hidden items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm animate-in fade-in">
                 <div class="flex items-center gap-2 overflow-hidden text-slate-700">
@@ -249,6 +257,10 @@
             var preview = document.getElementById('comment-attachment-preview-{{ ticket.id }}');
             var removeBtn = document.getElementById('remove-comment-attachment-{{ ticket.id }}');
             var previewName = document.getElementById('comment-attachment-name-{{ ticket.id }}');
+            var textarea = document.getElementById('comment-text-{{ ticket.id }}');
+            var dropdown = document.getElementById('mention-dropdown-{{ ticket.id }}');
+            var mentionUrl = '{% url "helpdesk:mention_users_search" %}';
+            var mentionTimer = null;
         
             if (!form || !fileInput) return;
         
@@ -289,8 +301,80 @@
                     }
                 }
             });
+
+            // Autocomplete @username (somente operadores — dropdown só existe nesse caso)
+            if (textarea && dropdown) {
+                function hideMentionDropdown() {
+                    dropdown.classList.add('hidden');
+                    dropdown.innerHTML = '';
+                }
+
+                function insertMention(username) {
+                    var val = textarea.value;
+                    var pos = textarea.selectionStart;
+                    var before = val.slice(0, pos);
+                    var after = val.slice(pos);
+                    var match = before.match(/@([A-Za-z0-9_.+-]*)$/);
+                    if (!match) return;
+                    var start = before.length - match[0].length;
+                    textarea.value = before.slice(0, start) + '@' + username + ' ' + after;
+                    var newPos = start + username.length + 2;
+                    textarea.focus();
+                    textarea.setSelectionRange(newPos, newPos);
+                    hideMentionDropdown();
+                }
+
+                function renderMentionResults(results) {
+                    dropdown.innerHTML = '';
+                    if (!results.length) {
+                        hideMentionDropdown();
+                        return;
+                    }
+                    results.forEach(function(item) {
+                        var li = document.createElement('li');
+                        li.setAttribute('role', 'option');
+                        li.className = 'px-3 py-2 cursor-pointer hover:bg-sky-50 text-slate-700';
+                        li.innerHTML = '<span class="font-semibold text-sky-600">@' + item.username + '</span>' +
+                            (item.label && item.label !== item.username
+                                ? ' <span class="text-slate-400 text-xs">' + item.label + '</span>'
+                                : '');
+                        li.addEventListener('mousedown', function(ev) {
+                            ev.preventDefault();
+                            insertMention(item.username);
+                        });
+                        dropdown.appendChild(li);
+                    });
+                    dropdown.classList.remove('hidden');
+                }
+
+                textarea.addEventListener('input', function() {
+                    var pos = textarea.selectionStart;
+                    var before = textarea.value.slice(0, pos);
+                    var match = before.match(/@([A-Za-z0-9_.+-]*)$/);
+                    if (!match) {
+                        hideMentionDropdown();
+                        return;
+                    }
+                    var q = match[1];
+                    clearTimeout(mentionTimer);
+                    mentionTimer = setTimeout(function() {
+                        fetch(mentionUrl + '?q=' + encodeURIComponent(q), {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin'
+                        })
+                        .then(function(r) { return r.ok ? r.json() : { results: [] }; })
+                        .then(function(data) { renderMentionResults(data.results || []); })
+                        .catch(function() { hideMentionDropdown(); });
+                    }, 180);
+                });
+
+                textarea.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') hideMentionDropdown();
+                });
+            }
         })();
         </script>
+
         {% else %}
         {% if ticket.status == 'RESOLVED' and pode_contestar %}
         <p class="text-sm text-slate-500 text-center py-2">Chamado finalizado — comentários disponíveis apenas para a TI. Para contestar, use o menu ⋮ no card.</p>

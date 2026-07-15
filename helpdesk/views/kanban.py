@@ -24,13 +24,19 @@ from helpdesk.audit import (
     log_chamado_recusado,
     log_triagem_alterada,
 )
+from helpdesk.mentions import marcar_mencoes_vistas, processar_mencoes
 from helpdesk.notifications import (
     EVENTO_COMMENT,
+    EVENTO_CREATED,
     EVENTO_PRIORITY_CHANGED,
     EVENTO_STATUS_CHANGED,
     EVENTO_TRIAGE_CHANGED,
     agendar_notificacao_chamado,
+    agendar_notificacao_mencoes,
+    destinatarios_finalizacao,
+    destinatarios_notificacao,
 )
+from helpdesk.queue import aplicar_posicoes_fila
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
     usuario_eh_operador_helpdesk,
@@ -45,11 +51,14 @@ from helpdesk.ticket_access import (
     usuarios_tecnicos_para_transferencia,
     usuario_pode_excluir_chamado,
 )
-from helpdesk.notifications import destinatarios_notificacao
 
-def adicionar_nao_lido(ticket, ator):
+
+def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False):
     from django.db.models import F
-    destinatarios = destinatarios_notificacao(ticket, ator)
+    if somente_nao_operadores:
+        destinatarios = destinatarios_finalizacao(ticket, ator)
+    else:
+        destinatarios = destinatarios_notificacao(ticket, ator)
     for usuario in destinatarios:
         obj, created = TicketUnread.objects.get_or_create(
             ticket=ticket, user=usuario,
@@ -192,27 +201,43 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
             output_field=IntegerField()
         )
         
-        from django.db.models import OuterRef, Subquery
+        from django.db.models import Exists, OuterRef, Subquery
         from django.db.models.functions import Coalesce
+        from helpdesk.models import TicketMention
+
         unread_subquery = TicketUnread.objects.filter(
             ticket_id=OuterRef('pk'),
             user=self.request.user
         ).values('count')[:1]
-        
+        unread_mention_exists = TicketMention.objects.filter(
+            ticket_id=OuterRef('pk'),
+            user=self.request.user,
+            seen_at__isnull=True,
+        )
+
         tickets_annotated = tickets.annotate(
             priority_order=priority_ordering,
-            user_unread_count=Coalesce(Subquery(unread_subquery, output_field=IntegerField()), 0)
+            user_unread_count=Coalesce(Subquery(unread_subquery, output_field=IntegerField()), 0),
+            has_unread_mention=Exists(unread_mention_exists),
         )
-        
-        context['tickets_new'] = tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
-        
+
+        tickets_new = list(
+            tickets_annotated.filter(status=Ticket.StatusChoices.NEW).order_by('-priority_order', 'created_at')
+        )
+        tickets_in_progress = list(
+            tickets_annotated.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-priority_order', '-created_at')
+        )
+        aplicar_posicoes_fila(tickets_new, tickets_in_progress)
+
+        context['tickets_new'] = tickets_new
+
         is_ti = usuario_eh_operador_helpdesk(self.request.user)
         if is_ti:
-            context['untriaged_count'] = sum(1 for t in context['tickets_new'] if not t.priority)
+            context['untriaged_count'] = sum(1 for t in tickets_new if not t.priority)
         else:
             context['untriaged_count'] = 0
-            
-        context['tickets_in_progress'] = tickets_annotated.filter(status=Ticket.StatusChoices.IN_PROGRESS).order_by('-priority_order', '-created_at')
+
+        context['tickets_in_progress'] = tickets_in_progress
         context['tickets_pending'] = tickets_annotated.filter(status=Ticket.StatusChoices.PENDING).order_by('-priority_order', '-created_at')
         context['tickets_resolved'] = tickets_annotated.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
         context['pode_operar_kanban'] = usuario_pode_operar_kanban(self.request.user)
@@ -260,6 +285,12 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
             )
             log_chamado_criado(ticket, request.user)
             adicionar_nao_lido(ticket, request.user)
+            agendar_notificacao_chamado(
+                ticket,
+                request.user,
+                EVENTO_CREATED,
+                f'Aberto por {_nome_usuario(request.user)}.',
+            )
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
                 'ticketUpdated': True,
@@ -437,8 +468,9 @@ def ticket_finalize(request, pk):
 
     ticket.resolved_by = request.user
     ticket.save()
-    adicionar_nao_lido(ticket, request.user)
-    
+    # Finalizados: badge/push só para não-operadores (solicitante, criador, etc.)
+    adicionar_nao_lido(ticket, request.user, somente_nao_operadores=True)
+
     if status_anterior != Ticket.StatusChoices.RESOLVED:
         log_status_alterado(
             ticket,
@@ -451,6 +483,7 @@ def ticket_finalize(request, pk):
             request.user,
             EVENTO_STATUS_CHANGED,
             f'Movido para {_rotulo_status(Ticket.StatusChoices.RESOLVED)}.',
+            somente_nao_operadores=True,
         )
 
     return JsonResponse({'success': True})
@@ -534,14 +567,13 @@ def ticket_drawer(request, pk):
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão para acessar este chamado.')
         
-    is_ti = usuario_eh_operador_helpdesk(request.user)
-    
     deleted, _ = TicketUnread.objects.filter(ticket=ticket, user=request.user).delete()
-    if deleted:
+    mencoes_vistas = marcar_mencoes_vistas(ticket, request.user)
+    if deleted or mencoes_vistas:
         response = render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
         response['HX-Trigger'] = json.dumps({'ticketUpdated': True, 'ticketRead': True})
         return response
-        
+
     return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
 
 
@@ -683,34 +715,67 @@ def ticket_add_comment(request, pk):
                 validate_image_attachment(attachment)
             except ValidationError as e:
                 return HttpResponse(e.messages[0], status=400)
-        Comment.objects.create(ticket=ticket, author=request.user, text=text, attachment=attachment)
+        comment = Comment.objects.create(
+            ticket=ticket, author=request.user, text=text, attachment=attachment,
+        )
         if text:
             log_comentario(ticket, request.user, text)
         else:
             log_comentario(ticket, request.user, 'Anexou uma imagem.')
-        
+
+        # Menções @: só operadores; concede co_authors + push dedicado
+        mencionados = processar_mencoes(ticket, comment, request.user) if text else []
+
         ticket.save(update_fields=['updated_at'])
         adicionar_nao_lido(ticket, request.user)
 
         preview = text[:120] if text else 'Nova imagem anexada.'
         agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
+        if mencionados:
+            agendar_notificacao_mencoes(ticket, mencionados, preview)
 
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
     return response
 
+
+@requer_modulo(MODULO_HELPDESK)
+def mention_users_search(request):
+    """Autocomplete de @username — exclusivo para operadores helpdesk."""
+    if not usuario_eh_operador_helpdesk(request.user):
+        return JsonResponse({'results': []}, status=403)
+
+    q = (request.GET.get('q') or '').strip().lstrip('@')
+    qs = CustomUser.objects.filter(is_active=True).exclude(pk=request.user.pk)
+    if q:
+        qs = qs.filter(
+            Q(username__icontains=q)
+            | Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+        )
+    qs = qs.order_by('username')[:15]
+    results = [
+        {
+            'username': u.username,
+            'label': u.get_full_name() or u.username,
+        }
+        for u in qs
+    ]
+    return JsonResponse({'results': results})
+
 @requer_modulo(MODULO_HELPDESK)
 def ticket_comments(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
     if not usuario_pode_acessar_chamado(request.user, ticket):
         return HttpResponseForbidden('Sem permissão.')
-        
+
     deleted, _ = TicketUnread.objects.filter(ticket=ticket, user=request.user).delete()
+    mencoes_vistas = marcar_mencoes_vistas(ticket, request.user)
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    
+
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
-    if deleted:
+    if deleted or mencoes_vistas:
         response['HX-Trigger'] = json.dumps({'ticketRead': True})
     return response
 
