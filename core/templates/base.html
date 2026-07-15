@@ -98,6 +98,12 @@
                     <span class="sidebar-hide-collapsed">Sair do Sistema</span>
                 </button>
             </form>
+            {% if helpdesk_asset_v %}
+            <p class="mt-3 text-center text-[10px] font-mono text-slate-400 tracking-wide select-all"
+               title="Versão do frontend helpdesk (hash do commit)">
+                v={{ helpdesk_asset_v }}
+            </p>
+            {% endif %}
         </div>
     </aside>
 
