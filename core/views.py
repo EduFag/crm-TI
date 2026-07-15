@@ -47,10 +47,36 @@ class UserListView(ModuloObrigatorioMixin, ListView):
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
 
     def get_queryset(self):
-        return CustomUser.objects.prefetch_related('equipes').order_by('-is_active', 'username')
+        qs = CustomUser.objects.prefetch_related('equipes').order_by('-is_active', 'username')
+        q = (self.request.GET.get('q') or '').strip()
+        status = (self.request.GET.get('status') or '').strip().lower()
+
+        if q:
+            filtro = (
+                Q(username__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+            )
+            if q.isdigit():
+                filtro |= Q(pk=int(q))
+            qs = qs.filter(filtro)
+
+        if status == 'ativo':
+            qs = qs.filter(is_active=True)
+        elif status == 'inativo':
+            qs = qs.filter(is_active=False)
+
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        base = CustomUser.objects.all()
+        context['total_usuarios'] = base.count()
+        context['total_ativos'] = base.filter(is_active=True).count()
+        context['total_inativos'] = base.filter(is_active=False).count()
+        context['filtro_q'] = (self.request.GET.get('q') or '').strip()
+        context['filtro_status'] = (self.request.GET.get('status') or '').strip().lower()
         context['audit_logs'] = logs_do_modulo(MODULO_CORE, limite=30)
         context['audit_titulo'] = 'Últimas ações de usuários e equipes'
         return context
