@@ -83,7 +83,7 @@
         {% include "helpdesk/_poll.html" %}
         <div id="kanban-board-container"
              hx-trigger="ticketUpdated from:body, ticketRead from:body"
-             hx-get="{% url 'helpdesk:kanban_board' %}"
+             hx-get="{% url 'helpdesk:kanban_board' %}?v={{ helpdesk_asset_v }}"
              hx-swap="innerHTML"
              class="h-full">
             {% include "helpdesk/_kanban_board.html" %}

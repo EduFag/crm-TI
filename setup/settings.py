@@ -274,5 +274,9 @@ VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
 VAPID_PRIVATE_KEY = _carregar_vapid_private_key(os.environ.get('VAPID_PRIVATE_KEY', ''))
 VAPID_ADMIN_EMAIL = os.environ.get('VAPID_ADMIN_EMAIL', 'mailto:ti@localhost')
 
+# Cache-busting do frontend helpdesk (?v=) — automático via hash do commit git
+from helpdesk.version import resolver_versao_frontend  # noqa: E402
+HELPDESK_FRONTEND_VERSION = resolver_versao_frontend(BASE_DIR)
+
 # Evitar migrações indesejadas de chaves primárias
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,6 +1,6 @@
 /* Service Worker — notificações Web Push do helpdesk */
 
-const CACHE_VERSION = 'helpdesk-push-v3';
+const CACHE_VERSION = 'helpdesk-push-__HELPDESK_FRONTEND_VERSION__';
 const ICON_URL = '/static/helpdesk/images/favicon.ico';
 
 self.addEventListener('push', function(event) {

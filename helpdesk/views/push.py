@@ -23,7 +23,10 @@ def service_worker_js(request):
     resposta['Service-Worker-Allowed'] = '/helpdesk/'
 
     if request.method == 'GET':
-        resposta.content = Path(caminho).read_text(encoding='utf-8')
+        conteudo = Path(caminho).read_text(encoding='utf-8')
+        versao = getattr(settings, 'HELPDESK_FRONTEND_VERSION', '1')
+        conteudo = conteudo.replace('__HELPDESK_FRONTEND_VERSION__', versao)
+        resposta.content = conteudo
 
     return resposta
 

@@ -1,7 +1,7 @@
-{% load static %}
+{% load static helpdesk_permissions %}
 {# Poll leve a cada 4s — só dispara refresh quando há alteração no banco #}
 <div id="helpdesk-poll"
-     hx-get="{% url 'helpdesk:poll' %}"
+     hx-get="{% url 'helpdesk:poll' %}?v={% helpdesk_v %}"
      hx-trigger="every 4s"
      hx-swap="none"
      class="hidden"
@@ -10,10 +10,10 @@
 <script>
     (function() {
         const currentUserId = {{ request.user.id|default:"null" }};
-        const URL_ALERTA_MENCAO = "{% static 'helpdesk/sounds/alerta-ruim.mp3' %}";
+        const URL_ALERTA_MENCAO = "{% helpdesk_static 'helpdesk/sounds/alerta-ruim.mp3' %}";
 
-        const audioAtualizacao = new Audio("{% static 'helpdesk/sounds/atualizacao.mp3' %}");
-        const audioComentario = new Audio("{% static 'helpdesk/sounds/comentario.mp3' %}");
+        const audioAtualizacao = new Audio("{% helpdesk_static 'helpdesk/sounds/atualizacao.mp3' %}");
+        const audioComentario = new Audio("{% helpdesk_static 'helpdesk/sounds/comentario.mp3' %}");
 
         const TITULOS_NOTIFICACAO = {
             COMMENT: 'Novo comentário',
@@ -110,7 +110,7 @@
 
             const notification = new Notification(titulo, {
                 body: corpo,
-                icon: "{% static 'helpdesk/images/favicon.ico' %}",
+                icon: "{% helpdesk_static 'helpdesk/images/favicon.ico' %}",
                 tag: tag,
             });
             notification.onclick = function() {

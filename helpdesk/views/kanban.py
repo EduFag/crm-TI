@@ -188,6 +188,13 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
     template_name = 'helpdesk/kanban.html'
     modulo_obrigatorio = MODULO_HELPDESK
 
+    def dispatch(self, request, *args, **kwargs):
+        # HTML/JS inline do helpdesk não fica preso em cache do browser
+        response = super().dispatch(request, *args, **kwargs)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         

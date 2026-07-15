@@ -30,6 +30,23 @@
         return meta ? meta.getAttribute('content') : '/helpdesk/';
     }
 
+    function assetVersion() {
+        const meta = document.querySelector('meta[name="helpdesk-asset-v"]');
+        return meta ? (meta.getAttribute('content') || '') : '';
+    }
+
+    function comVersao(url) {
+        const v = assetVersion();
+        if (!v) {
+            return url;
+        }
+        return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(v);
+    }
+
+    function urlServiceWorker() {
+        return comVersao(urlBaseHelpdesk() + 'sw.js');
+    }
+
     function urlVapidKey() {
         return urlBaseHelpdesk() + 'push/vapid-public-key/';
     }

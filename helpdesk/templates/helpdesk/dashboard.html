@@ -40,7 +40,7 @@
     {% include "helpdesk/_poll.html" %}
     <div id="dashboard-metrics-container"
          hx-trigger="ticketUpdated from:body"
-         hx-get="{% url 'helpdesk:dashboard_metrics' %}"
+         hx-get="{% url 'helpdesk:dashboard_metrics' %}?v={{ helpdesk_asset_v }}"
          hx-swap="innerHTML">
         {% include "helpdesk/_dashboard_metrics.html" %}
     </div>

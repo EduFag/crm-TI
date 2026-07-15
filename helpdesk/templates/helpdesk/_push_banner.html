@@ -1,4 +1,4 @@
-{% load static %}
+{% load static helpdesk_permissions %}
 {# Banner — pede permissão (default) ou orienta a reativar no Chrome (denied) #}
 <div id="helpdesk-push-banner"
      class="hidden mb-4 flex flex-col gap-3 px-4 py-3 rounded-xl text-sm border">
@@ -17,5 +17,6 @@
 </div>
 
 <meta name="helpdesk-push-base" content="{% url 'helpdesk:kanban' %}">
+<meta name="helpdesk-asset-v" content="{% helpdesk_v %}">
 <meta name="csrf-token" content="{{ csrf_token }}">
-<script src="{% static 'helpdesk/push.js' %}?v=4" defer></script>
+<script src="{% helpdesk_static 'helpdesk/push.js' %}" defer></script>
