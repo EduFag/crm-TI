@@ -96,7 +96,7 @@ def _url_chamado(ticket_id: int) -> str:
     return f'/helpdesk/?ticket={ticket_id}'
 
 
-def enviar_push_usuario(user, titulo: str, corpo: str, url: str, tag: str) -> None:
+def enviar_push_usuario(user, titulo: str, corpo: str, url: str, tag: str, tipo: str = '') -> None:
     """Envia push para todas as subscriptions ativas do usuário."""
     if not _vapid_configurado():
         return
@@ -112,6 +112,7 @@ def enviar_push_usuario(user, titulo: str, corpo: str, url: str, tag: str) -> No
         'body': corpo,
         'url': url,
         'tag': tag,
+        'tipo': tipo or '',
     })
 
     vapid_claims = {'sub': settings.VAPID_ADMIN_EMAIL}
@@ -160,7 +161,7 @@ def notificar_evento_chamado(
         ticket, actor, somente_nao_operadores=somente_nao_operadores,
     )
     for usuario in destinatarios:
-        enviar_push_usuario(usuario, titulo, corpo, url, tag)
+        enviar_push_usuario(usuario, titulo, corpo, url, tag, tipo=tipo)
 
 
 def notificar_usuarios_direto(ticket: Ticket, usuarios, tipo: str, mensagem: str) -> None:
@@ -171,7 +172,7 @@ def notificar_usuarios_direto(ticket: Ticket, usuarios, tipo: str, mensagem: str
     url = _url_chamado(ticket.pk)
     tag = f'helpdesk-{ticket.pk}-{tipo}-{int(time.time() * 1000)}'
     for usuario in usuarios:
-        enviar_push_usuario(usuario, titulo, corpo, url, tag)
+        enviar_push_usuario(usuario, titulo, corpo, url, tag, tipo=tipo)
 
 
 def agendar_notificacao_chamado(

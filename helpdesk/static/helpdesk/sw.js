@@ -1,6 +1,6 @@
 /* Service Worker — notificações Web Push do helpdesk */
 
-const CACHE_VERSION = 'helpdesk-push-v2';
+const CACHE_VERSION = 'helpdesk-push-v3';
 const ICON_URL = '/static/helpdesk/images/favicon.ico';
 
 self.addEventListener('push', function(event) {
@@ -22,11 +22,30 @@ self.addEventListener('push', function(event) {
         badge: ICON_URL,
         tag: payload.tag || ('helpdesk-' + Date.now()),
         renotify: true,
-        data: { url: payload.url || '/helpdesk/' },
-        requireInteraction: false,
+        data: {
+            url: payload.url || '/helpdesk/',
+            tipo: payload.tipo || '',
+        },
+        requireInteraction: Boolean(payload.tipo === 'MENTION'),
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    event.waitUntil(
+        Promise.all([
+            self.registration.showNotification(title, options),
+            // Avisa abas abertas para tocar áudio de menção (volume amplificado no cliente)
+            clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+                if (payload.tipo !== 'MENTION') {
+                    return;
+                }
+                clientList.forEach(function(client) {
+                    client.postMessage({
+                        type: 'HELPDESK_MENTION_ALERT',
+                        ticketUrl: payload.url || '/helpdesk/',
+                    });
+                });
+            }),
+        ])
+    );
 });
 
 self.addEventListener('notificationclick', function(event) {

@@ -10,17 +10,22 @@
 <script>
     (function() {
         const currentUserId = {{ request.user.id|default:"null" }};
+        const URL_ALERTA_MENCAO = "{% static 'helpdesk/sounds/alerta-ruim.mp3' %}";
 
         const audioAtualizacao = new Audio("{% static 'helpdesk/sounds/atualizacao.mp3' %}");
         const audioComentario = new Audio("{% static 'helpdesk/sounds/comentario.mp3' %}");
 
         const TITULOS_NOTIFICACAO = {
             COMMENT: 'Novo comentário',
+            MENTION: 'Você foi mencionado',
             STATUS_CHANGED: 'Chamado movido',
             PRIORITY_CHANGED: 'Prioridade alterada',
             TRIAGE_CHANGED: 'Triagem alterada',
             CREATED: 'Novo chamado',
         };
+
+        let audioCtxMencao = null;
+        let tocandoMencao = false;
 
         function tituloNotificacao(detail) {
             const base = TITULOS_NOTIFICACAO[detail.acao] || 'Atualização no helpdesk';
@@ -32,6 +37,59 @@
                 return '/helpdesk/?ticket=' + detail.ticket_id;
             }
             return '/helpdesk/';
+        }
+
+        function foiMencionado(detail) {
+            if (detail.acao === 'MENTION') {
+                const ids = detail.mention_user_ids || [];
+                if (!ids.length) {
+                    return true;
+                }
+                return ids.indexOf(currentUserId) !== -1;
+            }
+            const ids = detail.mention_user_ids || [];
+            return ids.indexOf(currentUserId) !== -1;
+        }
+
+        /** Toca alerta-ruim com ganho ~3x (Web Audio; volume HTML max=1). */
+        function tocarAlertaMencao() {
+            if (tocandoMencao) {
+                return;
+            }
+            tocandoMencao = true;
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) {
+                    const fallback = new Audio(URL_ALERTA_MENCAO);
+                    fallback.volume = 1;
+                    fallback.play().finally(function() { tocandoMencao = false; });
+                    return;
+                }
+                if (!audioCtxMencao) {
+                    audioCtxMencao = new AudioCtx();
+                }
+                if (audioCtxMencao.state === 'suspended') {
+                    audioCtxMencao.resume();
+                }
+                const audio = new Audio(URL_ALERTA_MENCAO);
+                audio.crossOrigin = 'anonymous';
+                const source = audioCtxMencao.createMediaElementSource(audio);
+                const gain = audioCtxMencao.createGain();
+                gain.gain.value = 3;
+                source.connect(gain);
+                gain.connect(audioCtxMencao.destination);
+                audio.addEventListener('ended', function() {
+                    tocandoMencao = false;
+                    try { source.disconnect(); gain.disconnect(); } catch (e) {}
+                });
+                audio.play().catch(function(e) {
+                    console.log('Audio play prevented (mencao):', e);
+                    tocandoMencao = false;
+                });
+            } catch (err) {
+                console.log('Falha ao tocar alerta de menção:', err);
+                tocandoMencao = false;
+            }
         }
 
         function exibirNotificacaoBrowser(detail) {
@@ -68,7 +126,9 @@
                 return;
             }
 
-            if (detail.acao === 'COMMENT') {
+            if (foiMencionado(detail)) {
+                tocarAlertaMencao();
+            } else if (detail.acao === 'COMMENT') {
                 audioComentario.currentTime = 0;
                 audioComentario.play().catch(function(e) {
                     console.log('Audio play prevented (comentario):', e);
@@ -87,5 +147,14 @@
 
             exibirNotificacaoBrowser(detail);
         });
+
+        // Push em background → Service Worker avisa a aba aberta
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'HELPDESK_MENTION_ALERT') {
+                    tocarAlertaMencao();
+                }
+            });
+        }
     })();
 </script>

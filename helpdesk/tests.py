@@ -844,6 +844,29 @@ class FilaPosicaoTestCase(TestCase):
         self.assertEqual(posicoes[andamento.pk], 1)
         self.assertEqual(posicoes[novo.pk], 2)
 
+    def test_em_atendimento_pesa_mais_que_novo(self):
+        """
+        Novo: 123 Média, 125 Alta, 126 Baixa
+        Em Atendimento: 124 Média, 120 Alta, 127 Urgente
+        Ordem: 127, 120, 124, 125, 123, 126
+        """
+        from helpdesk.queue import calcular_posicoes_fila
+
+        t123 = self._criar(123, Ticket.PriorityChoices.MEDIUM, Ticket.StatusChoices.NEW)
+        t125 = self._criar(125, Ticket.PriorityChoices.HIGH, Ticket.StatusChoices.NEW)
+        t126 = self._criar(126, Ticket.PriorityChoices.LOW, Ticket.StatusChoices.NEW)
+        t124 = self._criar(124, Ticket.PriorityChoices.MEDIUM, Ticket.StatusChoices.IN_PROGRESS)
+        t120 = self._criar(120, Ticket.PriorityChoices.HIGH, Ticket.StatusChoices.IN_PROGRESS)
+        t127 = self._criar(127, Ticket.PriorityChoices.URGENT, Ticket.StatusChoices.IN_PROGRESS)
+
+        tickets = [t123, t125, t126, t124, t120, t127]
+        posicoes = calcular_posicoes_fila(tickets)
+        ordem = sorted(tickets, key=lambda t: posicoes[t.pk])
+        self.assertEqual(
+            [t.pk for t in ordem],
+            [t127.pk, t120.pk, t124.pk, t125.pk, t123.pk, t126.pk],
+        )
+
     def test_posicao_global_igual_para_usuario_com_visao_filtrada(self):
         """Usuário padrão vê só o próprio card, mas a posição é a da fila global."""
         from helpdesk.queue import aplicar_posicoes_fila, calcular_posicoes_fila_global

@@ -1,7 +1,7 @@
 {% load helpdesk_permissions %}
 <div id="ticket-{{ ticket.id }}"
      {% if pode_operar_kanban %}draggable="true" ondragstart="drag(event)" ondragend="dragEnd(event)"{% endif %}
-     class="relative bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group {% if ticket.has_unread_mention %}ticket-mention-alert border-cyan-400{% else %}border-slate-200{% endif %}"
+     class="relative bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow {% if pode_operar_kanban %}cursor-grab active:cursor-grabbing{% else %}cursor-pointer{% endif %} group {% if ticket.has_unread_mention %}ticket-mention-alert border-red-500{% else %}border-slate-200{% endif %}"
      hx-get="{% url 'helpdesk:ticket_drawer' ticket.id %}" hx-trigger="click" hx-target="#drawer-container" hx-swap="innerHTML">
     
 

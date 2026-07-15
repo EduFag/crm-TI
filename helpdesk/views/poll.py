@@ -19,6 +19,9 @@ def _resolver_acao_poll(log):
     metadata = log.metadata or {}
 
     if acao == 'COMMENT':
+        # Comentário com @menção — cliente decide o áudio pelo mention_user_ids
+        if metadata.get('acao_ui') == 'MENTION' or metadata.get('mention_user_ids'):
+            return 'MENTION'
         return 'COMMENT'
     if acao == 'STATUS_CHANGED':
         return 'STATUS_CHANGED'
@@ -73,6 +76,7 @@ def poll_ticket_updates(request):
         acao = _resolver_acao_poll(latest_log)
         ticket_id = latest_log.object_id if latest_log else None
         descricao = latest_log.descricao[:200] if latest_log else ''
+        metadata = (latest_log.metadata or {}) if latest_log else {}
 
         trigger_data = {
             'ticketUpdated': {
@@ -80,6 +84,7 @@ def poll_ticket_updates(request):
                 'acao': acao,
                 'ticket_id': ticket_id,
                 'descricao': descricao,
+                'mention_user_ids': metadata.get('mention_user_ids') or [],
             }
         }
         return HttpResponse(status=200, headers={'HX-Trigger': json.dumps(trigger_data)})

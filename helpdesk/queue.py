@@ -2,7 +2,13 @@
 
 from helpdesk.models import Ticket
 
-# Peso de prioridade (maior = atende antes)
+# Peso de status: Em Atendimento sempre antes de Novo
+_PESO_STATUS = {
+    Ticket.StatusChoices.IN_PROGRESS: 2,
+    Ticket.StatusChoices.NEW: 1,
+}
+
+# Peso de prioridade (maior = atende antes), dentro do mesmo status
 _PESO_PRIORIDADE = {
     Ticket.PriorityChoices.URGENT: 4,
     Ticket.PriorityChoices.HIGH: 3,
@@ -17,9 +23,14 @@ _STATUS_FILA = (
 
 
 def _chave_ordenacao(ticket) -> tuple:
-    """Urgente primeiro; empate pelo pk mais antigo (menor id)."""
-    peso = _PESO_PRIORIDADE.get(ticket.priority, 0)
-    return (-peso, ticket.pk)
+    """
+    1) Em Atendimento antes de Novo
+    2) Dentro do status: Urgente > Alta > Média > Baixa
+    3) Empate: pk mais antigo (menor id)
+    """
+    peso_status = _PESO_STATUS.get(ticket.status, 0)
+    peso_prioridade = _PESO_PRIORIDADE.get(ticket.priority, 0)
+    return (-peso_status, -peso_prioridade, ticket.pk)
 
 
 def calcular_posicoes_fila(tickets) -> dict:

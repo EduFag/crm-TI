@@ -69,13 +69,14 @@ def log_edicao(ticket, actor, metadata, descricao):
     )
 
 
-def log_comentario(ticket, actor, texto):
+def log_comentario(ticket, actor, texto, metadata=None):
     return registrar_acao(
         modulo=MODULO_HELPDESK,
         acao=RegistroAcao.AcaoChoices.COMMENT,
         descricao=f'Comentário no chamado "{ticket.title}": {texto[:120]}',
         actor=actor,
         obj=ticket,
+        metadata=metadata or {},
     )
 
 

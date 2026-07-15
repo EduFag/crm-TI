@@ -726,13 +726,17 @@ def ticket_add_comment(request, pk):
         comment = Comment.objects.create(
             ticket=ticket, author=request.user, text=text, attachment=attachment,
         )
-        if text:
-            log_comentario(ticket, request.user, text)
-        else:
-            log_comentario(ticket, request.user, 'Anexou uma imagem.')
-
         # Menções @: só operadores; concede co_authors + notifica (inclui TI↔TI)
         mencionados = processar_mencoes(ticket, comment, request.user) if text else []
+
+        if text:
+            meta = {}
+            if mencionados:
+                meta['mention_user_ids'] = [u.pk for u in mencionados]
+                meta['acao_ui'] = 'MENTION'
+            log_comentario(ticket, request.user, text, metadata=meta or None)
+        else:
+            log_comentario(ticket, request.user, 'Anexou uma imagem.')
 
         ticket.save(update_fields=['updated_at'])
         # Badge geral + mencionados (silêncio TI não se aplica a quem foi @mencionado)
