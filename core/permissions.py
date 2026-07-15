@@ -18,6 +18,7 @@ MODULO_EMAILS = 'emails'
 MODULO_EQUIPMENT = 'equipment'
 MODULO_DISCADOR = 'discador'
 MODULO_GESTAO_USUARIOS = 'gestao_usuarios'
+MODULO_INTEGRACOES = 'integracoes'
 
 TODOS_MODULOS = frozenset({
     MODULO_HELPDESK,
@@ -26,6 +27,7 @@ TODOS_MODULOS = frozenset({
     MODULO_EQUIPMENT,
     MODULO_DISCADOR,
     MODULO_GESTAO_USUARIOS,
+    MODULO_INTEGRACOES,
 })
 
 # Matriz role → módulos permitidos
@@ -41,6 +43,7 @@ MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
         MODULO_EQUIPMENT,
         MODULO_DISCADOR,
         MODULO_GESTAO_USUARIOS,
+        MODULO_INTEGRACOES,
     }),
     CustomUser.RoleChoices.ADMIN: frozenset({MODULO_HELPDESK}),
 }

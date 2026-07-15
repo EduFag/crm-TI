@@ -15,6 +15,7 @@ def modulos_menu(request):
         'menu_usuarios_ativo': path.startswith('/usuarios/'),
         'menu_equipes_ativo': path.startswith('/equipes/'),
         'menu_auditoria_ativo': path.startswith('/auditoria/'),
+        'menu_integracoes_ia_ativo': path.startswith('/integracoes/'),
         'menu_suporte_expandido': path.startswith('/helpdesk/'),
         'menu_gestao_expandida': any(
             path.startswith(prefixo)
@@ -24,4 +25,5 @@ def modulos_menu(request):
             path.startswith(prefixo)
             for prefixo in ('/usuarios/', '/equipes/', '/auditoria/')
         ),
+        'menu_integracoes_expandida': path.startswith('/integracoes/'),
     }

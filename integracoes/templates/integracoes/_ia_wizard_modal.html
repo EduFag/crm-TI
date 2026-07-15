@@ -1,0 +1,206 @@
+{% load integracoes_extras %}
+{# Modal wizard: passo 1 provedor · passo 2 credenciais #}
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-hidden pointer-events-auto flex flex-col"
+         onclick="event.stopPropagation()">
+
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">Nova integração IA</h3>
+                <p class="text-xs text-slate-500 mt-0.5" id="ia-wizard-subtitle">Escolha o provedor (passo 1 de 2)</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <form method="post"
+              action="{{ form_action }}"
+              hx-post="{{ form_action }}"
+              hx-target="#modal-container"
+              hx-swap="innerHTML"
+              id="ia-wizard-form"
+              class="flex flex-col flex-1 min-h-0">
+            {% csrf_token %}
+            <input type="hidden" name="provider" id="ia-provider-input" value="{{ provider_selecionado|default:'' }}">
+
+            <div class="px-6 pt-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <span id="ia-step-dot-1" class="h-2 w-8 rounded-full bg-blue-600 transition-colors"></span>
+                    <span id="ia-step-dot-2" class="h-2 w-8 rounded-full bg-slate-200 transition-colors"></span>
+                </div>
+            </div>
+
+            {% if erro %}
+            <div class="mx-6 mb-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{{ erro }}</div>
+            {% endif %}
+
+            <div id="ia-step-1" class="px-6 pb-4 overflow-y-auto flex-1 {% if provider_selecionado %}hidden{% endif %}">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {% for p in provedores %}
+                    <button type="button"
+                            data-provider="{{ p.codigo }}"
+                            class="ia-provider-card text-left p-4 rounded-xl border-2 transition-all hover:shadow-md
+                                   {% if provider_selecionado == p.codigo %}border-blue-500 bg-blue-50/50 ring-2 ring-blue-100{% else %}border-slate-200 bg-white hover:border-slate-300{% endif %}">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold shrink-0
+                                {% if p.accent == 'emerald' %}bg-emerald-100 text-emerald-700
+                                {% elif p.accent == 'sky' %}bg-sky-100 text-sky-700
+                                {% elif p.accent == 'amber' %}bg-amber-100 text-amber-800
+                                {% elif p.accent == 'orange' %}bg-orange-100 text-orange-800
+                                {% elif p.accent == 'violet' %}bg-violet-100 text-violet-800
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ p.label|make_list|first }}
+                            </span>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-slate-900">{{ p.label }}</p>
+                                <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">{{ p.descricao }}</p>
+                            </div>
+                        </div>
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="ia-step-2" class="px-6 pb-4 overflow-y-auto flex-1 {% if not provider_selecionado %}hidden{% endif %}">
+                {% for p in provedores %}
+                <div class="ia-fields-panel space-y-4 {% if provider_selecionado != p.codigo %}hidden{% endif %}" data-fields-for="{{ p.codigo }}">
+                    <p class="text-sm text-slate-600">
+                        Configurando <span class="font-semibold text-slate-900">{{ p.label }}</span>
+                    </p>
+                    {% for field in p.fields %}
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="id_{{ p.codigo }}_{{ field.name }}">
+                            {{ field.label }}{% if field.required %}<span class="text-red-500">*</span>{% endif %}
+                        </label>
+                        {% with existing=valores|get_item:field.name %}
+                        <input type="{{ field.type }}"
+                               name="{{ field.name }}"
+                               id="id_{{ p.codigo }}_{{ field.name }}"
+                               data-for-provider="{{ p.codigo }}"
+                               {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+                               value="{% if provider_selecionado == p.codigo and existing %}{{ existing }}{% elif field.default and field.name != 'api_key' %}{{ field.default }}{% endif %}"
+                               class="ia-input w-full text-sm px-3 py-2.5 rounded-lg border border-slate-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50"
+                               {% if provider_selecionado != p.codigo %}disabled{% endif %}
+                               autocomplete="{% if field.sensitive %}new-password{% else %}off{% endif %}">
+                        {% endwith %}
+                        {% if field.name == 'api_key' %}
+                        <p class="mt-1 text-[11px] text-slate-400">A chave será armazenada criptografada e nunca exibida por completo.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                <button type="button" id="ia-btn-back"
+                        class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors {% if not provider_selecionado %}invisible{% endif %}">
+                    Voltar
+                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                            class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" id="ia-btn-next"
+                            class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors {% if provider_selecionado %}hidden{% endif %}">
+                        Continuar
+                    </button>
+                    <button type="submit" id="ia-btn-save"
+                            class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors {% if not provider_selecionado %}hidden{% endif %}">
+                        Salvar integração
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    var form = document.getElementById('ia-wizard-form');
+    if (!form) return;
+
+    var providerInput = document.getElementById('ia-provider-input');
+    var step1 = document.getElementById('ia-step-1');
+    var step2 = document.getElementById('ia-step-2');
+    var btnNext = document.getElementById('ia-btn-next');
+    var btnBack = document.getElementById('ia-btn-back');
+    var btnSave = document.getElementById('ia-btn-save');
+    var subtitle = document.getElementById('ia-wizard-subtitle');
+    var dot1 = document.getElementById('ia-step-dot-1');
+    var dot2 = document.getElementById('ia-step-dot-2');
+    var selected = providerInput.value || '';
+
+    function setStep(n) {
+        var onStep2 = n === 2;
+        step1.classList.toggle('hidden', onStep2);
+        step2.classList.toggle('hidden', !onStep2);
+        btnNext.classList.toggle('hidden', onStep2);
+        btnSave.classList.toggle('hidden', !onStep2);
+        btnBack.classList.toggle('invisible', !onStep2);
+        subtitle.textContent = onStep2
+            ? 'Preencha as credenciais (passo 2 de 2)'
+            : 'Escolha o provedor (passo 1 de 2)';
+        dot1.className = 'h-2 w-8 rounded-full transition-colors ' + (onStep2 ? 'bg-slate-200' : 'bg-blue-600');
+        dot2.className = 'h-2 w-8 rounded-full transition-colors ' + (onStep2 ? 'bg-blue-600' : 'bg-slate-200');
+    }
+
+    function selectProvider(codigo) {
+        selected = codigo;
+        providerInput.value = codigo;
+        document.querySelectorAll('.ia-provider-card').forEach(function(card) {
+            var on = card.getAttribute('data-provider') === codigo;
+            card.classList.toggle('border-blue-500', on);
+            card.classList.toggle('bg-blue-50/50', on);
+            card.classList.toggle('ring-2', on);
+            card.classList.toggle('ring-blue-100', on);
+            card.classList.toggle('border-slate-200', !on);
+        });
+        document.querySelectorAll('.ia-fields-panel').forEach(function(panel) {
+            var on = panel.getAttribute('data-fields-for') === codigo;
+            panel.classList.toggle('hidden', !on);
+            panel.querySelectorAll('.ia-input').forEach(function(inp) {
+                inp.disabled = !on;
+            });
+        });
+    }
+
+    document.querySelectorAll('.ia-provider-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            selectProvider(card.getAttribute('data-provider'));
+        });
+        card.addEventListener('dblclick', function() {
+            selectProvider(card.getAttribute('data-provider'));
+            setStep(2);
+        });
+    });
+
+    btnNext.addEventListener('click', function() {
+        if (!selected) {
+            alert('Selecione um provedor para continuar.');
+            return;
+        }
+        setStep(2);
+    });
+    btnBack.addEventListener('click', function() { setStep(1); });
+
+    form.addEventListener('submit', function() {
+        document.querySelectorAll('.ia-input').forEach(function(inp) {
+            if (inp.getAttribute('data-for-provider') !== selected) {
+                inp.disabled = true;
+            }
+        });
+    });
+
+    if (selected) {
+        selectProvider(selected);
+        setStep(2);
+    }
+})();
+</script>

@@ -25,6 +25,7 @@ urlpatterns = [
     path('emails/', include('emails.urls')),
     path('equipment/', include('equipment.urls')),
     path('discador/', include('discador.urls')),
+    path('integracoes/', include('integracoes.urls')),
 ]
 
 from django.conf import settings

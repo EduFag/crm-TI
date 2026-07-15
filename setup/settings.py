@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'emails',
     'equipment',
     'discador',
+    'integracoes.apps.IntegracoesConfig',
 ]
 
 MIDDLEWARE = [
