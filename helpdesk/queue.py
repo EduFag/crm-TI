@@ -33,9 +33,25 @@ def calcular_posicoes_fila(tickets) -> dict:
     return {t.pk: indice for indice, t in enumerate(pool, start=1)}
 
 
-def aplicar_posicoes_fila(tickets_new, tickets_in_progress) -> None:
-    """Atribui queue_position nos objetos (só cards Novos usam no template)."""
-    posicoes = calcular_posicoes_fila(list(tickets_new) + list(tickets_in_progress))
+def calcular_posicoes_fila_global() -> dict:
+    """
+    Fila global (todos os chamados ativos), independente do que o usuário enxerga.
+
+    Assim, se o TI vê o card na posição 5, o usuário padrão também vê #5
+    mesmo visualizando só o próprio card.
+    """
+    pool = Ticket.objects.filter(
+        is_active=True,
+        is_archived=False,
+        status__in=_STATUS_FILA,
+    ).only('pk', 'priority', 'status')
+    return calcular_posicoes_fila(pool)
+
+
+def aplicar_posicoes_fila(tickets_new, tickets_in_progress, posicoes=None) -> None:
+    """Atribui queue_position nos objetos visíveis usando a fila global."""
+    if posicoes is None:
+        posicoes = calcular_posicoes_fila_global()
     for ticket in tickets_new:
         ticket.queue_position = posicoes.get(ticket.pk)
     for ticket in tickets_in_progress:

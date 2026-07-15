@@ -819,3 +819,19 @@ class FilaPosicaoTestCase(TestCase):
         posicoes = calcular_posicoes_fila([novo, andamento])
         self.assertEqual(posicoes[andamento.pk], 1)
         self.assertEqual(posicoes[novo.pk], 2)
+
+    def test_posicao_global_igual_para_usuario_com_visao_filtrada(self):
+        """Usuário padrão vê só o próprio card, mas a posição é a da fila global."""
+        from helpdesk.queue import aplicar_posicoes_fila, calcular_posicoes_fila_global
+
+        outros = [
+            self._criar(i, Ticket.PriorityChoices.URGENT)
+            for i in range(4)
+        ]
+        meu = self._criar(99, Ticket.PriorityChoices.LOW)
+
+        posicoes_globais = calcular_posicoes_fila_global()
+        # Só o card do usuário na lista “visível”
+        aplicar_posicoes_fila([meu], [])
+        self.assertEqual(meu.queue_position, posicoes_globais[meu.pk])
+        self.assertEqual(meu.queue_position, len(outros) + 1)
