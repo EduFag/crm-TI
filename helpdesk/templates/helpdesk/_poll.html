@@ -51,12 +51,13 @@
             return ids.indexOf(currentUserId) !== -1;
         }
 
-        /** Toca alerta-ruim com ganho ~3x (Web Audio; volume HTML max=1). */
+        /** Toca alerta-ruim com ganho amplificado (Web Audio; volume HTML max=1). */
         function tocarAlertaMencao() {
             if (tocandoMencao) {
                 return;
             }
             tocandoMencao = true;
+            const GANHO_MENCAO = 10;
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (!AudioCtx) {
@@ -75,7 +76,7 @@
                 audio.crossOrigin = 'anonymous';
                 const source = audioCtxMencao.createMediaElementSource(audio);
                 const gain = audioCtxMencao.createGain();
-                gain.gain.value = 3;
+                gain.gain.value = GANHO_MENCAO;
                 source.connect(gain);
                 gain.connect(audioCtxMencao.destination);
                 audio.addEventListener('ended', function() {
