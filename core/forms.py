@@ -21,6 +21,19 @@ class EquipeForm(forms.ModelForm):
 class CustomUserCreateForm(UserCreationForm):
     """Formulário de criação de usuário (gestão de usuários / IT_USER e superuser)."""
 
+    # Senhas logo após os dados básicos (evita ficarem escondidas abaixo das equipes)
+    field_order = (
+        'username',
+        'password1',
+        'password2',
+        'email',
+        'first_name',
+        'last_name',
+        'role',
+        'equipes',
+        'is_active',
+    )
+
     equipes = forms.ModelMultipleChoiceField(
         queryset=Equipe.objects.none(),
         widget=forms.CheckboxSelectMultiple(),
@@ -46,7 +59,9 @@ class CustomUserCreateForm(UserCreationForm):
         self.fields['equipes'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
         # Labels em pt-br para os campos de senha herdados do UserCreationForm
         self.fields['password1'].label = 'Senha'
+        self.fields['password1'].help_text = 'Obrigatória. Use uma senha forte.'
         self.fields['password2'].label = 'Confirmação de senha'
+        self.fields['password2'].help_text = 'Digite a mesma senha novamente.'
         # Modal HTMX: autofocus nativo conflita com a busca já focada na listagem
         self.fields['username'].widget.attrs.pop('autofocus', None)
 

@@ -28,9 +28,19 @@
               class="p-6 space-y-5">
             {% csrf_token %}
 
-            {% if form.non_field_errors %}
-            <div class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-                {{ form.non_field_errors }}
+            {% if form.errors %}
+            <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                <p class="font-semibold">Corrija os erros abaixo para continuar:</p>
+                <ul class="list-disc list-inside text-xs space-y-0.5">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                        <li><span class="font-medium">{{ field.label }}:</span> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
             </div>
             {% endif %}
 
@@ -40,16 +50,17 @@
             </div>
             {% else %}
             {% for field in form %}
-            <div>
+            <div {% if field.errors %}class="rounded-lg ring-2 ring-red-200 bg-red-50/40 p-2 -m-2"{% endif %}>
                 <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">
                     {{ field.label }}
+                    {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
                 </label>
                 {{ field }}
                 {% if field.help_text %}
                 <p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>
                 {% endif %}
                 {% if field.errors %}
-                <p class="text-xs text-red-600 mt-1">{{ field.errors|join:", " }}</p>
+                <p class="text-xs text-red-600 mt-1 font-medium">{{ field.errors|join:", " }}</p>
                 {% endif %}
             </div>
             {% endfor %}

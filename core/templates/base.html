@@ -131,24 +131,23 @@
         document.body.addEventListener('htmx:configRequest', (event) => {
             event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
         });
-        // HTMX 1.x não troca HTML em 4xx por padrão; 422 traz o modal com erros de validação
-        document.body.addEventListener('htmx:beforeSwap', function (event) {
-            if (event.detail.xhr && event.detail.xhr.status === 422) {
-                event.detail.shouldSwap = true;
-                event.detail.isError = false;
-            }
-        });
-        // Foco manual no 1º campo do modal (evita aviso de autofocus com busca já focada)
+        // Foco no 1º campo com erro (ou no 1º campo) ao abrir/atualizar o modal
         document.body.addEventListener('htmx:afterSwap', function (event) {
             if (!event.detail.target || event.detail.target.id !== 'modal-container') return;
             if (document.activeElement && typeof document.activeElement.blur === 'function') {
                 document.activeElement.blur();
             }
-            const primeiro = event.detail.target.querySelector(
+            const comErro = event.detail.target.querySelector('.ring-red-200 input, .ring-red-200 select, .ring-red-200 textarea');
+            const primeiro = comErro || event.detail.target.querySelector(
                 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea'
             );
             if (primeiro) {
-                requestAnimationFrame(function () { primeiro.focus(); });
+                requestAnimationFrame(function () {
+                    primeiro.focus();
+                    if (typeof primeiro.scrollIntoView === 'function') {
+                        primeiro.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                });
             }
         });
         document.body.addEventListener('closeModal', function () {

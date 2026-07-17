@@ -62,6 +62,5 @@ class HtmxModalMixin:
         return response
 
     def form_invalid(self, form):
-        response = self.render_to_response(self.get_context_data(form=form))
-        response.status_code = 422
-        return response
+        # Retorna 200 para o HTMX trocar o HTML do modal (4xx gera erro no console e não faz swap)
+        return self.render_to_response(self.get_context_data(form=form))
