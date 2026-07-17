@@ -250,3 +250,73 @@ def ia_delete(request, pk):
     integracao.delete()
     messages.success(request, f'Integração "{nome}" removida.')
     return redirect('integracoes:ia_list')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+def ia_aprendizado(request):
+    """Página de aprendizado e flag do Assistente no Helpdesk."""
+    from integracoes.models import AssistenteChunk, AssistenteConfig
+
+    config = AssistenteConfig.get_solo()
+    chunks = AssistenteChunk.objects.all()[:50]
+    integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
+    return render(request, 'integracoes/ia_aprendizado.html', {
+        'config': config,
+        'chunks': chunks,
+        'integracoes': integracoes,
+    })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_aprendizado_toggle(request):
+    from integracoes.models import AssistenteConfig
+
+    config = AssistenteConfig.get_solo()
+    config.ativo = request.POST.get('ativo') in ('1', 'true', 'on', 'yes')
+    integracao_id = (request.POST.get('integracao') or '').strip()
+    if integracao_id.isdigit():
+        config.integracao_id = int(integracao_id)
+    elif integracao_id == '':
+        config.integracao = None
+    config.save()
+    estado = 'ativado' if config.ativo else 'desativado'
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=f'Assistente Helpdesk {estado}.',
+        actor=request.user,
+        metadata={'assistente_ativo': config.ativo},
+    )
+    messages.success(request, f'Assistente no Helpdesk {estado}.')
+    return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_aprendizado_gerar(request):
+    from integracoes.assistente_runtime import gerar_chunks_aprendizado
+    from integracoes.llm import LlmError
+
+    try:
+        resultado = gerar_chunks_aprendizado()
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.CREATED,
+            descricao=(
+                f'Aprendizado IA gerou {resultado["chunks"]} chunks '
+                f'a partir de {resultado["tickets_analisados"]} chamados.'
+            ),
+            actor=request.user,
+            metadata=resultado,
+        )
+        messages.success(
+            request,
+            f'Aprendizado gerado: {resultado["chunks"]} chunks '
+            f'({resultado["tickets_analisados"]} chamados analisados).',
+        )
+    except LlmError as exc:
+        messages.error(request, f'Falha ao gerar aprendizado: {exc}')
+    except Exception:
+        messages.error(request, 'Erro inesperado ao gerar aprendizado.')
+    return redirect('integracoes:ia_aprendizado')

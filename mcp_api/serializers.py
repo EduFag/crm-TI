@@ -61,10 +61,15 @@ def serialize_ticket(ticket, detalhe=False):
 
 
 def serialize_comment(comment):
+    if comment.is_assistente:
+        author = {'id': None, 'username': 'Assistente', 'full_name': 'Assistente'}
+    else:
+        author = user_ref(comment.author)
     return {
         'id': comment.pk,
         'ticket_id': comment.ticket_id,
-        'author': user_ref(comment.author),
+        'author': author,
+        'is_assistente': comment.is_assistente,
         'text': comment.text,
         'has_attachment': bool(comment.attachment),
         'is_active': comment.is_active,

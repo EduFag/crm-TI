@@ -1,5 +1,6 @@
 import json
 import os
+from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
@@ -51,6 +52,15 @@ from helpdesk.ticket_access import (
     usuarios_tecnicos_para_transferencia,
     usuario_pode_excluir_chamado,
 )
+
+
+def _agendar_assistente(ticket_id: int) -> None:
+    """Agenda processamento do Assistente após o commit da request."""
+    def _run():
+        from integracoes.assistente_runtime import processar_assistente
+        processar_assistente(ticket_id)
+
+    transaction.on_commit(_run)
 
 
 def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False, usuarios_extra=None):
@@ -306,6 +316,7 @@ class TicketCreateView(ModuloObrigatorioMixin, View):
                 EVENTO_CREATED,
                 f'Aberto por {_nome_usuario(request.user)}.',
             )
+            _agendar_assistente(ticket.pk)
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
                 'ticketUpdated': True,
@@ -754,6 +765,10 @@ def ticket_add_comment(request, pk):
         if mencionados:
             # Push dedicado de menção — ignora silêncio TI↔TI
             agendar_notificacao_mencoes(ticket, mencionados, preview)
+
+        # Assistente responde a comentários de solicitante/não-TI
+        if not usuario_eh_operador_helpdesk(request.user) and not getattr(comment, 'is_assistente', False):
+            _agendar_assistente(ticket.pk)
 
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})

@@ -1,4 +1,4 @@
-"""MCP Helpdesk — tools somente leitura."""
+"""MCP Helpdesk — leitura + escrita (Assistente)."""
 
 from mcp.server.fastmcp import FastMCP
 
@@ -44,6 +44,54 @@ def list_ticket_comments(ticket_id: int, limit: int = 50) -> str:
     """Lista comentários ativos de um chamado."""
     try:
         return get_client().get_text(f'tickets/{ticket_id}/comments/', {'limit': limit})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def send_assistente_message(ticket_id: int, text: str) -> str:
+    """Envia mensagem no chamado como Assistente de IA."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/assistente/comentarios/',
+            {'text': text},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def set_ticket_priority(ticket_id: int, priority: str) -> str:
+    """Define prioridade: LOW, MEDIUM, HIGH ou URGENT."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/priority/',
+            {'priority': priority},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def set_ticket_status(ticket_id: int, status: str) -> str:
+    """Altera coluna Kanban: NEW, IN_PROGRESS, PENDING ou RESOLVED."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/status/',
+            {'status': status},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def escalar_para_ti(ticket_id: int, motivo: str = '') -> str:
+    """Encerra o Assistente e pede intervenção da TI (status PENDING se NEW)."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/assistente/escalar/',
+            {'motivo': motivo},
+        )
     except CrmTiApiError as exc:
         return f'Erro: {exc}'
 

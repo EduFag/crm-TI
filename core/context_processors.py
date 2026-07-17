@@ -15,7 +15,8 @@ def modulos_menu(request):
         'menu_usuarios_ativo': path.startswith('/usuarios/'),
         'menu_equipes_ativo': path.startswith('/equipes/'),
         'menu_auditoria_ativo': path.startswith('/auditoria/'),
-        'menu_integracoes_ia_ativo': path.startswith('/integracoes/'),
+        'menu_integracoes_ia_ativo': path.startswith('/integracoes/ia/') and '/aprendizado' not in path,
+        'menu_integracoes_aprendizado_ativo': path.startswith('/integracoes/ia/aprendizado'),
         'menu_suporte_expandido': path.startswith('/helpdesk/'),
         'menu_gestao_expandida': any(
             path.startswith(prefixo)

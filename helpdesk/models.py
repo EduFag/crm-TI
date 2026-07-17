@@ -158,6 +158,10 @@ class Ticket(models.Model):
         related_name='resolved_tickets',
         help_text='Usuário que finalizou ou recusou o chamado.',
     )
+    assistente_escalado = models.BooleanField(
+        default=False,
+        help_text='Assistente IA encerrou o atendimento e pediu intervenção da TI.',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
@@ -332,9 +336,14 @@ class Comment(models.Model):
     # Soft delete e timestamps
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_assistente = models.BooleanField(
+        default=False,
+        help_text='Comentário gerado pelo Assistente de IA.',
+    )
 
     def __str__(self) -> str:
-        return f"Comment by {self.author.username} on Ticket {self.ticket.id}"
+        autor = self.author.username if self.author_id else ('Assistente' if self.is_assistente else 'Sistema')
+        return f"Comment by {autor} on Ticket {self.ticket_id}"
 
     @property
     def is_image(self):

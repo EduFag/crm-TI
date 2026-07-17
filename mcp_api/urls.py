@@ -7,6 +7,10 @@ urlpatterns = [
     path('tickets/', helpdesk.list_tickets, name='mcp_list_tickets'),
     path('tickets/<int:pk>/', helpdesk.get_ticket, name='mcp_get_ticket'),
     path('tickets/<int:pk>/comments/', helpdesk.list_ticket_comments, name='mcp_list_ticket_comments'),
+    path('tickets/<int:pk>/assistente/comentarios/', helpdesk.post_assistente_comentario, name='mcp_assistente_comentario'),
+    path('tickets/<int:pk>/priority/', helpdesk.post_ticket_priority, name='mcp_ticket_priority'),
+    path('tickets/<int:pk>/status/', helpdesk.post_ticket_status, name='mcp_ticket_status'),
+    path('tickets/<int:pk>/assistente/escalar/', helpdesk.post_assistente_escalar, name='mcp_assistente_escalar'),
 
     # Chips
     path('chips/', chips.list_chips, name='mcp_list_chips'),

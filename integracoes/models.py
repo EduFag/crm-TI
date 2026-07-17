@@ -62,3 +62,56 @@ class IntegracaoIA(models.Model):
     @property
     def token_mascarado(self) -> str:
         return mascarar_token(self.token_hint)
+
+
+class AssistenteConfig(models.Model):
+    """Configuração singleton do Assistente no Helpdesk (pk=1)."""
+
+    ativo = models.BooleanField(
+        default=False,
+        help_text='Quando ativo, o Assistente responde chamados de não-TI.',
+    )
+    integracao = models.ForeignKey(
+        IntegracaoIA,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='configs_assistente',
+        help_text='Integração IA preferencial (senão usa a primeira ativa).',
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+    ultima_geracao_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Última geração de chunks de aprendizado.',
+    )
+
+    class Meta:
+        verbose_name = 'configuração do assistente'
+        verbose_name_plural = 'configuração do assistente'
+
+    def __str__(self) -> str:
+        return f'Assistente ({"ativo" if self.ativo else "inativo"})'
+
+    @classmethod
+    def get_solo(cls) -> 'AssistenteConfig':
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={'ativo': False})
+        return obj
+
+
+class AssistenteChunk(models.Model):
+    """Trecho de aprendizado gerado a partir de chamados finalizados."""
+
+    titulo = models.CharField(max_length=200)
+    conteudo = models.TextField()
+    categoria_hint = models.CharField(max_length=120, blank=True, default='')
+    fonte_ticket_ids = models.JSONField(default=list, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+        verbose_name = 'chunk de aprendizado'
+        verbose_name_plural = 'chunks de aprendizado'
+
+    def __str__(self) -> str:
+        return self.titulo

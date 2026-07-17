@@ -1,11 +1,36 @@
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_http_methods
 
+from helpdesk.assistente_services import (
+    AssistenteServiceError,
+    escalar_para_ti,
+    send_assistente_message,
+    set_ticket_priority,
+    set_ticket_status,
+)
 from helpdesk.models import Comment, Ticket
 from mcp_api.auth import requer_token_mcp
 from mcp_api.serializers import parse_limit, serialize_comment, serialize_ticket
+
+
+def _json_body(request) -> dict:
+    import json
+    try:
+        if request.body:
+            return json.loads(request.body.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+    return {k: v for k, v in request.POST.items()}
+
+
+def _service_response(fn, *args, **kwargs):
+    try:
+        return JsonResponse(fn(*args, **kwargs))
+    except AssistenteServiceError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=exc.status_code)
 
 
 @require_GET
@@ -76,3 +101,35 @@ def list_ticket_comments(request, pk):
     limit = parse_limit(request, default=50)
     itens = [serialize_comment(c) for c in qs[:limit]]
     return JsonResponse({'ticket_id': ticket.pk, 'count': len(itens), 'results': itens})
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_assistente_comentario(request, pk):
+    data = _json_body(request)
+    return _service_response(send_assistente_message, pk, data.get('text', ''))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_ticket_priority(request, pk):
+    data = _json_body(request)
+    return _service_response(set_ticket_priority, pk, data.get('priority', ''))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_ticket_status(request, pk):
+    data = _json_body(request)
+    return _service_response(set_ticket_status, pk, data.get('status', ''))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_assistente_escalar(request, pk):
+    data = _json_body(request)
+    return _service_response(escalar_para_ti, pk, data.get('motivo', ''))

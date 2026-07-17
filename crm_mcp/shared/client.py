@@ -60,8 +60,39 @@ class CrmTiClient:
             )
         return resp.json()
 
+    def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        path = path.lstrip('/')
+        url = urljoin(self.api_root, path)
+        headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(url, headers=headers, json=body or {})
+        except httpx.HTTPError as exc:
+            raise CrmTiApiError(f'Falha de rede: {exc}') from exc
+
+        if resp.status_code >= 400:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise CrmTiApiError(
+                f'HTTP {resp.status_code}: {detail}',
+                status_code=resp.status_code,
+            )
+        if not resp.content:
+            return {'ok': True}
+        return resp.json()
+
     def get_text(self, path: str, params: dict[str, Any] | None = None) -> str:
         data = self.get(path, params)
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    def post_text(self, path: str, body: dict[str, Any] | None = None) -> str:
+        data = self.post(path, body)
         return json.dumps(data, ensure_ascii=False, indent=2)
 
 

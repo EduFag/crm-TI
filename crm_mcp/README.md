@@ -6,7 +6,14 @@ Seis servidores MCP (stdio) que chamam a API Django em `/api/mcp/` com Bearer to
 
 | Servidor | Módulo Python | Tools |
 |----------|---------------|-------|
-| mcp-helpdesk | `crm_mcp.helpdesk.server` | list_tickets, get_ticket, list_ticket_comments |
+## Tools de escrita (Assistente)
+
+| Tool | Endpoint |
+|------|----------|
+| `send_assistente_message` | POST `tickets/<id>/assistente/comentarios/` |
+| `set_ticket_priority` | POST `tickets/<id>/priority/` |
+| `set_ticket_status` | POST `tickets/<id>/status/` |
+| `escalar_para_ti` | POST `tickets/<id>/assistente/escalar/` |
 | mcp-chips | `crm_mcp.chips.server` | list_chips, get_chip, lookup_chip_by_line, list_chip_movements |
 | mcp-equipment | `crm_mcp.equipment.server` | list_equipment, get_equipment, lookup_equipment_by_tag, list_equipment_logs |
 | mcp-emails | `crm_mcp.emails.server` | list_domains, list_accounts, get_account |
