@@ -25,6 +25,7 @@ urlpatterns = [
     path('emails/', include('emails.urls')),
     path('equipment/', include('equipment.urls')),
     path('integracoes/', include('integracoes.urls')),
+    path('api/mcp/', include('mcp_api.urls')),
 ]
 
 from django.conf import settings

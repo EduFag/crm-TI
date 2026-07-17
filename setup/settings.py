@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'emails',
     'equipment',
     'integracoes.apps.IntegracoesConfig',
+    'mcp_api.apps.McpApiConfig',
 ]
 
 MIDDLEWARE = [
@@ -251,6 +252,8 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 SISTEMA_URL_PUBLICA = os.environ.get('SISTEMA_URL_PUBLICA', 'https://ti.moneypromotora.com.br/').rstrip('/') + '/'
+# Token Bearer para API MCP (somente leitura). Sem token → endpoints retornam 503.
+MCP_API_TOKEN = (os.environ.get('MCP_API_TOKEN') or '').strip()
 
 # Media files
 MEDIA_URL = '/media/'
