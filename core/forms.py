@@ -47,6 +47,8 @@ class CustomUserCreateForm(UserCreationForm):
         # Labels em pt-br para os campos de senha herdados do UserCreationForm
         self.fields['password1'].label = 'Senha'
         self.fields['password2'].label = 'Confirmação de senha'
+        # Modal HTMX: autofocus nativo conflita com a busca já focada na listagem
+        self.fields['username'].widget.attrs.pop('autofocus', None)
 
 
 
