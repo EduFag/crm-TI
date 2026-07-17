@@ -255,15 +255,18 @@ def ia_delete(request, pk):
 @requer_modulo(MODULO_INTEGRACOES)
 def ia_aprendizado(request):
     """Página de aprendizado e flag do Assistente no Helpdesk."""
+    from integracoes.memoria_chat import SESSION_KEY
     from integracoes.models import AssistenteChunk, AssistenteConfig
 
     config = AssistenteConfig.get_solo()
     chunks = AssistenteChunk.objects.all()[:50]
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
+    chat_historico = request.session.get(SESSION_KEY) or []
     return render(request, 'integracoes/ia_aprendizado.html', {
         'config': config,
         'chunks': chunks,
         'integracoes': integracoes,
+        'chat_historico': chat_historico,
     })
 
 
@@ -394,3 +397,64 @@ def ia_chunk_delete(request, pk):
     )
     messages.success(request, f'Chunk "{titulo}" removido.')
     return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_aprendizado_chat(request):
+    """Chat para gravar/corrigir memória (chunks) conversando com a IA."""
+    import json
+
+    from django.http import JsonResponse
+
+    from integracoes.llm import LlmError
+    from integracoes.memoria_chat import SESSION_KEY, processar_mensagem_memoria
+
+    try:
+        body = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except json.JSONDecodeError:
+        body = {}
+    mensagem = (body.get('message') or request.POST.get('message') or '').strip()
+    if not mensagem:
+        return JsonResponse({'ok': False, 'error': 'Mensagem vazia.'}, status=400)
+
+    historico = request.session.get(SESSION_KEY) or []
+    if not isinstance(historico, list):
+        historico = []
+
+    try:
+        resultado = processar_mensagem_memoria(historico, mensagem)
+    except LlmError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=502)
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'Erro ao processar o chat.'}, status=500)
+
+    request.session[SESSION_KEY] = resultado['historico']
+    request.session.modified = True
+
+    if resultado.get('memoria_alterada'):
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.UPDATED,
+            descricao='Memória do Assistente atualizada via chat de aprendizado.',
+            actor=request.user,
+            metadata={'via': 'chat_memoria'},
+        )
+
+    return JsonResponse({
+        'ok': True,
+        'reply': resultado['reply'],
+        'memoria_alterada': resultado['memoria_alterada'],
+    })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_aprendizado_chat_limpar(request):
+    from django.http import JsonResponse
+
+    from integracoes.memoria_chat import SESSION_KEY
+
+    request.session[SESSION_KEY] = []
+    request.session.modified = True
+    return JsonResponse({'ok': True})

@@ -3,11 +3,11 @@
 {% block title %}Aprendizado IA{% endblock %}
 
 {% block content %}
-<div class="flex flex-col w-full gap-6 max-w-4xl">
+<div class="flex flex-col w-full gap-6">
     <div>
         <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Aprendizado IA</h2>
         <p class="text-sm text-slate-500 mt-1">
-            Treine o Assistente com chamados finalizados e controle se ele atende no Helpdesk.
+            Treine o Assistente com chamados finalizados, corrija chunks e grave na memória pelo chat.
         </p>
     </div>
 
@@ -21,138 +21,253 @@
     </div>
     {% endif %}
 
-    <!-- Flag Assistente -->
-    <form method="post" action="{% url 'integracoes:ia_aprendizado_toggle' %}"
-          class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
-        {% csrf_token %}
-        <h3 class="text-lg font-bold text-slate-900">Assistente no Helpdesk</h3>
-        <p class="text-sm text-slate-500">
-            Quando ativo, o Assistente conversa com o solicitante até a TI assumir o chamado ou ele escalar.
-            Default: desativado.
-        </p>
-        <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" name="ativo" value="1" class="h-5 w-5 accent-blue-600"
-                   {% if config.ativo %}checked{% endif %}>
-            <span class="text-sm font-semibold text-slate-800">Ativar Assistente no Helpdesk</span>
-        </label>
-        <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">Integração preferencial</label>
-            <select name="integracao"
-                    class="w-full max-w-md text-sm rounded-lg border border-slate-300 px-3 py-2.5">
-                <option value="">Primeira integração ativa (DeepSeek se houver)</option>
-                {% for integ in integracoes %}
-                <option value="{{ integ.pk }}" {% if config.integracao_id == integ.pk %}selected{% endif %}>
-                    {{ integ.name }} ({{ integ.get_provider_display }})
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit"
-                class="inline-flex items-center px-5 py-2.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
-            Salvar configuração
-        </button>
-        {% if config.ultima_geracao_em %}
-        <p class="text-xs text-slate-400">Última geração de chunks: {{ config.ultima_geracao_em|date:"d/m/Y H:i" }}</p>
-        {% endif %}
-    </form>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <!-- Coluna esquerda: config + chunks -->
+        <div class="flex flex-col gap-6 min-w-0">
+            <form method="post" action="{% url 'integracoes:ia_aprendizado_toggle' %}"
+                  class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
+                {% csrf_token %}
+                <h3 class="text-lg font-bold text-slate-900">Assistente no Helpdesk</h3>
+                <p class="text-sm text-slate-500">
+                    Quando ativo, o Assistente conversa com o solicitante até a TI assumir ou escalar.
+                </p>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="ativo" value="1" class="h-5 w-5 accent-blue-600"
+                           {% if config.ativo %}checked{% endif %}>
+                    <span class="text-sm font-semibold text-slate-800">Ativar Assistente no Helpdesk</span>
+                </label>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração preferencial</label>
+                    <select name="integracao"
+                            class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2.5">
+                        <option value="">Primeira integração ativa (DeepSeek se houver)</option>
+                        {% for integ in integracoes %}
+                        <option value="{{ integ.pk }}" {% if config.integracao_id == integ.pk %}selected{% endif %}>
+                            {{ integ.name }} ({{ integ.get_provider_display }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit"
+                        class="inline-flex items-center px-5 py-2.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                    Salvar configuração
+                </button>
+                {% if config.ultima_geracao_em %}
+                <p class="text-xs text-slate-400">Última geração: {{ config.ultima_geracao_em|date:"d/m/Y H:i" }}</p>
+                {% endif %}
+            </form>
 
-    <!-- Gerar aprendizado -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
-        <h3 class="text-lg font-bold text-slate-900">Gerar chunks de aprendizado</h3>
-        <p class="text-sm text-slate-500">
-            Usa a IA cadastrada para analisar chamados resolvidos/arquivados (título, descrição e comentários)
-            e gerar padrões de resposta no estilo da TI. Depois você pode corrigir cada chunk abaixo.
-        </p>
-        <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
-              onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
-            {% csrf_token %}
-            <button type="submit"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
-                Gerar aprendizado com a IA
-            </button>
-        </form>
-    </div>
-
-    <!-- Novo chunk manual -->
-    <details class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 group">
-        <summary class="cursor-pointer text-lg font-bold text-slate-900 list-none flex items-center justify-between">
-            Novo chunk manual
-            <span class="text-sm font-medium text-blue-600 group-open:hidden">Abrir</span>
-            <span class="text-sm font-medium text-slate-500 hidden group-open:inline">Fechar</span>
-        </summary>
-        <form method="post" action="{% url 'integracoes:ia_chunk_create' %}" class="mt-4 space-y-3">
-            {% csrf_token %}
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Título</label>
-                <input type="text" name="titulo" required maxlength="200"
-                       class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Categoria (opcional)</label>
-                <input type="text" name="categoria_hint" maxlength="120" placeholder="Ex.: discador, acessos"
-                       class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Conteúdo</label>
-                <textarea name="conteudo" required rows="4"
-                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2"></textarea>
-            </div>
-            <button type="submit"
-                    class="inline-flex px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
-                Adicionar chunk
-            </button>
-        </form>
-    </details>
-
-    <!-- Lista chunks editáveis -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Chunks atuais</h3>
-            <span class="text-xs text-slate-400">Edite e salve para corrigir o aprendizado</span>
-        </div>
-        <ul class="divide-y divide-slate-100">
-            {% for chunk in chunks %}
-            <li class="px-6 py-5" id="chunk-{{ chunk.pk }}">
-                <form method="post" action="{% url 'integracoes:ia_chunk_update' chunk.pk %}" class="space-y-3">
-                    {% csrf_token %}
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Título</label>
-                        <input type="text" name="titulo" value="{{ chunk.titulo }}" required maxlength="200"
-                               class="w-full text-sm font-semibold rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Categoria</label>
-                        <input type="text" name="categoria_hint" value="{{ chunk.categoria_hint }}" maxlength="120"
-                               placeholder="Ex.: discador"
-                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Conteúdo</label>
-                        <textarea name="conteudo" required rows="4"
-                                  class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ chunk.conteudo }}</textarea>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 pt-1">
-                        <button type="submit"
-                                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                            Salvar correção
-                        </button>
-                    </div>
-                </form>
-                <form method="post" action="{% url 'integracoes:ia_chunk_delete' chunk.pk %}" class="mt-2"
-                      onsubmit="return confirm('Remover este chunk permanentemente?');">
+            <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
+                <h3 class="text-lg font-bold text-slate-900">Gerar chunks com a IA</h3>
+                <p class="text-sm text-slate-500">
+                    Analisa chamados resolvidos/arquivados. Depois corrija manualmente ou pelo chat.
+                </p>
+                <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
+                      onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
                     {% csrf_token %}
                     <button type="submit"
-                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50">
-                        Excluir
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                        Gerar aprendizado com a IA
                     </button>
                 </form>
-            </li>
-            {% empty %}
-            <li class="px-6 py-10 text-center text-sm text-slate-500">
-                Nenhum chunk ainda. Gere com a IA ou adicione manualmente.
-            </li>
-            {% endfor %}
-        </ul>
+            </div>
+
+            <details class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 group">
+                <summary class="cursor-pointer text-lg font-bold text-slate-900 list-none flex items-center justify-between">
+                    Novo chunk manual
+                    <span class="text-sm font-medium text-blue-600 group-open:hidden">Abrir</span>
+                    <span class="text-sm font-medium text-slate-500 hidden group-open:inline">Fechar</span>
+                </summary>
+                <form method="post" action="{% url 'integracoes:ia_chunk_create' %}" class="mt-4 space-y-3">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Título</label>
+                        <input type="text" name="titulo" required maxlength="200"
+                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Categoria (opcional)</label>
+                        <input type="text" name="categoria_hint" maxlength="120" placeholder="Ex.: discador, acessos"
+                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Conteúdo</label>
+                        <textarea name="conteudo" required rows="4"
+                                  class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2"></textarea>
+                    </div>
+                    <button type="submit"
+                            class="inline-flex px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+                        Adicionar chunk
+                    </button>
+                </form>
+            </details>
+
+            <div id="chunks-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Chunks atuais</h3>
+                    <span class="text-xs text-slate-400">Edite ou use o chat →</span>
+                </div>
+                <ul class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+                    {% for chunk in chunks %}
+                    <li class="px-6 py-5" id="chunk-{{ chunk.pk }}">
+                        <form method="post" action="{% url 'integracoes:ia_chunk_update' chunk.pk %}" class="space-y-3">
+                            {% csrf_token %}
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Título</label>
+                                <input type="text" name="titulo" value="{{ chunk.titulo }}" required maxlength="200"
+                                       class="w-full text-sm font-semibold rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Categoria</label>
+                                <input type="text" name="categoria_hint" value="{{ chunk.categoria_hint }}" maxlength="120"
+                                       class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Conteúdo</label>
+                                <textarea name="conteudo" required rows="3"
+                                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">{{ chunk.conteudo }}</textarea>
+                            </div>
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
+                                Salvar correção
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'integracoes:ia_chunk_delete' chunk.pk %}" class="mt-2"
+                              onsubmit="return confirm('Remover este chunk permanentemente?');">
+                            {% csrf_token %}
+                            <button type="submit" class="text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1 rounded">
+                                Excluir
+                            </button>
+                        </form>
+                    </li>
+                    {% empty %}
+                    <li class="px-6 py-10 text-center text-sm text-slate-500">
+                        Nenhum chunk ainda. Gere com a IA, adicione manualmente ou grave pelo chat.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Coluna direita: chat memória -->
+        <aside class="xl:sticky xl:top-4 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col h-[min(85vh,780px)] min-h-[420px]">
+            <div class="px-5 py-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between gap-2 shrink-0">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Chat · Grave na memória</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Peça para lembrar, corrigir ou esquecer procedimentos.</p>
+                </div>
+                <button type="button" id="memoria-chat-limpar"
+                        class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-white">
+                    Limpar
+                </button>
+            </div>
+            <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+                {% for msg in chat_historico %}
+                <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
+                        {% if msg.role == 'user' %}bg-blue-600 text-white rounded-br-md{% else %}bg-white border border-slate-200 text-slate-700 rounded-bl-md{% endif %}">
+                        {{ msg.content }}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-sm text-slate-400 py-8 px-4">
+                    Exemplos:<br>
+                    “Grave na memória: em problema de discador, sempre pedir print da campanha.”<br>
+                    “Corrija o chunk de blacklist: Joytec não tem blacklist manual.”
+                </div>
+                {% endfor %}
+            </div>
+            <form id="memoria-chat-form" class="p-4 border-t border-slate-100 shrink-0 space-y-2">
+                {% csrf_token %}
+                <textarea id="memoria-chat-input" rows="3" required
+                          placeholder="Ex.: Grave na memória que..."
+                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none"></textarea>
+                <button type="submit" id="memoria-chat-enviar"
+                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60">
+                    Enviar
+                </button>
+                <p id="memoria-chat-status" class="text-xs text-slate-400 text-center hidden"></p>
+            </form>
+        </aside>
     </div>
 </div>
+
+<script>
+(function () {
+    const log = document.getElementById('memoria-chat-log');
+    const form = document.getElementById('memoria-chat-form');
+    const input = document.getElementById('memoria-chat-input');
+    const btn = document.getElementById('memoria-chat-enviar');
+    const status = document.getElementById('memoria-chat-status');
+    const limpar = document.getElementById('memoria-chat-limpar');
+    const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    function appendBubble(role, text) {
+        const empty = log.querySelector('.text-center');
+        if (empty) empty.remove();
+        const wrap = document.createElement('div');
+        wrap.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+        const bubble = document.createElement('div');
+        bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ' +
+            (role === 'user'
+                ? 'bg-blue-600 text-white rounded-br-md'
+                : 'bg-white border border-slate-200 text-slate-700 rounded-bl-md');
+        bubble.textContent = text;
+        wrap.appendChild(bubble);
+        log.appendChild(wrap);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const message = (input.value || '').trim();
+        if (!message) return;
+        appendBubble('user', message);
+        input.value = '';
+        btn.disabled = true;
+        status.classList.remove('hidden');
+        status.textContent = 'Pensando e gravando se necessário…';
+        try {
+            const resp = await fetch('{% url "integracoes:ia_aprendizado_chat" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf,
+                },
+                body: JSON.stringify({ message: message }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                appendBubble('assistant', data.error || 'Falha ao processar.');
+            } else {
+                appendBubble('assistant', data.reply);
+                if (data.memoria_alterada) {
+                    status.textContent = 'Memória atualizada — recarregando chunks…';
+                    setTimeout(function () { window.location.reload(); }, 600);
+                    return;
+                }
+            }
+        } catch (err) {
+            appendBubble('assistant', 'Erro de rede ao falar com a IA.');
+        }
+        btn.disabled = false;
+        status.classList.add('hidden');
+    });
+
+    limpar.addEventListener('click', async function () {
+        await fetch('{% url "integracoes:ia_aprendizado_chat_limpar" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf },
+        });
+        log.innerHTML = '<div class="text-center text-sm text-slate-400 py-8 px-4">Conversa limpa. Pode gravar novas memórias.</div>';
+    });
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.requestSubmit();
+        }
+    });
+})();
+</script>
 {% endblock %}
