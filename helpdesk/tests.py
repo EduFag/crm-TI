@@ -19,7 +19,7 @@ class SupervisorRequesterTestCase(TestCase):
     def setUp(self):
         self.equipe1 = Equipe.objects.create(name="TI", is_active=True)
         self.equipe2 = Equipe.objects.create(name="Suporte", is_active=True)
-        self.categoria = TicketCategory.objects.create(name="Dúvidas", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Dúvidas", defaults={"is_active": True})[0]
 
         self.supervisor = CustomUser.objects.create_user(
             username="test_supervisor",
@@ -122,7 +122,7 @@ class SupervisorRequesterTestCase(TestCase):
 class RbacHelpdeskTestCase(TestCase):
     def setUp(self):
         self.equipe = Equipe.objects.create(name="Comercial", is_active=True)
-        self.categoria = TicketCategory.objects.create(name="Software", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Software", defaults={"is_active": True})[0]
 
         self.it_user = CustomUser.objects.create_user(
             username="ti_user", password="x", role=CustomUser.RoleChoices.IT_USER,
@@ -233,7 +233,7 @@ class RbacHelpdeskTestCase(TestCase):
 
 class ArquivamentoAutomaticoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Rede", defaults={"is_active": True})[0]
 
     def test_arquiva_resolvido_apos_24h_por_resolved_at(self):
         """Comentários não devem adiar arquivamento — usa resolved_at, não updated_at."""
@@ -243,10 +243,12 @@ class ArquivamentoAutomaticoTestCase(TestCase):
             category=self.categoria,
             requester_name="Teste",
             status=Ticket.StatusChoices.RESOLVED,
-            resolved_at=timezone.now() - timedelta(hours=25),
         )
-        ticket.updated_at = timezone.now()
-        ticket.save(update_fields=['updated_at'])
+        Ticket.objects.filter(pk=ticket.pk).update(
+            resolved_at=timezone.now() - timedelta(hours=25),
+            updated_at=timezone.now()
+        )
+        ticket.refresh_from_db()
 
         Ticket.archive_old_tickets()
         ticket.refresh_from_db()
@@ -308,7 +310,7 @@ class ArquivamentoAutomaticoTestCase(TestCase):
 
 class HistoryExportCsvTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name="Hardware", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Hardware", defaults={"is_active": True})[0]
         self.it_user = CustomUser.objects.create_user(
             username="ti_export",
             password="x",
@@ -386,7 +388,7 @@ class HistoryExportCsvTestCase(TestCase):
 
 class HistoricoFiltroArquivadoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Rede", defaults={"is_active": True})[0]
         self.it_user = CustomUser.objects.create_user(
             username="ti_historico",
             password="x",
@@ -498,7 +500,7 @@ class HistoricoFiltroArquivadoTestCase(TestCase):
 
 class ComentarioFinalizadoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name="Software", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Software", defaults={"is_active": True})[0]
         self.it_user = CustomUser.objects.create_user(
             username="ti_final", password="x", role=CustomUser.RoleChoices.IT_USER,
         )
@@ -542,7 +544,7 @@ class ComentarioFinalizadoTestCase(TestCase):
 
 class ContestacaoChamadoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name="Rede", is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name="Rede", defaults={"is_active": True})[0]
         self.it_user = CustomUser.objects.create_user(
             username="ti_contest", password="x", role=CustomUser.RoleChoices.IT_USER,
         )
@@ -618,7 +620,8 @@ class ContestacaoChamadoTestCase(TestCase):
         self.assertFalse(self.ticket.is_rejected)
         self.assertIsNone(self.ticket.resolved_at)
         self.assertIsNone(self.ticket.resolved_by)
-        self.assertTrue(self.ticket.unread_by_tech)
+        from helpdesk.models import TicketUnread
+        self.assertTrue(TicketUnread.objects.filter(ticket=self.ticket).exists())
 
         contestacao = TicketContestation.objects.get(ticket=self.ticket)
         self.assertEqual(contestacao.contested_by, self.standard)
@@ -647,7 +650,7 @@ class ContestacaoChamadoTestCase(TestCase):
 
 class DestinatariosNotificacaoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name='Cat Notif', is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name='Cat Notif', defaults={"is_active": True})[0]
         self.admin = CustomUser.objects.create_user(
             username='notif_admin', password='pass', role=CustomUser.RoleChoices.ADMIN,
         )
@@ -702,7 +705,7 @@ class DestinatariosNotificacaoTestCase(TestCase):
 
 class MentionAccessTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name='Cat Mention', is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name='Cat Mention', defaults={"is_active": True})[0]
         self.admin = CustomUser.objects.create_user(
             username='mention_admin', password='pass', role=CustomUser.RoleChoices.ADMIN,
         )
@@ -780,7 +783,7 @@ class MentionAccessTestCase(TestCase):
 
 class FilaPosicaoTestCase(TestCase):
     def setUp(self):
-        self.categoria = TicketCategory.objects.create(name='Cat Fila', is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name='Cat Fila', defaults={"is_active": True})[0]
         self.user = CustomUser.objects.create_user(
             username='fila_user', password='pass', role=CustomUser.RoleChoices.STANDARD,
         )
@@ -889,7 +892,7 @@ class ChamadoRestritoCriador25TestCase(TestCase):
 
     def setUp(self):
         from unittest.mock import patch
-        self.categoria = TicketCategory.objects.create(name='Cat Restrito', is_active=True)
+        self.categoria = TicketCategory.objects.get_or_create(name='Cat Restrito', defaults={"is_active": True})[0]
         self.criador = CustomUser.objects.create_user(
             username='criador_restrito', password='pass', role=CustomUser.RoleChoices.STANDARD,
         )

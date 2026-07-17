@@ -243,6 +243,11 @@ def usuario_pode_editar_chamado(user, ticket=None) -> bool:
         return False
     if usuario_eh_operador_helpdesk(user):
         return True
+        
+    role = _role(user)
+    if role in (CustomUser.RoleChoices.MULTIPLIER, CustomUser.RoleChoices.STANDARD):
+        return False
+        
     if ticket:
         return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
     return False
@@ -253,6 +258,11 @@ def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
         return False
     if usuario_eh_operador_helpdesk(user):
         return True
+        
+    role = _role(user)
+    if role in (CustomUser.RoleChoices.MULTIPLIER, CustomUser.RoleChoices.STANDARD, CustomUser.RoleChoices.SUPERVISOR):
+        return False
+        
     if ticket:
         return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
     return False

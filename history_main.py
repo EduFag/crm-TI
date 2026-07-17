@@ -164,14 +164,8 @@ class HistoryListView(ModuloObrigatorioMixin, ListView):
         return context
 
 
-from django.contrib.auth.decorators import login_required
-from helpdesk.ticket_access import usuario_pode_acessar_dashboard_e_historico
-from django.core.exceptions import PermissionDenied
-
 @login_required
 def history_export_csv(request):
-    if not usuario_pode_acessar_dashboard_e_historico(request.user):
-        raise PermissionDenied
 
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
