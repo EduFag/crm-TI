@@ -320,3 +320,77 @@ def ia_aprendizado_gerar(request):
     except Exception:
         messages.error(request, 'Erro inesperado ao gerar aprendizado.')
     return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_chunk_update(request, pk):
+    from integracoes.models import AssistenteChunk
+
+    chunk = get_object_or_404(AssistenteChunk, pk=pk)
+    titulo = (request.POST.get('titulo') or '').strip()
+    conteudo = (request.POST.get('conteudo') or '').strip()
+    categoria = (request.POST.get('categoria_hint') or '').strip()
+    if not titulo or not conteudo:
+        messages.error(request, 'Título e conteúdo são obrigatórios.')
+        return redirect('integracoes:ia_aprendizado')
+    chunk.titulo = titulo[:200]
+    chunk.conteudo = conteudo
+    chunk.categoria_hint = categoria[:120]
+    chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint'])
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=f'Chunk de aprendizado "{chunk.titulo}" corrigido.',
+        actor=request.user,
+        metadata={'chunk_id': chunk.pk},
+    )
+    messages.success(request, f'Chunk "{chunk.titulo}" atualizado.')
+    return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_chunk_create(request):
+    from integracoes.models import AssistenteChunk
+
+    titulo = (request.POST.get('titulo') or '').strip()
+    conteudo = (request.POST.get('conteudo') or '').strip()
+    categoria = (request.POST.get('categoria_hint') or '').strip()
+    if not titulo or not conteudo:
+        messages.error(request, 'Título e conteúdo são obrigatórios.')
+        return redirect('integracoes:ia_aprendizado')
+    chunk = AssistenteChunk.objects.create(
+        titulo=titulo[:200],
+        conteudo=conteudo,
+        categoria_hint=categoria[:120],
+        fonte_ticket_ids=[],
+    )
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.CREATED,
+        descricao=f'Chunk de aprendizado "{chunk.titulo}" criado manualmente.',
+        actor=request.user,
+        metadata={'chunk_id': chunk.pk},
+    )
+    messages.success(request, f'Chunk "{chunk.titulo}" criado.')
+    return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_chunk_delete(request, pk):
+    from integracoes.models import AssistenteChunk
+
+    chunk = get_object_or_404(AssistenteChunk, pk=pk)
+    titulo = chunk.titulo
+    chunk.delete()
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.DELETED,
+        descricao=f'Chunk de aprendizado "{titulo}" removido.',
+        actor=request.user,
+        metadata={'chunk_id': pk},
+    )
+    messages.success(request, f'Chunk "{titulo}" removido.')
+    return redirect('integracoes:ia_aprendizado')
