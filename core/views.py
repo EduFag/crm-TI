@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, ListView, UpdateView
 
 from core.audit import MODULO_CORE, logs_do_modulo, registrar_acao, registrar_alteracoes
@@ -45,6 +46,12 @@ class UserListView(ModuloObrigatorioMixin, ListView):
     template_name = 'core/user_list.html'
     context_object_name = 'usuarios'
     modulo_obrigatorio = MODULO_GESTAO_USUARIOS
+
+    def get_template_names(self):
+        # Filtros HTMX pedem só o fragmento da tabela
+        if self.request.headers.get('HX-Request'):
+            return ['core/_user_list_results.html']
+        return [self.template_name]
 
     def get_queryset(self):
         qs = CustomUser.objects.prefetch_related('equipes').order_by('-is_active', 'username')
@@ -102,8 +109,13 @@ class UserCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
             obj=self.object,
             metadata={'role': self.object.role, 'is_active': self.object.is_active},
         )
-        messages.success(self.request, f'Usuário "{form.instance.username}" criado com sucesso.')
-        return self.htmx_redirect_response()
+        # Após criar, mostra modal com mensagem pronta (senha ainda disponível em texto)
+        return render(self.request, 'core/_user_access_message_modal.html', {
+            'usuario': self.object,
+            'senha_inicial': form.cleaned_data.get('password1', ''),
+            'sistema_url': settings.SISTEMA_URL_PUBLICA,
+            'criado_agora': True,
+        })
 
 
 class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
@@ -141,8 +153,28 @@ class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
                 actor=self.request.user,
                 obj=self.object,
             )
+            # Após trocar senha, oferece mensagem pronta com a nova senha
+            return render(self.request, 'core/_user_access_message_modal.html', {
+                'usuario': self.object,
+                'senha_inicial': form.cleaned_data.get('nova_senha', ''),
+                'sistema_url': settings.SISTEMA_URL_PUBLICA,
+                'criado_agora': True,
+            })
         messages.success(self.request, f'Usuário "{form.instance.username}" atualizado com sucesso.')
         return self.htmx_redirect_response()
+
+
+@requer_modulo(MODULO_GESTAO_USUARIOS)
+@require_GET
+def user_access_message(request, pk):
+    """Modal com mensagem pronta de acesso (link + usuário + senha informada)."""
+    usuario = get_object_or_404(CustomUser, pk=pk)
+    return render(request, 'core/_user_access_message_modal.html', {
+        'usuario': usuario,
+        'senha_inicial': '',
+        'sistema_url': settings.SISTEMA_URL_PUBLICA,
+        'criado_agora': False,
+    })
 
 
 

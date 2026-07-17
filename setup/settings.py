@@ -250,6 +250,7 @@ AUTH_USER_MODEL = 'core.CustomUser'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+SISTEMA_URL_PUBLICA = os.environ.get('SISTEMA_URL_PUBLICA', 'https://ti.moneypromotora.com.br/').rstrip('/') + '/'
 
 # Media files
 MEDIA_URL = '/media/'
