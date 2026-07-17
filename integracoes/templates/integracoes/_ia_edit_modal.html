@@ -50,7 +50,10 @@
                     <p class="block text-sm font-semibold text-slate-700 mb-1.5">
                         Modelos permitidos<span class="text-red-500">*</span>
                     </p>
-                    <p class="text-[11px] text-slate-400 mb-2">Marque apenas os modelos que esta integração poderá usar.</p>
+                    <p class="text-[11px] text-slate-400 mb-2">
+                        Marque os modelos permitidos. O <strong>primeiro</strong> é o chat/tools;
+                        o <strong>segundo</strong> (se houver) é usado para visão de imagens/anexos do Assistente.
+                    </p>
                     <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
                         {% for m in modelos %}
                         <label class="flex items-start gap-2.5 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-white transition-colors">

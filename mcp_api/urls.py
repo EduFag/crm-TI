@@ -11,6 +11,13 @@ urlpatterns = [
     path('tickets/<int:pk>/priority/', helpdesk.post_ticket_priority, name='mcp_ticket_priority'),
     path('tickets/<int:pk>/status/', helpdesk.post_ticket_status, name='mcp_ticket_status'),
     path('tickets/<int:pk>/assistente/escalar/', helpdesk.post_assistente_escalar, name='mcp_assistente_escalar'),
+    path('tickets/<int:pk>/assistente/triar/', helpdesk.post_triar_chamado, name='mcp_assistente_triar'),
+    path('tickets/<int:pk>/assistente/recusar/', helpdesk.post_recusar_chamado, name='mcp_assistente_recusar'),
+    path('tickets/<int:pk>/anexos/', helpdesk.get_ticket_anexos, name='mcp_ticket_anexos'),
+    path('tickets/<int:pk>/anexos/ler-imagem/', helpdesk.post_ler_imagem_anexo, name='mcp_ler_imagem_anexo'),
+    path('categorias-especificas/', helpdesk.get_categorias_especificas, name='mcp_categorias_especificas'),
+    path('assistente/consultar-chips/', helpdesk.get_consultar_chips, name='mcp_consultar_chips'),
+    path('assistente/consultar-usuario/', helpdesk.get_consultar_usuario, name='mcp_consultar_usuario'),
 
     # Chips
     path('chips/', chips.list_chips, name='mcp_list_chips'),

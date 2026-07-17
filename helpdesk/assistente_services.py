@@ -1,10 +1,15 @@
-"""Serviços de escrita do Assistente (usados pelo MCP e pelo runtime Django)."""
+"""Serviços de escrita/leitura do Assistente (MCP e runtime Django)."""
 
 from __future__ import annotations
 
+import mimetypes
+import os
+from typing import Any
+
+from django.db.models import Q
 from django.utils import timezone
 
-from helpdesk.models import Comment, Ticket
+from helpdesk.models import Comment, Ticket, TicketAttachment, TicketSpecificCategory
 from helpdesk.ticket_access import usuario_eh_operador_helpdesk
 
 
@@ -75,6 +80,11 @@ def set_ticket_priority(ticket_id: int, priority: str) -> dict:
     antes = ticket.priority
     ticket.priority = priority
     ticket.save(update_fields=['priority', 'updated_at'])
+    try:
+        from helpdesk.audit import log_prioridade_alterada
+        log_prioridade_alterada(ticket, None, antes, priority)
+    except Exception:
+        pass
     return {
         'ok': True,
         'ticket_id': ticket.pk,
@@ -136,3 +146,386 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> dict:
         'status': ticket.status,
         'comment_id': comment.pk,
     }
+
+
+def listar_categorias_especificas() -> dict:
+    cats = list(
+        TicketSpecificCategory.objects.filter(is_active=True)
+        .order_by('name')
+        .values('id', 'name')
+    )
+    return {'ok': True, 'count': len(cats), 'results': list(cats)}
+
+
+def triar_chamado(
+    ticket_id: int,
+    priority: str,
+    specific_category_id: int | None = None,
+) -> dict:
+    """Define prioridade e categoria específica (triagem), sem forçar mudança de coluna."""
+    priority = (priority or '').strip().upper()
+    if priority not in PRIORIDADES:
+        raise AssistenteServiceError(f'Prioridade inválida. Use: {", ".join(sorted(PRIORIDADES))}.')
+
+    ticket = Ticket.objects.select_related('specific_category').filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+    if ticket.status == Ticket.StatusChoices.RESOLVED:
+        raise AssistenteServiceError('Não é possível triar chamado resolvido.')
+
+    cat_id = specific_category_id
+    if cat_id is not None and cat_id != '':
+        try:
+            cat_id = int(cat_id)
+        except (TypeError, ValueError):
+            raise AssistenteServiceError('specific_category_id inválido.')
+        if not TicketSpecificCategory.objects.filter(pk=cat_id, is_active=True).exists():
+            raise AssistenteServiceError('Categoria específica não encontrada ou inativa.', 404)
+    else:
+        cat_id = None
+
+    prioridade_antes = ticket.priority
+    cat_antes = ticket.specific_category
+    ticket.priority = priority
+    ticket.specific_category_id = cat_id
+    ticket.save(update_fields=['priority', 'specific_category', 'updated_at'])
+    ticket.refresh_from_db()
+
+    try:
+        from helpdesk.audit import log_prioridade_alterada, log_triagem_alterada
+        if prioridade_antes != priority:
+            log_prioridade_alterada(ticket, None, prioridade_antes, priority)
+        if (cat_antes.pk if cat_antes else None) != ticket.specific_category_id:
+            log_triagem_alterada(ticket, None, cat_antes, ticket.specific_category)
+    except Exception:
+        pass
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'priority': ticket.priority,
+        'specific_category_id': ticket.specific_category_id,
+        'specific_category': ticket.specific_category.name if ticket.specific_category_id else None,
+        'status': ticket.status,
+    }
+
+
+def recusar_chamado(ticket_id: int, motivo: str) -> dict:
+    """Recusa o chamado (título/descrição incorretos etc.) e encerra o Assistente."""
+    motivo_limpo = (motivo or '').strip()
+    if not motivo_limpo:
+        raise AssistenteServiceError('Motivo da recusa é obrigatório.')
+
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+    if ticket.status == Ticket.StatusChoices.RESOLVED and ticket.is_rejected:
+        raise AssistenteServiceError('Chamado já está recusado.')
+
+    ticket.status = Ticket.StatusChoices.RESOLVED
+    ticket.is_rejected = True
+    ticket.rejection_reason = motivo_limpo
+    ticket.assistente_escalado = True
+    if not ticket.resolved_at:
+        ticket.resolved_at = timezone.now()
+    ticket.save(update_fields=[
+        'status', 'is_rejected', 'rejection_reason', 'assistente_escalado',
+        'resolved_at', 'updated_at',
+    ])
+
+    texto = (
+        f'Chamado recusado.\nMotivo: {motivo_limpo}\n\n'
+        'Por favor, abra um novo chamado com título e descrição que correspondam '
+        'ao problema real.'
+    )
+    comment = Comment.objects.create(
+        ticket=ticket,
+        author=None,
+        text=texto,
+        is_assistente=True,
+    )
+    try:
+        from helpdesk.audit import log_chamado_recusado
+        log_chamado_recusado(ticket, None, motivo_limpo)
+    except Exception:
+        pass
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'is_rejected': True,
+        'status': ticket.status,
+        'comment_id': comment.pk,
+        'motivo': motivo_limpo,
+    }
+
+
+def _mime_e_ext(nome: str, content_type: str | None = None) -> tuple[str, str]:
+    ext = os.path.splitext(nome or '')[1].lower()
+    mime = (content_type or '').split(';')[0].strip().lower()
+    if not mime:
+        guessed, _ = mimetypes.guess_type(nome or '')
+        mime = guessed or 'application/octet-stream'
+    return mime, ext
+
+
+def listar_anexos_ticket(ticket_id: int) -> dict:
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+
+    resultados: list[dict[str, Any]] = []
+    for att in ticket.attachments.all().order_by('created_at'):
+        mime, ext = _mime_e_ext(att.file_name or att.file.name)
+        resultados.append({
+            'ref': f'ticket:{att.pk}',
+            'origem': 'ticket',
+            'id': att.pk,
+            'nome': att.file_name or os.path.basename(att.file.name),
+            'ext': ext,
+            'mime': mime,
+            'is_image': ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'] or mime.startswith('image/'),
+            'url': att.file.url if att.file else None,
+        })
+
+    for c in (
+        Comment.objects.filter(ticket=ticket, is_active=True)
+        .exclude(attachment='')
+        .exclude(attachment=None)
+        .order_by('created_at')
+    ):
+        if not c.attachment:
+            continue
+        nome = os.path.basename(c.attachment.name)
+        mime, ext = _mime_e_ext(nome)
+        resultados.append({
+            'ref': f'comment:{c.pk}',
+            'origem': 'comment',
+            'id': c.pk,
+            'nome': nome,
+            'ext': ext,
+            'mime': mime,
+            'is_image': c.is_image,
+            'url': c.attachment.url,
+            'comment_id': c.pk,
+        })
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'count': len(resultados),
+        'results': resultados,
+    }
+
+
+def _resolver_anexo(ticket_id: int, attachment_ref: str):
+    """Retorna (file_field, nome, mime) ou levanta AssistenteServiceError."""
+    ref = (attachment_ref or '').strip()
+    if not ref:
+        raise AssistenteServiceError('Informe attachment_ref (ex.: ticket:12 ou comment:34).')
+
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+
+    if ref.startswith('ticket:'):
+        try:
+            pk = int(ref.split(':', 1)[1])
+        except ValueError:
+            raise AssistenteServiceError('attachment_ref inválido.')
+        att = TicketAttachment.objects.filter(pk=pk, ticket_id=ticket_id).first()
+        if not att or not att.file:
+            raise AssistenteServiceError('Anexo do ticket não encontrado.', 404)
+        nome = att.file_name or os.path.basename(att.file.name)
+        mime, ext = _mime_e_ext(nome)
+        return att.file, nome, mime, ext
+
+    if ref.startswith('comment:'):
+        try:
+            pk = int(ref.split(':', 1)[1])
+        except ValueError:
+            raise AssistenteServiceError('attachment_ref inválido.')
+        comment = Comment.objects.filter(pk=pk, ticket_id=ticket_id, is_active=True).first()
+        if not comment or not comment.attachment:
+            raise AssistenteServiceError('Anexo do comentário não encontrado.', 404)
+        nome = os.path.basename(comment.attachment.name)
+        mime, ext = _mime_e_ext(nome)
+        return comment.attachment, nome, mime, ext
+
+    # Compat: só número → tenta ticket attachment
+    if ref.isdigit():
+        return _resolver_anexo(ticket_id, f'ticket:{ref}')
+
+    raise AssistenteServiceError('attachment_ref deve ser ticket:<id> ou comment:<id>.')
+
+
+def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
+    """Lê bytes da imagem e pede descrição à visão do LLM."""
+    from integracoes.llm import LlmError, chat_completion_vision
+
+    file_field, nome, mime, ext = _resolver_anexo(ticket_id, attachment_ref)
+    is_image = ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'] or mime.startswith('image/')
+    if not is_image:
+        raise AssistenteServiceError('O anexo não é uma imagem.')
+
+    try:
+        file_field.open('rb')
+        raw = file_field.read()
+    finally:
+        try:
+            file_field.close()
+        except Exception:
+            pass
+
+    if not raw:
+        raise AssistenteServiceError('Arquivo de imagem vazio.')
+
+    # GIF animado: usa 1º frame via Pillow para reduzir payload
+    if ext == '.gif' or mime == 'image/gif':
+        try:
+            import io
+            from PIL import Image
+            img = Image.open(io.BytesIO(raw))
+            img.seek(0)
+            buf = io.BytesIO()
+            frame = img.convert('RGB')
+            frame.save(buf, format='JPEG', quality=85)
+            raw = buf.getvalue()
+            mime = 'image/jpeg'
+        except Exception:
+            pass
+
+    prompt = (
+        'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
+        'Inclua textos visíveis (OCR), números de telefone, nomes de campanha, erros na tela, '
+        'prints de discador/WhatsApp/sistemas e qualquer detalhe relevante para o chamado. '
+        'Se a imagem estiver ilegível, diga isso claramente.'
+    )
+    try:
+        descricao = chat_completion_vision(prompt, raw, mime or 'image/jpeg')
+    except LlmError as exc:
+        raise AssistenteServiceError(
+            f'Não foi possível ler a imagem (visão/LLM): {exc}. '
+            'Peça ao solicitante descrever o print em texto.'
+        ) from exc
+
+    return {
+        'ok': True,
+        'ticket_id': ticket_id,
+        'ref': attachment_ref,
+        'nome': nome,
+        'descricao': descricao,
+    }
+
+
+def consultar_chips(q: str, limit: int = 20) -> dict:
+    """Busca chips por linha, observação ou nome do consultor (última entrega)."""
+    from chips.models import Chip, ChipMovement
+
+    termo = (q or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe um termo de busca (nome do consultor ou número).')
+
+    limit = max(1, min(int(limit or 20), 50))
+    resultados: list[dict] = []
+    visto: set[int] = set()
+
+    # Chips cujo último movimento de entrega bate com o nome
+    movs = (
+        ChipMovement.objects.filter(
+            action=ChipMovement.ActionChoices.DELIVERY,
+            employee_name__icontains=termo,
+        )
+        .select_related('chip', 'chip__operator')
+        .order_by('-timestamp')[:80]
+    )
+    for mov in movs:
+        chip = mov.chip
+        if chip.pk in visto:
+            continue
+        if chip.usage_status != Chip.UsageChoices.IN_USE:
+            # ainda lista, mas marca
+            pass
+        visto.add(chip.pk)
+        resultados.append({
+            'id': chip.pk,
+            'line_number': chip.line_number,
+            'formatted_line_number': chip.formatted_line_number,
+            'status': chip.status,
+            'usage_status': chip.usage_status,
+            'operator': chip.operator.name if chip.operator_id else None,
+            'employee_name': mov.employee_name,
+            'ultima_entrega': mov.timestamp.isoformat() if mov.timestamp else None,
+            'match': 'entrega',
+        })
+        if len(resultados) >= limit:
+            break
+
+    if len(resultados) < limit:
+        qs = (
+            Chip.objects.filter(
+                Q(line_number__icontains=termo)
+                | Q(observacao__icontains=termo)
+                | Q(iccid__icontains=termo)
+            )
+            .select_related('operator')
+            .order_by('-updated_at')[:limit]
+        )
+        for chip in qs:
+            if chip.pk in visto:
+                continue
+            visto.add(chip.pk)
+            # Última entrega se houver
+            last = (
+                ChipMovement.objects.filter(
+                    chip=chip, action=ChipMovement.ActionChoices.DELIVERY,
+                )
+                .order_by('-timestamp')
+                .first()
+            )
+            resultados.append({
+                'id': chip.pk,
+                'line_number': chip.line_number,
+                'formatted_line_number': chip.formatted_line_number,
+                'status': chip.status,
+                'usage_status': chip.usage_status,
+                'operator': chip.operator.name if chip.operator_id else None,
+                'employee_name': last.employee_name if last else None,
+                'ultima_entrega': last.timestamp.isoformat() if last and last.timestamp else None,
+                'match': 'linha_ou_obs',
+            })
+            if len(resultados) >= limit:
+                break
+
+    em_uso = [r for r in resultados if r.get('usage_status') == Chip.UsageChoices.IN_USE]
+    return {
+        'ok': True,
+        'q': termo,
+        'count': len(resultados),
+        'em_uso_count': len(em_uso),
+        'results': resultados,
+        'orientacao': (
+            'Se o consultor já tiver 2 números em uso, questionar se algum pede código '
+            'antes de ativar chip novo.'
+            if len(em_uso) >= 2
+            else ''
+        ),
+    }
+
+
+def consultar_usuario(q: str, limit: int = 15) -> dict:
+    """Busca usuários CRM por username/nome/e-mail."""
+    from core.models import CustomUser
+    from mcp_api.serializers import filtro_q_usuario, serialize_user
+
+    termo = (q or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe username ou nome para buscar.')
+
+    limit = max(1, min(int(limit or 15), 40))
+    qs = filtro_q_usuario(
+        CustomUser.objects.prefetch_related('equipes').order_by('username'),
+        termo,
+    ).distinct()[:limit]
+    itens = [serialize_user(u) for u in qs]
+    return {'ok': True, 'q': termo, 'count': len(itens), 'results': itens}

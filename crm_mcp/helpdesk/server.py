@@ -96,6 +96,78 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> str:
         return f'Erro: {exc}'
 
 
+@mcp.tool()
+def listar_categorias_especificas() -> str:
+    """Lista categorias específicas ativas (id e nome) para triagem."""
+    try:
+        return get_client().get_text('categorias-especificas/')
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def triar_chamado(ticket_id: int, priority: str, specific_category_id: int = 0) -> str:
+    """Triagem: prioridade + categoria específica. specific_category_id=0 omite categoria."""
+    body = {'priority': priority}
+    if specific_category_id:
+        body['specific_category_id'] = specific_category_id
+    try:
+        return get_client().post_text(f'tickets/{ticket_id}/assistente/triar/', body)
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def recusar_chamado(ticket_id: int, motivo: str) -> str:
+    """Recusa chamado (título/descrição incorretos) com motivo."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/assistente/recusar/',
+            {'motivo': motivo},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def listar_anexos(ticket_id: int) -> str:
+    """Lista anexos do ticket e comentários (refs ticket:ID / comment:ID)."""
+    try:
+        return get_client().get_text(f'tickets/{ticket_id}/anexos/')
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def ler_imagem_anexo(ticket_id: int, attachment_ref: str) -> str:
+    """Descreve imagem anexada via visão (attachment_ref ex.: ticket:12 ou comment:34)."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/anexos/ler-imagem/',
+            {'attachment_ref': attachment_ref},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def consultar_chips(q: str) -> str:
+    """Busca chips por consultor ou número (WhatsApp)."""
+    try:
+        return get_client().get_text('assistente/consultar-chips/', {'q': q})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def consultar_usuario(q: str) -> str:
+    """Busca usuário CRM por username ou nome."""
+    try:
+        return get_client().get_text('assistente/consultar-usuario/', {'q': q})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
 def main():
     mcp.run(transport='stdio')
 

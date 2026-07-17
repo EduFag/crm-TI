@@ -46,6 +46,15 @@ def _resolver_endpoint_e_modelo(integracao: IntegracaoIA) -> tuple[str, str, str
     return api_key, base_url, model
 
 
+def _resolver_modelo_visao(integracao: IntegracaoIA) -> tuple[str, str, str]:
+    """Usa o 2º modelo da lista (VL) se existir; senão o 1º."""
+    api_key, base_url, model_texto = _resolver_endpoint_e_modelo(integracao)
+    creds = integracao.get_credentials()
+    models = creds.get('models') or []
+    model = models[1] if len(models) > 1 else model_texto
+    return api_key, base_url, model
+
+
 def chat_completion(
     messages: list[dict[str, Any]],
     *,
@@ -97,3 +106,76 @@ def chat_completion(
 def chat_text(messages: list[dict[str, Any]], **kwargs) -> str:
     msg = chat_completion(messages, tools=None, **kwargs)
     return (msg.get('content') or '').strip()
+
+
+def chat_completion_vision(
+    prompt: str,
+    image_bytes: bytes,
+    mime: str = 'image/jpeg',
+    *,
+    timeout: float = 60.0,
+) -> str:
+    """
+    Descreve uma imagem via content multimodal (OpenAI-compatible).
+    Modelo: 2º da lista de credenciais (visão), ou o 1º se só houver um.
+    """
+    import base64
+
+    integracao = obter_integracao_ativa()
+    if not integracao:
+        raise LlmError('Nenhuma integração IA ativa.')
+
+    if not image_bytes:
+        raise LlmError('Imagem vazia.')
+    if len(image_bytes) > 5 * 1024 * 1024:
+        raise LlmError('Imagem maior que 5MB.')
+
+    mime = (mime or 'image/jpeg').split(';')[0].strip().lower() or 'image/jpeg'
+    if not mime.startswith('image/'):
+        raise LlmError('Arquivo não é imagem.')
+
+    api_key, base_url, model = _resolver_modelo_visao(integracao)
+    b64 = base64.b64encode(image_bytes).decode('ascii')
+    data_url = f'data:{mime};base64,{b64}'
+
+    url = urljoin(base_url + '/', 'chat/completions')
+    payload = {
+        'model': model,
+        'temperature': 0.2,
+        'messages': [
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': (prompt or '').strip() or 'Descreva a imagem.'},
+                    {'type': 'image_url', 'image_url': {'url': data_url}},
+                ],
+            }
+        ],
+    }
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, headers=headers, json=payload)
+    except httpx.HTTPError as exc:
+        logger.exception('Falha de rede no LLM visão')
+        raise LlmError(f'Falha de rede (visão): {exc}') from exc
+
+    if resp.status_code >= 400:
+        logger.error('LLM visão HTTP %s: %s', resp.status_code, resp.text[:500])
+        raise LlmError(
+            f'Visão indisponível (HTTP {resp.status_code}). '
+            'Configure um modelo multimodal como 2º modelo na integração IA.'
+        )
+
+    data = resp.json()
+    try:
+        content = data['choices'][0]['message'].get('content') or ''
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmError('Resposta de visão inválida.') from exc
+    texto = content.strip() if isinstance(content, str) else str(content)
+    if not texto:
+        raise LlmError('Modelo de visão retornou descrição vazia.')
+    return texto

@@ -99,7 +99,9 @@
                         <p class="block text-sm font-semibold text-slate-700 mb-1.5">
                             Modelos permitidos<span class="text-red-500">*</span>
                         </p>
-                        <p class="text-[11px] text-slate-400 mb-2">Marque apenas os modelos que esta integração poderá usar.</p>
+                        <p class="text-[11px] text-slate-400 mb-2">
+                            Marque os modelos. O primeiro é chat/tools; o segundo (se houver) é visão de imagens do Assistente.
+                        </p>
                         {% with sel=modelos_selecionados|get_item:p.codigo %}
                         <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
                             {% for m in p.models %}

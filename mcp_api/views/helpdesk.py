@@ -6,10 +6,17 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from helpdesk.assistente_services import (
     AssistenteServiceError,
+    consultar_chips,
+    consultar_usuario,
+    descrever_imagem_anexo,
     escalar_para_ti,
+    listar_anexos_ticket,
+    listar_categorias_especificas,
+    recusar_chamado,
     send_assistente_message,
     set_ticket_priority,
     set_ticket_status,
+    triar_chamado,
 )
 from helpdesk.models import Comment, Ticket
 from mcp_api.auth import requer_token_mcp
@@ -133,3 +140,58 @@ def post_ticket_status(request, pk):
 def post_assistente_escalar(request, pk):
     data = _json_body(request)
     return _service_response(escalar_para_ti, pk, data.get('motivo', ''))
+
+
+@require_GET
+@requer_token_mcp
+def get_categorias_especificas(request):
+    return _service_response(listar_categorias_especificas)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_triar_chamado(request, pk):
+    data = _json_body(request)
+    return _service_response(
+        triar_chamado,
+        pk,
+        data.get('priority', ''),
+        data.get('specific_category_id'),
+    )
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_recusar_chamado(request, pk):
+    data = _json_body(request)
+    return _service_response(recusar_chamado, pk, data.get('motivo', ''))
+
+
+@require_GET
+@requer_token_mcp
+def get_ticket_anexos(request, pk):
+    return _service_response(listar_anexos_ticket, pk)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_ler_imagem_anexo(request, pk):
+    data = _json_body(request)
+    return _service_response(descrever_imagem_anexo, pk, data.get('attachment_ref', ''))
+
+
+@require_GET
+@requer_token_mcp
+def get_consultar_chips(request):
+    q = (request.GET.get('q') or '').strip()
+    return _service_response(consultar_chips, q)
+
+
+@require_GET
+@requer_token_mcp
+def get_consultar_usuario(request):
+    q = (request.GET.get('q') or '').strip()
+    return _service_response(consultar_usuario, q)
