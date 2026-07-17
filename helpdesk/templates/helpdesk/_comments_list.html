@@ -1,20 +1,66 @@
 {% load helpdesk_permissions %}
 {% for comment in comments %}
+{% if not comment.is_assistente and comment.author_id == request.user.id %}
+<div class="flex gap-3 flex-row-reverse">
+    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
+        {{ comment.author.username|make_list|first|upper|default:"S" }}
+    </div>
+    <div class="max-w-[85%] bg-blue-50 border border-blue-100 shadow-sm p-3 rounded-lg rounded-tr-none">
+        <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="text-xs font-bold text-blue-800">
+                {{ comment.author.get_full_name|default:comment.author.username|default:"Você" }}
+            </span>
+            <span class="text-[10px] text-blue-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
+        </div>
+        {% if comment.text %}
+        <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{{ comment.text|highlight_mentions }}</p>
+        {% endif %}
+        {% if comment.attachment %}
+        <div class="mt-2">
+            {% if comment.is_image %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}?comment_id={{ comment.id }}"
+                    hx-target="#modal-container"
+                    class="block max-w-full text-left group">
+                <img src="{{ comment.attachment.url }}" alt="Anexo"
+                     class="max-h-48 max-w-full rounded-lg border border-blue-100 object-contain bg-white group-hover:border-blue-300 transition-colors">
+            </button>
+            {% elif comment.is_audio %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}?comment_id={{ comment.id }}"
+                    hx-target="#modal-container"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                Ver Anexo
+            </button>
+            {% else %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}?comment_id={{ comment.id }}"
+                    hx-target="#modal-container"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                Ver Anexo
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
 <div class="flex gap-3">
     <div class="w-8 h-8 rounded-full {% if comment.is_assistente %}bg-violet-100 text-violet-700{% else %}bg-blue-100 text-blue-600{% endif %} flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
         {% if comment.is_assistente %}A{% else %}{{ comment.author.username|make_list|first|upper|default:"S" }}{% endif %}
     </div>
-    <div class="flex-1 bg-white border border-slate-100 shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_assistente %}border-violet-100{% endif %}">
-        <div class="flex items-center justify-between mb-1">
+    <div class="max-w-[85%] bg-white border border-slate-100 shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_assistente %}border-violet-100{% endif %}">
+        <div class="flex items-center justify-between gap-3 mb-1">
             <span class="text-xs font-bold text-slate-800">
                 {% if comment.is_assistente %}Assistente{% else %}{{ comment.author.get_full_name|default:comment.author.username|default:"Sistema" }}{% endif %}
             </span>
             <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
         </div>
-        <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-            {% if comment.text %}{{ comment.text|highlight_mentions }}{% endif %}
-        </p>
-
+        {% if comment.text %}
+        <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{{ comment.text|highlight_mentions }}</p>
+        {% endif %}
         {% if comment.attachment %}
         <div class="mt-2">
             {% if comment.is_image %}
@@ -25,25 +71,28 @@
                 <img src="{{ comment.attachment.url }}" alt="Anexo"
                      class="max-h-48 max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50 group-hover:border-blue-300 transition-colors">
             </button>
+            {% elif comment.is_audio %}
+            <button type="button"
+                    hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}?comment_id={{ comment.id }}"
+                    hx-target="#modal-container"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                Ver Anexo
+            </button>
             {% else %}
             <button type="button"
                     hx-get="{% url 'helpdesk:ticket_attachments' ticket.id %}?comment_id={{ comment.id }}"
                     hx-target="#modal-container"
-                    {% if comment.is_audio %}
-                    class="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
-                        Ver Anexo
-                    {% else %}
                     class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                        Ver Anexo
-                    {% endif %}
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                Ver Anexo
             </button>
             {% endif %}
         </div>
         {% endif %}
     </div>
 </div>
+{% endif %}
 {% empty %}
 <div class="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
     <p class="text-sm text-slate-500">Nenhum comentário ainda.</p>
