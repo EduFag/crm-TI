@@ -268,9 +268,9 @@ from django.core.exceptions import ValidationError
 
 def validate_file_attachment(value):
     ext = os.path.splitext(value.name)[1].lower()
-    valid_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.txt', '.csv', '.mp3', '.wav', '.ogg', '.m4a']
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar', '.txt', '.csv', '.mp3', '.wav', '.ogg', '.m4a']
     if ext not in valid_extensions:
-        raise ValidationError('Tipo de arquivo não permitido (apenas imagens, áudios, PDF, Word, Excel, ZIP, RAR, TXT, CSV).')
+        raise ValidationError('Tipo de arquivo não permitido (apenas imagens/GIF, áudios, PDF, Word, Excel, ZIP, RAR, TXT, CSV).')
     if value.size > 5 * 1024 * 1024:
         raise ValidationError('O arquivo não pode ser maior que 5MB.')
 

@@ -292,31 +292,81 @@
         });
     }
 
+    var clipboardImageUrl = '{% url "helpdesk:fetch_clipboard_image" %}';
+
+    function csrfTokenCreate() {
+        var m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    function extractImageUrlFromClipboard(cd) {
+        if (!cd) return '';
+        var html = cd.getData('text/html') || '';
+        var imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (imgMatch && imgMatch[1] && /^https?:\/\//i.test(imgMatch[1])) return imgMatch[1];
+        var uri = (cd.getData('text/uri-list') || '').split('\n').map(function(l) { return l.trim(); }).find(function(l) {
+            return l && !l.startsWith('#') && /^https?:\/\//i.test(l);
+        });
+        if (uri) return uri;
+        var plain = (cd.getData('text/plain') || '').trim();
+        if (/^https?:\/\/.+\.(gif|png|jpe?g|webp)(\?|$)/i.test(plain)) return plain;
+        return '';
+    }
+
     document.addEventListener('paste', function(e) {
-        var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        // Só processa se o input de anexo do modal existir
+        if (!fileInput || !fileInput.closest('form')) return;
+
+        var cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+        if (!cd) return;
+        var items = cd.items || [];
         var hasImages = false;
         var dt = new DataTransfer();
-        
-        for (var index in items) {
-            var item = items[index];
-            if (item.kind === 'file' && item.type.startsWith('image/')) {
+
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            if (item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
                 var blob = item.getAsFile();
                 if (blob) {
-                    var ext = blob.type.split('/')[1] || 'png';
-                    var file = new File([blob], "imagem_colada_" + Date.now() + "_" + index + "." + ext, {type: blob.type});
+                    var ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                    var file = new File([blob], 'imagem_colada_' + Date.now() + '_' + i + '.' + ext, {type: blob.type});
                     dt.items.add(file);
                     hasImages = true;
                 }
             }
         }
-        
-        if (hasImages && fileInput) {
+
+        if (hasImages) {
             addFiles(dt.files);
-            // Impede a ação padrão se não estiver digitando texto
-            if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
-                e.preventDefault();
-            }
+            e.preventDefault();
+            return;
         }
+
+        var remoteUrl = extractImageUrlFromClipboard(cd);
+        if (!remoteUrl) return;
+        e.preventDefault();
+        fetch(clipboardImageUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfTokenCreate(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ url: remoteUrl })
+        }).then(function(r) {
+            if (!r.ok) {
+                return r.json().catch(function() { return {}; }).then(function(data) {
+                    throw new Error((data && data.error) || 'Falha ao colar a imagem.');
+                });
+            }
+            var nome = r.headers.get('X-Image-Filename') || ('gif_colado_' + Date.now() + '.gif');
+            return r.blob().then(function(blob) {
+                addFiles([new File([blob], nome, { type: blob.type || 'image/gif' })]);
+            });
+        }).catch(function(err) {
+            alert(err.message || 'Não foi possível colar este GIF.');
+        });
     });
 })();
 </script>

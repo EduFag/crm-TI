@@ -727,6 +727,28 @@ def ticket_transfer(request, pk):
 
 @requer_modulo(MODULO_HELPDESK)
 @require_POST
+def fetch_clipboard_image(request):
+    """Baixa GIF/imagem de URL colada (Win+. / Google) e devolve como arquivo."""
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = {}
+    url = (payload.get('url') or request.POST.get('url') or '').strip()
+    if not url:
+        return JsonResponse({'error': 'URL não informada.'}, status=400)
+    try:
+        from helpdesk.clipboard_image import baixar_imagem_remota
+        arquivo = baixar_imagem_remota(url)
+    except ValueError as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+    response = HttpResponse(arquivo.read(), content_type=arquivo.content_type or 'image/gif')
+    response['Content-Disposition'] = f'inline; filename="{arquivo.name}"'
+    response['X-Image-Filename'] = arquivo.name
+    return response
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
 def ticket_add_comment(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
     if not usuario_pode_comentar_chamado(request.user, ticket):

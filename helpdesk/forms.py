@@ -67,11 +67,11 @@ class TicketCreateForm(forms.ModelForm):
     attachment = MultipleFileField(
         required=False,
         label='Anexos (Opcional)',
-        help_text='Máx: 5MB por arquivo. Limite de 4 arquivos (PDF, imagens, áudios, Word, Excel, ZIP, etc).',
+        help_text='Máx: 5MB por arquivo. Limite de 4 arquivos (PDF, imagens/GIF, áudios, Word, Excel, ZIP, etc).',
         validators=[validate_file_attachment],
         widget=MultipleFileInput(attrs={
             'class': 'w-full text-sm p-2 border border-slate-300 rounded-lg bg-white',
-            'accept': 'image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a',
+            'accept': 'image/*,.gif,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a',
             'multiple': True
         })
     )

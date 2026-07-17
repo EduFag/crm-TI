@@ -243,7 +243,7 @@
                 <label class="cursor-pointer text-slate-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-slate-100 flex items-center gap-1 group">
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                     <span class="text-xs font-medium">Anexar</span>
-                    <input type="file" id="comment-file-{{ ticket.id }}" name="attachment" class="hidden" accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a">
+                    <input type="file" id="comment-file-{{ ticket.id }}" name="attachment" class="hidden" accept="image/*,.gif,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a">
                 </label>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                     Enviar Comentário
@@ -260,9 +260,22 @@
             var textarea = document.getElementById('comment-text-{{ ticket.id }}');
             var dropdown = document.getElementById('mention-dropdown-{{ ticket.id }}');
             var mentionUrl = '{% url "helpdesk:mention_users_search" %}';
+            var clipboardImageUrl = '{% url "helpdesk:fetch_clipboard_image" %}';
             var mentionTimer = null;
         
             if (!form || !fileInput) return;
+
+            function csrfToken() {
+                var m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+                return m ? decodeURIComponent(m[1]) : (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+            }
+
+            function extFromType(type, fallback) {
+                if (!type) return fallback || 'png';
+                var part = type.split('/')[1] || fallback || 'png';
+                if (part === 'jpeg') return 'jpg';
+                return part.replace(/[^a-z0-9]/gi, '') || fallback || 'png';
+            }
         
             function handleFile(file) {
                 var dt = new DataTransfer();
@@ -271,6 +284,55 @@
                 previewName.textContent = file.name;
                 preview.classList.remove('hidden');
                 preview.classList.add('flex');
+            }
+
+            function attachFromRemoteUrl(imageUrl) {
+                previewName.textContent = 'Baixando GIF/imagem…';
+                preview.classList.remove('hidden');
+                preview.classList.add('flex');
+                return fetch(clipboardImageUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ url: imageUrl })
+                }).then(function(r) {
+                    if (!r.ok) {
+                        return r.json().catch(function() { return {}; }).then(function(data) {
+                            throw new Error((data && data.error) || 'Falha ao colar a imagem.');
+                        });
+                    }
+                    var nome = r.headers.get('X-Image-Filename') || ('gif_colado_' + Date.now() + '.gif');
+                    return r.blob().then(function(blob) {
+                        var type = blob.type || 'image/gif';
+                        var file = new File([blob], nome, { type: type });
+                        handleFile(file);
+                    });
+                }).catch(function(err) {
+                    preview.classList.add('hidden');
+                    preview.classList.remove('flex');
+                    alert(err.message || 'Não foi possível colar este GIF. Tente Anexar o arquivo.');
+                });
+            }
+
+            function extractImageUrlFromClipboard(cd) {
+                if (!cd) return '';
+                var html = cd.getData('text/html') || '';
+                var imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+                if (imgMatch && imgMatch[1] && /^https?:\/\//i.test(imgMatch[1])) {
+                    return imgMatch[1];
+                }
+                var uri = (cd.getData('text/uri-list') || '').split('\n').map(function(l) { return l.trim(); }).find(function(l) {
+                    return l && !l.startsWith('#') && /^https?:\/\//i.test(l);
+                });
+                if (uri) return uri;
+                var plain = (cd.getData('text/plain') || '').trim();
+                if (/^https?:\/\/.+\.(gif|png|jpe?g|webp)(\?|$)/i.test(plain)) return plain;
+                if (/^https?:\/\/(media\.tenor\.|media\d*\.giphy\.|i\.giphy\.|.*\.googleusercontent\.)/i.test(plain)) return plain;
+                return '';
             }
         
             fileInput.addEventListener('change', function(e) {
@@ -284,21 +346,56 @@
                 preview.classList.add('hidden');
                 preview.classList.remove('flex');
             });
+
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                form.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.classList.add('ring-2', 'ring-blue-400');
+                });
+            });
+            ['dragleave', 'drop'].forEach(function(evt) {
+                form.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.classList.remove('ring-2', 'ring-blue-400');
+                });
+            });
+            form.addEventListener('drop', function(e) {
+                var files = e.dataTransfer && e.dataTransfer.files;
+                if (!files || !files.length) return;
+                var file = files[0];
+                if (file.type && file.type.indexOf('image/') === 0) {
+                    handleFile(file);
+                    return;
+                }
+                if (/\.gif$/i.test(file.name || '')) {
+                    handleFile(new File([file], file.name, { type: file.type || 'image/gif' }));
+                }
+            });
         
             form.addEventListener('paste', function(e) {
-                var items = (e.clipboardData || e.originalEvent.clipboardData).items;
-                for (var index in items) {
-                    var item = items[index];
-                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                var cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+                if (!cd) return;
+                var items = cd.items || [];
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    if (item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
                         var blob = item.getAsFile();
                         if (blob) {
-                            var ext = blob.type.split('/')[1] || 'png';
-                            var file = new File([blob], "imagem_colada_" + Date.now() + "." + ext, {type: blob.type});
+                            var ext = extFromType(blob.type, 'gif');
+                            var file = new File([blob], 'imagem_colada_' + Date.now() + '.' + ext, { type: blob.type || 'image/' + ext });
                             handleFile(file);
                             e.preventDefault();
-                            break;
+                            return;
                         }
                     }
+                }
+                // Win+. / Google costumam colar HTML com <img src="..."> em vez de arquivo
+                var remoteUrl = extractImageUrlFromClipboard(cd);
+                if (remoteUrl) {
+                    e.preventDefault();
+                    attachFromRemoteUrl(remoteUrl);
                 }
             });
 

@@ -17,6 +17,10 @@ def optimize_image_to_webp(uploaded_file):
     if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']:
         return uploaded_file
 
+    # Preserva GIF animado (conversão WebP perderia os frames)
+    if ext == '.gif' or getattr(uploaded_file, 'content_type', '') == 'image/gif':
+        return uploaded_file
+
     try:
         # Abrir imagem
         image = Image.open(uploaded_file)
