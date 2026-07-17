@@ -688,8 +688,9 @@
             var envelope = ($row.find('.chip-envelope').text() || '').toLowerCase();
             var funcionario = ($row.find('.chip-funcionario').text() || '').toLowerCase();
 
+            var textDigits = textInput.replace(/\D/g, '');
             var matchText = linha.includes(textInput) ||
-                linha.replace(/\D/g, '').includes(textInput.replace(/\D/g, '')) ||
+                (textDigits !== '' && linha.replace(/\D/g, '').includes(textDigits)) ||
                 operadora.includes(textInput) ||
                 envelope.includes(textInput) ||
                 funcionario.includes(textInput);
