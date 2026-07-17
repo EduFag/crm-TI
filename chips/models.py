@@ -38,11 +38,16 @@ class Batch(models.Model):
 class Chip(models.Model):
     """Cadastro Central de Chips (RF05, RF07)"""
     class StatusChoices(models.TextChoices):
-        AVAILABLE = 'AVAILABLE', 'Disponível'
-        IN_USE = 'IN_USE', 'Em Uso'
+        ACTIVE = 'ACTIVE', 'Ativo'
         BLOCKED = 'BLOCKED', 'Bloqueado'
         CANCELED = 'CANCELED', 'Cancelado'
         LOST = 'LOST', 'Perdido'
+        OTHER = 'OTHER', 'Outro'
+
+    class UsageChoices(models.TextChoices):
+        AVAILABLE = 'AVAILABLE', 'Disponível'
+        IN_USE = 'IN_USE', 'Em Uso'
+        UNAVAILABLE = 'UNAVAILABLE', 'Indisponível'
 
     class TechChoices(models.TextChoices):
         PHYSICAL = 'PHYSICAL', 'Físico'
@@ -54,7 +59,8 @@ class Chip(models.Model):
         CONTROL = 'CONTROL', 'Controle'
 
     line_number = models.CharField("Número da Linha", max_length=20, unique=True, help_text="Número da Linha com DDD")
-    status = models.CharField("Status", max_length=20, choices=StatusChoices.choices, default=StatusChoices.AVAILABLE)
+    status = models.CharField("Status do Chip", max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
+    usage_status = models.CharField("Status de Uso", max_length=20, choices=UsageChoices.choices, default=UsageChoices.AVAILABLE)
     technology = models.CharField("Tecnologia", max_length=20, choices=TechChoices.choices, default=TechChoices.PHYSICAL)
     iccid = models.CharField("ICCID", max_length=50, unique=True, blank=True, null=True, help_text="ICCID (Número de série do chip)")
     plan_type = models.CharField("Tipo de Plano", max_length=20, choices=PlanChoices.choices, default=PlanChoices.CONTROL)
@@ -80,16 +86,36 @@ class Chip(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def formatted_line_number(self):
+        digits = ''.join(c for c in self.line_number if c.isdigit())
+        if len(digits) == 11:
+            return f"({digits[:2]}){digits[2:7]}-{digits[7:]}"
+        elif len(digits) == 10:
+            return f"({digits[:2]}){digits[2:6]}-{digits[6:]}"
+        return self.line_number
+
     def __str__(self):
-        return f"{self.line_number} - {self.operator.name}"
+        return f"{self.formatted_line_number} - {self.operator.name}"
 
     def clean(self):
-        if self.status == self.StatusChoices.AVAILABLE:
+        # Automate usage_status based on status if not IN_USE
+        if self.usage_status != self.UsageChoices.IN_USE:
+            if self.status == self.StatusChoices.ACTIVE:
+                self.usage_status = self.UsageChoices.AVAILABLE
+            else:
+                self.usage_status = self.UsageChoices.UNAVAILABLE
+
+        if self.usage_status == self.UsageChoices.AVAILABLE:
             if not self.batch_id:
                 raise ValidationError({'batch': 'Informe o envelope quando o chip estiver disponível na TI.'})
-        # Removidas validações baseadas em custody.
 
     def save(self, *args, **kwargs):
+        if self.usage_status != self.UsageChoices.IN_USE:
+            if self.status == self.StatusChoices.ACTIVE:
+                self.usage_status = self.UsageChoices.AVAILABLE
+            else:
+                self.usage_status = self.UsageChoices.UNAVAILABLE
         super().save(*args, **kwargs)
 
 

@@ -98,14 +98,14 @@ class ChipTransferView(_JsonChipsMixin, View):
         chip = get_object_or_404(
             Chip, 
             pk=pk, 
-            status__in=[Chip.StatusChoices.IN_USE, Chip.StatusChoices.AVAILABLE]
+            usage_status__in=[Chip.UsageChoices.IN_USE, Chip.UsageChoices.AVAILABLE]
         )
         form = TransferForm(request.POST)
         if not form.is_valid():
             return JsonResponse({'errors': form.errors}, status=400)
 
         try:
-            if chip.status == Chip.StatusChoices.AVAILABLE:
+            if chip.usage_status == Chip.UsageChoices.AVAILABLE:
                 row = entregar_chip(
                     chip,
                     employee_name=form.cleaned_data['employee_name'],

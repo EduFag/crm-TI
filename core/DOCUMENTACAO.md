@@ -25,7 +25,7 @@ App **núcleo** do sistema: autenticação, usuário customizado, permissões po
 | Papel | Módulos |
 |-------|---------|
 | STANDARD, MULTIPLIER, TEAM_LEADER, SUPERVISOR | helpdesk |
-| IT_USER | helpdesk, chips, emails, equipment, discador, gestao_usuarios |
+| IT_USER | helpdesk, chips, emails, equipment, gestao_usuarios |
 | ADMIN | helpdesk |
 | Superuser | todos os módulos (inclui Django Admin via `is_staff`) |
 

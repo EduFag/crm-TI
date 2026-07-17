@@ -1,6 +1,6 @@
 # Documentação — Raiz do projeto (`branch-v2`)
 
-CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashboard inicial e módulos operacionais (helpdesk, chips, e-mails, equipamentos e discador).
+CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashboard inicial e módulos operacionais (helpdesk, chips, e-mails e equipamentos).
 
 ## Para que serve esta pasta
 
@@ -23,7 +23,6 @@ CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashb
 | `chips/` | Inventário e movimentação de chips celulares. Ver `chips/DOCUMENTACAO.md`. |
 | `emails/` | Domínios e contas de e-mail corporativas. Ver `emails/DOCUMENTACAO.md`. |
 | `equipment/` | Patrimônio de equipamentos de TI. Ver `equipment/DOCUMENTACAO.md`. |
-| `discador/` | Integração 3C Plus, blacklist e reciclagem de bases. Ver `discador/DOCUMENTACAO.md`. |
 
 ## Rotas principais (`setup/urls.py`)
 
@@ -36,7 +35,6 @@ CRM web para o setor de TI, construído em **Django 6**. Centraliza login, dashb
 | `/chips/` | Chips |
 | `/emails/` | E-mails |
 | `/equipment/` | Equipamentos |
-| `/discador/` | Discador |
 
 ## Documentação por subpasta
 

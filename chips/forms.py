@@ -101,7 +101,7 @@ class TransferForm(TipoTitularFormMixin):
 class GeneralTransferForm(TipoTitularFormMixin):
     chip = forms.ModelChoiceField(
         queryset=Chip.objects.filter(
-            status__in=[Chip.StatusChoices.AVAILABLE, Chip.StatusChoices.BLOCKED]
+            usage_status=Chip.UsageChoices.AVAILABLE
         ).order_by('line_number'),
         label="Linha (Chip Disponível)",
         empty_label="Selecione a linha disponível",

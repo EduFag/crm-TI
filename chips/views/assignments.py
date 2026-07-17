@@ -16,7 +16,7 @@ class ReturnChipView(_ChipsMixin, View):
     """Devolve um chip ao estoque na TI (RF12)."""
 
     def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk, status=Chip.StatusChoices.IN_USE)
+        chip = get_object_or_404(Chip, pk=pk, usage_status=Chip.UsageChoices.IN_USE)
         tab = request.POST.get('tab', 'chips')
 
         try:

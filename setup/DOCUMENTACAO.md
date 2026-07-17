@@ -17,4 +17,4 @@ Define apps instalados, banco, templates, `AUTH_USER_MODEL`, URLs raiz e pontos 
 
 ## Apps registrados em `settings.py`
 
-`core`, `helpdesk`, `chips`, `emails`, `equipment`, `discador` + apps padrão do Django (`admin`, `auth`, `sessions`, etc.).
+`core`, `helpdesk`, `chips`, `emails`, `equipment` + apps padrão do Django (`admin`, `auth`, `sessions`, etc.).

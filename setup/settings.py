@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     'chips',
     'emails',
     'equipment',
-    'discador',
     'integracoes.apps.IntegracoesConfig',
 ]
 

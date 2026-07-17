@@ -24,7 +24,6 @@ urlpatterns = [
     path('chips/', include('chips.urls')),
     path('emails/', include('emails.urls')),
     path('equipment/', include('equipment.urls')),
-    path('discador/', include('discador.urls')),
     path('integracoes/', include('integracoes.urls')),
 ]
 

@@ -36,14 +36,14 @@ def entregar_chip(
     activated_at=None,
 ):
     """Entrega chip disponível na TI para uma pessoa."""
-    if chip.status != Chip.StatusChoices.AVAILABLE:
+    if chip.usage_status != Chip.UsageChoices.AVAILABLE:
         raise ValidationError('Somente chips disponíveis na TI podem ser entregues.')
 
     hoje = activated_at or timezone.localdate()
     if not chip.activated_at:
         chip.activated_at = hoje
 
-    chip.status = Chip.StatusChoices.IN_USE
+    chip.usage_status = Chip.UsageChoices.IN_USE
     chip.save()
 
     ChipMovement.objects.create(
@@ -60,7 +60,7 @@ def entregar_chip(
 @transaction.atomic
 def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
     """Transfere posse sem alterar activated_at nem ciclo de recarga."""
-    if chip.status != Chip.StatusChoices.IN_USE:
+    if chip.usage_status != Chip.UsageChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser transferidos.')
 
     anterior = _titular_atual(chip)
@@ -80,7 +80,7 @@ def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
 @transaction.atomic
 def devolver_para_ti(chip, *, actor):
     """Devolve chip da rua para envelope na TI."""
-    if chip.status != Chip.StatusChoices.IN_USE:
+    if chip.usage_status != Chip.UsageChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser devolvidos.')
 
     anterior = _titular_atual(chip)
@@ -95,7 +95,7 @@ def devolver_para_ti(chip, *, actor):
     )
     log_devolucao(chip, nome_anterior, actor)
 
-    chip.status = Chip.StatusChoices.AVAILABLE
+    chip.usage_status = Chip.UsageChoices.AVAILABLE
     chip.save()
     return _chip_grid(chip.pk)
 
@@ -129,7 +129,7 @@ def criar_chip_operacional(
         batch=batch,
         observacao=observacao.strip(),
         email_vinculado=email_vinculado,
-        status=Chip.StatusChoices.IN_USE if employee_name.strip() else Chip.StatusChoices.AVAILABLE,
+        usage_status=Chip.UsageChoices.IN_USE if employee_name.strip() else Chip.UsageChoices.AVAILABLE,
         activated_at=(
             activated_at or timezone.localdate()
             if employee_name.strip()
@@ -180,7 +180,7 @@ def atualizar_chip_grid(chip, *, dados, actor):
         chip.batch_id = _inteiro_opcional(dados.get('batch_id'))
         alterou = True
 
-    if 'employee_name' in dados and chip.status == Chip.StatusChoices.IN_USE:
+    if 'employee_name' in dados and chip.usage_status == Chip.UsageChoices.IN_USE:
         nome = (dados.get('employee_name') or '').strip()
         if nome:
             atual = _titular_atual(chip)

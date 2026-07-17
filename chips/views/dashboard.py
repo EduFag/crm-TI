@@ -115,10 +115,10 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         from django.core.paginator import Paginator
         context['total_chips'] = Chip.objects.filter(is_active=True).count()
         context['metric_available'] = Chip.objects.filter(
-            status=Chip.StatusChoices.AVAILABLE,
+            usage_status=Chip.UsageChoices.AVAILABLE,
         ).count()
         context['metric_in_use'] = Chip.objects.filter(
-            status=Chip.StatusChoices.IN_USE,
+            usage_status=Chip.UsageChoices.IN_USE,
         ).count()
         context['metric_blocked_canceled'] = Chip.objects.filter(
             status__in=[Chip.StatusChoices.BLOCKED, Chip.StatusChoices.CANCELED]
@@ -130,7 +130,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
         from chips.queries import _calcular_ciclo
         vencendo = 0
         for chip in chips_com_anotacoes_operacionais(
-            Chip.objects.filter(status=Chip.StatusChoices.IN_USE)
+            Chip.objects.filter(usage_status=Chip.UsageChoices.IN_USE)
         ):
             _, _, status = _calcular_ciclo(chip)
             if status in ('warning', 'danger'):
@@ -185,7 +185,7 @@ class ChipsAssignmentPostView(ModuloObrigatorioMixin, View):
         usuario = form.cleaned_data.get('employee_user')
 
         try:
-            if chip.status == Chip.StatusChoices.IN_USE:
+            if chip.usage_status == Chip.UsageChoices.IN_USE:
                 transferir_chip(chip, novo_nome=nome, novo_user=usuario, actor=request.user)
                 messages.success(request, f'Chip {chip.line_number} transferido para {nome}.')
             else:

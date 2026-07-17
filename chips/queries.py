@@ -97,7 +97,7 @@ def chip_para_grid_dict(chip):
 
     return {
         'id': chip.id,
-        'line_number': chip.line_number,
+        'line_number': chip.formatted_line_number,
         'employee_name': chip.employee_name or '',
         'employee_user_id': chip.employee_user_id,
         'activated_at': chip.activated_at.isoformat() if chip.activated_at else '',
@@ -118,6 +118,9 @@ def chip_para_grid_dict(chip):
         'batch_id': chip.batch_id,
         'envelope_label': envelope_label,
         'status': chip.status,
+        'status_display': chip.get_status_display(),
+        'usage_status': chip.usage_status,
+        'usage_status_display': chip.get_usage_status_display(),
         'recharge_due_at': recharge_due_at.isoformat() if recharge_due_at else '',
         'days_to_recharge': days_to_recharge,
         'recharge_status': recharge_status,

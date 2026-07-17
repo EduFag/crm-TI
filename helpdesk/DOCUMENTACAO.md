@@ -11,7 +11,7 @@ Registrar tickets (título, prioridade, categoria, solicitante, co-autores), mov
 | Papel | Código | Módulos | Ver chamados | Arquivados | Kanban move | Comentar | Contestar |
 |-------|--------|---------|--------------|------------|-------------|----------|-----------|
 | Superuser | `is_superuser` | Todos | Todos | Sim | Sim | Todos | Não |
-| Membro Equipe (TI) | `IT_USER` | chips, emails, equipment, discador, helpdesk | Todos | Sim | Sim | Todos | Não |
+| Membro Equipe (TI) | `IT_USER` | chips, emails, equipment, helpdesk | Todos | Sim | Sim | Todos | Não |
 | Administrador | `ADMIN` | helpdesk | Todos | Sim | Sim | Todos | Não |
 | Supervisor | `SUPERVISOR` | helpdesk | Equipes do usuário | Não | Não | Qualquer visível* | Não |
 | Líder de Equipe | `TEAM_LEADER` | helpdesk | Equipes do usuário | Não | Não | Só autor/solicitante/co-autor* | Não |

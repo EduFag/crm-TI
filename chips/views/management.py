@@ -93,7 +93,10 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
         form = super().get_form(form_class)
         from django import forms
         if 'activated_at' in form.fields:
-            form.fields['activated_at'].widget = forms.DateInput(attrs={'type': 'date'})
+            form.fields['activated_at'].widget = forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'type': 'date'}
+            )
         if 'line_number' in form.fields:
             form.fields['line_number'].widget.attrs.update({
                 'data-mask': '(00) 00000-0000',
@@ -122,7 +125,10 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
         form = super().get_form(form_class)
         from django import forms
         if 'activated_at' in form.fields:
-            form.fields['activated_at'].widget = forms.DateInput(attrs={'type': 'date'})
+            form.fields['activated_at'].widget = forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'type': 'date'}
+            )
         if 'line_number' in form.fields:
             form.fields['line_number'].widget.attrs.update({
                 'data-mask': '(00) 00000-0000',
