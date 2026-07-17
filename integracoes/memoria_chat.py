@@ -175,7 +175,9 @@ def _system_prompt() -> str:
         'Quando o usuário pedir para lembrar, gravar na memória, corrigir um procedimento ou '
         'esquecer algo, use as tools gravar_memoria / atualizar_memoria / remover_memoria. '
         'Antes de atualizar/remover, use listar_memorias se precisar do id. '
-        'Responda sempre em português, de forma objetiva. Confirme o que foi gravado.\n\n'
+        'Responda sempre em português, de forma objetiva e legível. '
+        'Use Markdown leve (negrito com **, listas numeradas) só quando ajudar a leitura. '
+        'Confirme o que foi gravado.\n\n'
         f'Memórias atuais:\n{lista}'
     )
 

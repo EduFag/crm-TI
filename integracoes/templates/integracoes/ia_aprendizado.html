@@ -1,8 +1,32 @@
 {% extends "base.html" %}
+{% load integracoes_extras %}
 
 {% block title %}Aprendizado IA{% endblock %}
 
 {% block content %}
+<style>
+/* Tipografia do Markdown no chat de memória */
+.memoria-md { font-size: 0.875rem; line-height: 1.55; color: inherit; }
+.memoria-md .memoria-md-p { margin: 0.45em 0; }
+.memoria-md .memoria-md-p:first-child { margin-top: 0; }
+.memoria-md .memoria-md-p:last-child { margin-bottom: 0; }
+.memoria-md .memoria-md-h { font-size: 0.95rem; font-weight: 700; margin: 0.55em 0 0.3em; line-height: 1.35; color: #0f172a; }
+.memoria-md .memoria-md-h:first-child { margin-top: 0; }
+.memoria-md .memoria-md-list { margin: 0.45em 0; padding-left: 1.25rem; list-style-position: outside; }
+.memoria-md ol.memoria-md-list { list-style-type: decimal; }
+.memoria-md ul.memoria-md-list { list-style-type: disc; }
+.memoria-md .memoria-md-list li { margin: 0.28em 0; padding-left: 0.15rem; }
+.memoria-md strong { font-weight: 700; color: #0f172a; }
+.memoria-md em { font-style: italic; }
+.memoria-md .memoria-md-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8em;
+    background: #f1f5f9;
+    border-radius: 0.25rem;
+    padding: 0.1em 0.35em;
+}
+.memoria-md .memoria-md-link { color: #6d28d9; text-decoration: underline; text-underline-offset: 2px; }
+</style>
 <div class="flex flex-col w-full gap-6">
     <div>
         <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Aprendizado IA</h2>
@@ -164,10 +188,11 @@
             <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
                 {% for msg in chat_historico %}
                 <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
-                        {% if msg.role == 'user' %}bg-blue-600 text-white rounded-br-md{% else %}bg-white border border-slate-200 text-slate-700 rounded-bl-md{% endif %}">
-                        {{ msg.content }}
-                    </div>
+                    {% if msg.role == 'user' %}
+                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md">{{ msg.content }}</div>
+                    {% else %}
+                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md">{{ msg.content|markdown_leve }}</div>
+                    {% endif %}
                 </div>
                 {% empty %}
                 <div class="text-center text-sm text-slate-400 py-8 px-4">
@@ -202,17 +227,23 @@
     const limpar = document.getElementById('memoria-chat-limpar');
     const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    function appendBubble(role, text) {
+    function appendBubble(role, text, html) {
         const empty = log.querySelector('.text-center');
         if (empty) empty.remove();
         const wrap = document.createElement('div');
         wrap.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
         const bubble = document.createElement('div');
-        bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ' +
-            (role === 'user'
-                ? 'bg-blue-600 text-white rounded-br-md'
-                : 'bg-white border border-slate-200 text-slate-700 rounded-bl-md');
-        bubble.textContent = text;
+        if (role === 'user') {
+            bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md';
+            bubble.textContent = text;
+        } else {
+            bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md';
+            if (html) {
+                bubble.innerHTML = html;
+            } else {
+                bubble.textContent = text;
+            }
+        }
         wrap.appendChild(bubble);
         log.appendChild(wrap);
         log.scrollTop = log.scrollHeight;
@@ -240,7 +271,7 @@
             if (!resp.ok || !data.ok) {
                 appendBubble('assistant', data.error || 'Falha ao processar.');
             } else {
-                appendBubble('assistant', data.reply);
+                appendBubble('assistant', data.reply, data.reply_html);
                 if (data.memoria_alterada) {
                     status.textContent = 'Memória atualizada — recarregando chunks…';
                     setTimeout(function () { window.location.reload(); }, 600);

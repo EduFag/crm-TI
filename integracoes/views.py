@@ -408,6 +408,7 @@ def ia_aprendizado_chat(request):
     from django.http import JsonResponse
 
     from integracoes.llm import LlmError
+    from integracoes.markdown_safe import render_markdown_leve
     from integracoes.memoria_chat import SESSION_KEY, processar_mensagem_memoria
 
     try:
@@ -444,6 +445,7 @@ def ia_aprendizado_chat(request):
     return JsonResponse({
         'ok': True,
         'reply': resultado['reply'],
+        'reply_html': render_markdown_leve(resultado['reply'] or ''),
         'memoria_alterada': resultado['memoria_alterada'],
     })
 
