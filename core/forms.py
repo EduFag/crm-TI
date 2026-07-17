@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
 
 from core.models import CustomUser, Equipe
@@ -18,7 +19,7 @@ class EquipeForm(forms.ModelForm):
 
 
 class CustomUserCreateForm(UserCreationForm):
-    """Formulário de criação de usuário (apenas ADMIN via gestão de usuários)."""
+    """Formulário de criação de usuário (gestão de usuários / IT_USER e superuser)."""
 
     equipes = forms.ModelMultipleChoiceField(
         queryset=Equipe.objects.none(),
@@ -43,6 +44,10 @@ class CustomUserCreateForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['equipes'].queryset = Equipe.objects.filter(is_active=True).order_by('name')
+        # Labels em pt-br para os campos de senha herdados do UserCreationForm
+        self.fields['password1'].label = 'Senha'
+        self.fields['password2'].label = 'Confirmação de senha'
+
 
 
 class CustomUserUpdateForm(forms.ModelForm):
@@ -86,6 +91,13 @@ class CustomUserUpdateForm(forms.ModelForm):
                     Q(is_active=True) | Q(pk__in=inativas_vinculadas)
                 ).distinct().order_by('name')
 
+    def clean_nova_senha(self):
+        senha = self.cleaned_data.get('nova_senha') or ''
+        if senha:
+            # Reutiliza as regras de senha do Django (mesmas do cadastro)
+            validate_password(senha, self.instance)
+        return senha
+
     def save(self, commit=True):
         usuario = super().save(commit=False)
         senha = self.cleaned_data.get('nova_senha')
@@ -95,3 +107,4 @@ class CustomUserUpdateForm(forms.ModelForm):
             usuario.save()
             self.save_m2m()
         return usuario
+

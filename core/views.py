@@ -83,7 +83,7 @@ class UserListView(ModuloObrigatorioMixin, ListView):
 
 
 class UserCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
-    """Cadastro de novo usuário pelo ADMIN (modal HTMX na listagem)."""
+    """Cadastro de novo usuário (modal HTMX; exige módulo gestão de usuários)."""
     model = CustomUser
     form_class = CustomUserCreateForm
     list_url_name = 'user_list'
@@ -123,6 +123,7 @@ class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
 
     def form_valid(self, form):
         antes = CustomUser.objects.get(pk=self.object.pk)
+        senha_alterada = bool(form.cleaned_data.get('nova_senha'))
         self.object = form.save()
         registrar_alteracoes(
             modulo=MODULO_CORE,
@@ -132,8 +133,17 @@ class UserUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
             campos=['username', 'email', 'first_name', 'last_name', 'role', 'equipes', 'is_active', 'is_staff'],
             descricao_prefixo=f'Usuário "{self.object.username}" atualizado.',
         )
+        if senha_alterada:
+            registrar_acao(
+                modulo=MODULO_CORE,
+                acao=RegistroAcao.AcaoChoices.PASSWORD_RESET,
+                descricao=f'Senha do usuário "{self.object.username}" alterada.',
+                actor=self.request.user,
+                obj=self.object,
+            )
         messages.success(self.request, f'Usuário "{form.instance.username}" atualizado com sucesso.')
         return self.htmx_redirect_response()
+
 
 
 @requer_modulo(MODULO_GESTAO_USUARIOS)
