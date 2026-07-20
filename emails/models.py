@@ -17,11 +17,11 @@ class EmailAccount(models.Model):
     username = models.CharField(max_length=150, help_text="Prefixo (ex: joao.silva)", null=True)
     domain = models.ForeignKey(EmailDomain, on_delete=models.PROTECT, related_name='accounts', null=True)
     
-    employee_name = models.CharField(max_length=150, help_text="Nome do funcionário vinculado")
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
+    employee_name = models.CharField("Vínculo", max_length=150, help_text="Nome do funcionário vinculado")
+    status = models.CharField("Status", max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
+    password = models.CharField("Senha", max_length=255, blank=True)
     
     # Rastreabilidade
-    last_password_reset = models.DateTimeField(null=True, blank=True, help_text="Data do último reset")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

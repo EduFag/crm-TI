@@ -12,7 +12,7 @@ class EmailDomainAdmin(admin.ModelAdmin):
 
 @admin.register(EmailAccount)
 class EmailAccountAdmin(admin.ModelAdmin):
-    list_display = ('get_endereco', 'employee_name', 'status', 'last_password_reset', 'created_at')
+    list_display = ('get_endereco', 'employee_name', 'status', 'created_at')
     list_filter = ('status', 'domain')
     search_fields = ('username', 'employee_name', 'domain__name')
     readonly_fields = ('created_at', 'updated_at', 'get_endereco')

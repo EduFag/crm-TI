@@ -1,5 +1,5 @@
 from django.utils import timezone
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView, CreateView, View, ListView
 from django.contrib import messages
 
@@ -42,9 +42,17 @@ class DashboardView(_EmailsMixin, TemplateView):
 class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     """Cadastro de novo e-mail via modal no dashboard."""
     model = EmailAccount
-    fields = ['username', 'domain', 'employee_name', 'status']
+    fields = ['username', 'domain', 'employee_name', 'password', 'status']
     modal_template_name = 'emails/_account_form_modal.html'
     list_url_name = 'emails:dashboard'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form_action'] = reverse('emails:account_create')
+        context['modal_title'] = 'Novo E-mail'
+        context['modal_subtitle'] = 'Crie a identidade e o acesso da caixa corporativa.'
+        context['modal_submit_label'] = 'Criar Conta'
+        return context
     
     def form_valid(self, form):
         self.object = form.save()
@@ -52,15 +60,59 @@ class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
         messages.success(self.request, f"E-mail {form.instance.address} cadastrado com sucesso!")
         return self.htmx_redirect_response()
 
-class ResetPasswordView(_EmailsMixin, View):
-    """Ação: Reset de Senha"""
+from django.urls import reverse, reverse_lazy
+from django.views.generic import UpdateView, DeleteView
+
+class EmailAccountUpdateView(HtmxModalMixin, _EmailsMixin, UpdateView):
+    """Edição de e-mail."""
+    model = EmailAccount
+    fields = ['username', 'domain', 'employee_name', 'password', 'status']
+    modal_template_name = 'emails/_account_form_modal.html'
+    list_url_name = 'emails:dashboard'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form_action'] = reverse('emails:account_update', args=[self.object.pk])
+        context['modal_title'] = 'Editar E-mail'
+        context['modal_subtitle'] = f'Atualize os dados da caixa {self.object.address}.'
+        context['modal_submit_label'] = 'Salvar Alterações'
+        return context
+
+    def form_valid(self, form):
+        self.object = form.save()
+        messages.success(self.request, f"E-mail {form.instance.address} atualizado com sucesso!")
+        return self.htmx_redirect_response()
+
+class EmailAccountDeleteView(_EmailsMixin, DeleteView):
+    """Exclusão de e-mail via POST direto."""
+    model = EmailAccount
+    success_url = reverse_lazy('emails:dashboard')
+    
+    def form_valid(self, form):
+        address = self.object.address
+        messages.success(self.request, f"E-mail {address} excluído permanentemente.")
+        return super().form_valid(form)
+
+from django.http import HttpResponse
+
+class EmailAccountViewPasswordModal(HtmxModalMixin, _EmailsMixin, View):
+    """Visualização da senha protegida por verificação de segurança."""
+    
+    def get(self, request, pk):
+        account = get_object_or_404(EmailAccount, pk=pk)
+        return render(request, 'emails/_view_password_modal.html', {'account': account, 'password_visible': False})
+        
     def post(self, request, pk):
         account = get_object_or_404(EmailAccount, pk=pk)
-        account.last_password_reset = timezone.now()
-        account.save()
-        log_reset_senha(account, request.user)
-        messages.success(request, f"Senha da conta {account.address} resetada. Uma notificação temporária foi gerada.")
-        return redirect('emails:dashboard')
+        admin_password = request.POST.get('admin_password', '')
+        
+        if request.user.check_password(admin_password):
+            return render(request, 'emails/_view_password_modal.html', {'account': account, 'password_visible': True, 'account_password': account.password})
+        else:
+            return render(request, 'emails/_view_password_modal.html', {'account': account, 'password_visible': False, 'error': 'Senha incorreta. Acesso negado.'})
+
+
+
 
 class ToggleAccountStatusView(_EmailsMixin, View):
     """Ação: Bloquear/Desbloquear Conta"""

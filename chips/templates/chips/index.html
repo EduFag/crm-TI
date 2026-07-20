@@ -359,7 +359,7 @@
                                 </svg>
                             </button>
                             {% endif %}
-                            {% if chip.status == 'IN_USE' %}
+                            {% if chip.usage_status == 'IN_USE' %}
                             <button type="button" title="Devolver TI"
                                 onclick="devolverChip({{ chip.id }}, '{{ chip.line_number }}')"
                                 class="text-orange-600 hover:text-orange-700 px-1 transition-colors">

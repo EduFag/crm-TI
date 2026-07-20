@@ -8,7 +8,10 @@ urlpatterns = [
     # Dashboard Unificado
     path('', views.DashboardView.as_view(), name='dashboard'),
     path('create/', views.EmailAccountCreateView.as_view(), name='account_create'),
-    path('accounts/<int:pk>/reset/', views.ResetPasswordView.as_view(), name='account_reset_password'),
+    path('accounts/<int:pk>/edit/', views.EmailAccountUpdateView.as_view(), name='account_update'),
+    path('accounts/<int:pk>/delete/', views.EmailAccountDeleteView.as_view(), name='account_delete'),
+    path('accounts/<int:pk>/view-password/', views.EmailAccountViewPasswordModal.as_view(), name='account_view_password'),
+
     path('accounts/<int:pk>/toggle-status/', views.ToggleAccountStatusView.as_view(), name='account_toggle_status'),
 
     # Gestão de Domínios
