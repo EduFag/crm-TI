@@ -3,6 +3,7 @@ from django.views.generic import CreateView, UpdateView, FormView
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.htmx import ChipsModalMixin
 from chips.models import Chip, Operator, Batch
+from chips.forms import ChipUpdateForm, LinkEmailForm
 from chips.audit import log_chip_atualizado, log_chip_criado, log_lote_criado, log_operadora_criada
 
 
@@ -112,29 +113,11 @@ class ChipCreateView(ChipsModalMixin, _ChipsMixin, CreateView):
 
 class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
     model = Chip
-    fields = [
-        'line_number', 'operator', 'status', 'technology', 'iccid',
-        'batch', 'activated_at', 'observacao', 'email_vinculado',
-    ]
+    form_class = ChipUpdateForm
     chips_tab = 'chips'
     modal_submit_label = 'Salvar'
     modal_max_width = 'max-w-2xl'
     form_layout = 'as_p'
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        from django import forms
-        if 'activated_at' in form.fields:
-            form.fields['activated_at'].widget = forms.DateInput(
-                format='%Y-%m-%d',
-                attrs={'type': 'date'}
-            )
-        if 'line_number' in form.fields:
-            form.fields['line_number'].widget.attrs.update({
-                'data-mask': '(00) 00000-0000',
-                'placeholder': '(11) 98888-7777',
-            })
-        return form
 
     def get_modal_title(self):
         return f'Editar Chip — {self.object.line_number}'
@@ -207,3 +190,40 @@ def batch_delete_view(request, pk):
     batch.delete()
     messages.success(request, f'Envelope "{nome_str}" excluído com sucesso.')
     return redirect('/chips/?tab=envelopes')
+
+class ChipLinkEmailView(ChipsModalMixin, _ChipsMixin, FormView):
+    from chips.forms import LinkEmailForm
+    form_class = LinkEmailForm
+    template_name = 'chips/_link_email_modal.html'
+    chips_tab = 'chips'
+    modal_title = 'Vincular E-mail'
+    modal_subtitle = 'Selecione um e-mail existente ou crie um novo para vincular ao chip.'
+    modal_submit_label = 'Vincular / Criar'
+
+    def get_template_names(self):
+        return [self.template_name]
+
+    def form_valid(self, form):
+        chip = get_object_or_404(Chip, pk=self.kwargs['pk'])
+        account = form.cleaned_data.get('email_account')
+        
+        if not account:
+            # Create new email account
+            from emails.models import EmailAccount
+            username = form.cleaned_data.get('new_email_username')
+            domain = form.cleaned_data.get('new_email_domain')
+            employee_name = form.cleaned_data.get('employee_name')
+            password = form.cleaned_data.get('password')
+            status = form.cleaned_data.get('status')
+            account = EmailAccount.objects.create(
+                username=username,
+                domain=domain,
+                employee_name=employee_name or chip.employee_name or 'Usuário do Chip',
+                password=password or '',
+                status=status or EmailAccount.StatusChoices.ACTIVE
+            )
+            
+        chip.email_vinculado = account
+        chip.save(update_fields=['email_vinculado'])
+        
+        return self.htmx_redirect_response()

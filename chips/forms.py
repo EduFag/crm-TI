@@ -2,6 +2,7 @@ from django import forms
 
 from core.models import CustomUser
 from chips.models import Batch, Chip, Operator
+from emails.models import EmailAccount, EmailDomain
 
 
 INPUT_CLASS = (
@@ -194,10 +195,12 @@ class ChipGridCreateForm(forms.Form):
             'placeholder': 'Observações sobre o chip',
         }),
     )
-    email_vinculado = forms.BooleanField(
+    email_vinculado = forms.ModelChoiceField(
+        queryset=EmailAccount.objects.filter(status=EmailAccount.StatusChoices.ACTIVE),
         required=False,
-        label='Possui e-mail vinculado?',
-        widget=forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'})
+        label='E-mail vinculado (opcional)',
+        empty_label='Sem e-mail',
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
     )
 
     def clean(self):
@@ -225,4 +228,73 @@ class ChipGridCreateForm(forms.Form):
             if 'employee_user' in self.errors:
                 del self.errors['employee_user']
 
+        return cleaned
+
+class ChipUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Chip
+        fields = [
+            'line_number', 'operator', 'status', 'usage_status', 'technology', 'iccid',
+            'plan_type', 'batch', 'activated_at', 'observacao', 'email_vinculado',
+        ]
+        widgets = {
+            'line_number': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-mask': '(00) 00000-0000'}),
+            'operator': forms.Select(attrs={'class': SELECT_CLASS}),
+            'status': forms.Select(attrs={'class': SELECT_CLASS}),
+            'usage_status': forms.Select(attrs={'class': SELECT_CLASS}),
+            'technology': forms.Select(attrs={'class': SELECT_CLASS}),
+            'iccid': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'plan_type': forms.Select(attrs={'class': SELECT_CLASS}),
+            'batch': forms.Select(attrs={'class': SELECT_CLASS}),
+            'activated_at': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+            'observacao': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 3}),
+            'email_vinculado': forms.Select(attrs={'class': SELECT_CLASS}),
+        }
+
+class LinkEmailForm(forms.Form):
+    email_account = forms.ModelChoiceField(
+        queryset=EmailAccount.objects.all().order_by('username'),
+        required=False,
+        label='Selecionar E-mail Existente',
+        empty_label='--- Nenhum / Criar Novo ---',
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    new_email_username = forms.CharField(
+        required=False,
+        label='Prefixo do Novo E-mail',
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Ex: joao.silva'})
+    )
+    new_email_domain = forms.ModelChoiceField(
+        queryset=EmailDomain.objects.all(),
+        required=False,
+        label='Domínio',
+        empty_label='Selecione o domínio',
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    employee_name = forms.CharField(
+        required=False,
+        label='Vínculo',
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Nome completo do colaborador'})
+    )
+    password = forms.CharField(
+        required=False,
+        label='Senha',
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Senha do E-mail'})
+    )
+    status = forms.ChoiceField(
+        choices=EmailAccount.StatusChoices.choices,
+        required=False,
+        initial=EmailAccount.StatusChoices.ACTIVE,
+        label='Status Inicial',
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        account = cleaned.get('email_account')
+        username = cleaned.get('new_email_username')
+        domain = cleaned.get('new_email_domain')
+        
+        if not account and not (username and domain):
+            raise forms.ValidationError('Selecione um e-mail existente ou preencha o endereço de e-mail corporativo.')
         return cleaned

@@ -7,6 +7,7 @@ from .management import (
     ChipCreateView,
     ChipUpdateView,
     ChipGeneralTransferView,
+    ChipLinkEmailView,
     batch_delete_view,
 )
 from .assignments import ReturnChipView
@@ -19,6 +20,5 @@ from .grid import (
     ChipReturnView,
     ChipTransferModalView,
     ChipGridCreateModalView,
-    ChipToggleEmailView,
     ChipObservationModalView,
 )

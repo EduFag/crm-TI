@@ -173,48 +173,6 @@ class ChipTransferModalView(ModuloObrigatorioMixin, View):
         return render(request, self.template_name, {'chip': chip, 'form': form})
 
 
-class ChipToggleEmailView(ModuloObrigatorioMixin, View):
-    """POST /chips/api/grid/<pk>/toggle-email/ — Alterna email_vinculado para SIM."""
-    modulo_obrigatorio = MODULO_CHIPS
-
-    def post(self, request, pk):
-        chip = get_object_or_404(Chip, pk=pk)
-        chip.email_vinculado = not chip.email_vinculado
-        chip.save(update_fields=['email_vinculado'])
-        
-        from django.urls import reverse
-        toggle_url = reverse('chips:chip_toggle_email', args=[chip.id])
-        
-        if chip.email_vinculado:
-            html = f"""
-            <div class="flex items-center gap-1">
-                <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700">SIM</span>
-                <button type="button" title="Remover Vínculo de E-mail"
-                        hx-post="{toggle_url}"
-                        hx-target="#email-td-{chip.id}"
-                        hx-swap="innerHTML"
-                        class="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
-                </button>
-            </div>
-            """
-        else:
-            html = f"""
-            <div class="flex items-center gap-1">
-                <span class="px-2.5 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">NÃO</span>
-                <button type="button" title="Vincular E-mail"
-                        hx-post="{toggle_url}"
-                        hx-target="#email-td-{chip.id}"
-                        hx-swap="innerHTML"
-                        class="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                </button>
-            </div>
-            """
-        from django.http import HttpResponse
-        return HttpResponse(html)
-
-
 class ChipObservationModalView(ModuloObrigatorioMixin, View):
     """GET /chips/api/grid/<pk>/observation/ — Modal com a observação."""
     modulo_obrigatorio = MODULO_CHIPS

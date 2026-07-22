@@ -33,6 +33,16 @@
         </div>
     </div>
 
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <p class="px-4 py-3 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-100{% else %}bg-emerald-50 text-emerald-700 border border-emerald-100{% endif %}">
+            {{ message }}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Navegação de abas -->
     <nav class="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6" id="emails-tabs-nav" role="tablist">
         <button type="button" role="tab" data-tab="emails"
