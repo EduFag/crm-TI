@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from core.models import RegistroAcao
 from core.permissions import (
     MODULO_CHIPS,
+    MODULO_DISCADOR,
     MODULO_EMAILS,
     MODULO_EQUIPMENT,
     MODULO_HELPDESK,
@@ -19,6 +20,7 @@ MODULOS_AUDITORIA = frozenset({
     MODULO_CHIPS,
     MODULO_EMAILS,
     MODULO_EQUIPMENT,
+    MODULO_DISCADOR,
     MODULO_CORE,
 })
 

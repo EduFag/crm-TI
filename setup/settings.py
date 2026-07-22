@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     'chips',
     'emails',
     'equipment',
+    'discador.apps.DiscadorConfig',
     'integracoes.apps.IntegracoesConfig',
     'mcp_api.apps.McpApiConfig',
 ]

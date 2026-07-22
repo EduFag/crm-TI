@@ -16,6 +16,7 @@ MODULO_HELPDESK = 'helpdesk'
 MODULO_CHIPS = 'chips'
 MODULO_EMAILS = 'emails'
 MODULO_EQUIPMENT = 'equipment'
+MODULO_DISCADOR = 'discador'
 MODULO_GESTAO_USUARIOS = 'gestao_usuarios'
 MODULO_INTEGRACOES = 'integracoes'
 
@@ -24,6 +25,7 @@ TODOS_MODULOS = frozenset({
     MODULO_CHIPS,
     MODULO_EMAILS,
     MODULO_EQUIPMENT,
+    MODULO_DISCADOR,
     MODULO_GESTAO_USUARIOS,
     MODULO_INTEGRACOES,
 })
@@ -39,6 +41,7 @@ MODULOS_POR_ROLE: dict[str, frozenset[str]] = {
         MODULO_CHIPS,
         MODULO_EMAILS,
         MODULO_EQUIPMENT,
+        MODULO_DISCADOR,
         MODULO_GESTAO_USUARIOS,
         MODULO_INTEGRACOES,
     }),

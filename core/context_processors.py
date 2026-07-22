@@ -22,6 +22,7 @@ def modulos_menu(request):
             path.startswith(prefixo)
             for prefixo in ('/chips/', '/emails/', '/equipment/', '/discador/')
         ),
+        'menu_discadores_expandida': path.startswith('/discador/'),
         'menu_admin_expandida': any(
             path.startswith(prefixo)
             for prefixo in ('/usuarios/', '/equipes/', '/auditoria/')

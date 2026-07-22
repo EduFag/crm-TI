@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}JoyTec — Discadores{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">JoyTec</h2>
+            <p class="text-sm text-slate-500 mt-1">Contrato de acessos, ramais, campanhas e licenças do discador.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <div data-tab-actions="acessos" class="flex gap-2">
+                <button type="button"
+                        hx-get="{% url 'discador:acesso_create' %}"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                    + Novo acesso
+                </button>
+            </div>
+            <div data-tab-actions="ramais" class="flex gap-2 hidden">
+                <button type="button"
+                        hx-get="{% url 'discador:ramal_create' %}"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                    + Novo ramal
+                </button>
+            </div>
+            <div data-tab-actions="campanhas" class="flex gap-2 hidden">
+                <button type="button"
+                        hx-get="{% url 'discador:campanha_create' %}"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                    + Nova campanha
+                </button>
+            </div>
+            <div data-tab-actions="contrato" class="flex gap-2 hidden">
+                <button type="button"
+                        hx-get="{% url 'discador:contrato_update' %}"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors text-sm">
+                    Editar contrato
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <p class="px-4 py-3 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-100{% else %}bg-emerald-50 text-emerald-700 border border-emerald-100{% endif %}">
+            {{ message }}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# KPIs de licenças (sempre visíveis) #}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 w-full">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contratadas</p>
+            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.contratadas }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 {% if kpis.no_limite %}border-l-amber-500{% else %}border-l-indigo-500{% endif %}">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Consumidas</p>
+            <h3 class="text-2xl font-bold {% if kpis.estourado %}text-red-600{% else %}text-slate-900{% endif %}">{{ kpis.consumidas }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Em uso</p>
+            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.em_uso }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Livres</p>
+            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.livres }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Não config.</p>
+            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.nao_configurados }}</h3>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-violet-500">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Custo mensal</p>
+            <h3 class="text-xl font-bold text-slate-900">R$ {{ kpis.custo_mensal }}</h3>
+        </div>
+    </div>
+
+    {% if kpis.no_limite %}
+    <div class="mb-6 px-4 py-3 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200">
+        Limite de licenças atingido ({{ kpis.consumidas }}/{{ kpis.contratadas }}). Novos ramais Em uso/Livre serão bloqueados até liberar ou aumentar o contrato.
+    </div>
+    {% endif %}
+
+    <nav class="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6" id="discador-tabs-nav" role="tablist">
+        <button type="button" role="tab" data-tab="acessos"
+                class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Acessos
+        </button>
+        <button type="button" role="tab" data-tab="ramais"
+                class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Ramais
+        </button>
+        <button type="button" role="tab" data-tab="campanhas"
+                class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Campanhas
+        </button>
+        <button type="button" role="tab" data-tab="contrato"
+                class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Contrato / Licenças
+        </button>
+    </nav>
+
+    {# ========== ABA ACESSOS ========== #}
+    <div class="discador-tab-panel hidden" data-tab-panel="acessos">
+        <form method="get" class="bg-white p-4 rounded-xl w-full mb-6 shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input type="hidden" name="tab" value="acessos">
+            <div>
+                <select name="status" onchange="this.form.submit()" class="w-full text-sm p-2.5 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold">
+                    <option value="">Todos os status</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if filtro_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="tipo" onchange="this.form.submit()" class="w-full text-sm p-2.5 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold">
+                    <option value="">Todos os tipos</option>
+                    {% for value, label in tipo_choices %}
+                    <option value="{{ value }}" {% if filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center">
+                <a href="{% url 'discador:joytec' %}?tab=acessos" class="text-sm text-slate-500 hover:text-blue-600 font-medium">Limpar filtros</a>
+            </div>
+        </form>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Nome</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Login</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Ramal</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Campanha</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Tipo</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for acesso in acessos %}
+                        <tr class="hover:bg-blue-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">{{ acesso.nome_exibicao }}</td>
+                            <td class="px-6 py-4 text-slate-600">{{ acesso.login_discador }}</td>
+                            <td class="px-6 py-4 font-mono text-slate-800">{{ acesso.ramal.numero }}</td>
+                            <td class="px-6 py-4 text-slate-600">{{ acesso.campanha.nome }}</td>
+                            <td class="px-6 py-4 text-slate-600">{{ acesso.get_tipo_display }}</td>
+                            <td class="px-6 py-4">
+                                {% if acesso.status == 'IN_USE' %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">{{ acesso.get_status_display }}</span>
+                                {% elif acesso.status == 'FREE' %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700">{{ acesso.get_status_display }}</span>
+                                {% else %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">{{ acesso.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="inline-flex items-center gap-2">
+                                    <button type="button"
+                                            hx-get="{% url 'discador:acesso_update' acesso.pk %}"
+                                            hx-target="#modal-container"
+                                            hx-swap="innerHTML"
+                                            class="text-blue-600 hover:text-blue-800 text-xs font-bold">Editar</button>
+                                    <form method="post" action="{% url 'discador:acesso_delete' acesso.pk %}" class="inline"
+                                          onsubmit="return confirm('Excluir este acesso? O ramal ficará Livre.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Excluir</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-10 text-center text-slate-400 text-sm">Nenhum acesso cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ========== ABA RAMAIS ========== #}
+    <div class="discador-tab-panel hidden" data-tab-panel="ramais">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Número</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Consome licença</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for ramal in ramais %}
+                        <tr class="hover:bg-blue-50 transition-colors">
+                            <td class="px-6 py-4 font-mono font-bold text-slate-900">{{ ramal.numero }}</td>
+                            <td class="px-6 py-4">
+                                {% if ramal.status == 'IN_USE' %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">{{ ramal.get_status_display }}</span>
+                                {% elif ramal.status == 'FREE' %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700">{{ ramal.get_status_display }}</span>
+                                {% else %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">{{ ramal.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-slate-600">{% if ramal.consome_licenca %}Sim{% else %}Não{% endif %}</td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="inline-flex items-center gap-2">
+                                    <button type="button"
+                                            hx-get="{% url 'discador:ramal_update' ramal.pk %}"
+                                            hx-target="#modal-container"
+                                            hx-swap="innerHTML"
+                                            class="text-blue-600 hover:text-blue-800 text-xs font-bold">Editar</button>
+                                    <form method="post" action="{% url 'discador:ramal_delete' ramal.pk %}" class="inline"
+                                          onsubmit="return confirm('Excluir o ramal {{ ramal.numero }}?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Excluir</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-10 text-center text-slate-400 text-sm">Nenhum ramal cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ========== ABA CAMPANHAS ========== #}
+    <div class="discador-tab-panel hidden" data-tab-panel="campanhas">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Nome</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Status</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for campanha in campanhas %}
+                        <tr class="hover:bg-blue-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">{{ campanha.nome }}</td>
+                            <td class="px-6 py-4">
+                                {% if campanha.is_active %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">Ativa</span>
+                                {% else %}
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">Inativa</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="inline-flex items-center gap-2">
+                                    <button type="button"
+                                            hx-get="{% url 'discador:campanha_update' campanha.pk %}"
+                                            hx-target="#modal-container"
+                                            hx-swap="innerHTML"
+                                            class="text-blue-600 hover:text-blue-800 text-xs font-bold">Editar</button>
+                                    <form method="post" action="{% url 'discador:campanha_delete' campanha.pk %}" class="inline"
+                                          onsubmit="return confirm('Excluir a campanha {{ campanha.nome }}?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Excluir</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="px-6 py-10 text-center text-slate-400 text-sm">Nenhuma campanha cadastrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ========== ABA CONTRATO ========== #}
+    <div class="discador-tab-panel hidden" data-tab-panel="contrato">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Contrato atual</h3>
+            <p class="text-sm text-slate-500 mb-4">{{ discador.nome }} · slug <span class="font-mono">{{ discador.slug }}</span></p>
+            <dl class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                    <dt class="text-xs font-bold text-slate-500 uppercase">Valor por licença</dt>
+                    <dd class="text-xl font-bold text-slate-900 mt-1">R$ {{ discador.valor_por_licenca }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-bold text-slate-500 uppercase">Licenças contratadas</dt>
+                    <dd class="text-xl font-bold text-slate-900 mt-1">{{ discador.licencas_contratadas }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-bold text-slate-500 uppercase">Disponíveis</dt>
+                    <dd class="text-xl font-bold text-slate-900 mt-1">{{ kpis.disponiveis }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100">
+                    <h4 class="font-bold text-slate-900 text-sm">Histórico do contrato</h4>
+                </div>
+                <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Data/Hora</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Licenças</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Valor</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Por</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for h in historico_contrato %}
+                            <tr>
+                                <td class="px-4 py-3 text-slate-600 text-xs">{{ h.timestamp|date:"d/m/Y H:i" }}</td>
+                                <td class="px-4 py-3 font-bold">{{ h.licencas_contratadas }}</td>
+                                <td class="px-4 py-3">R$ {{ h.valor_por_licenca }}</td>
+                                <td class="px-4 py-3 text-slate-500 text-xs">{% if h.registered_by %}{{ h.registered_by.get_full_name|default:h.registered_by.username }}{% else %}Sistema{% endif %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm">Sem histórico.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100">
+                    <h4 class="font-bold text-slate-900 text-sm">Histórico de atribuições de ramal</h4>
+                </div>
+                <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Data/Hora</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Ramal</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Ação</th>
+                                <th class="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Titular</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for h in historico_atribuicoes %}
+                            <tr>
+                                <td class="px-4 py-3 text-slate-600 text-xs">{{ h.timestamp|date:"d/m/Y H:i" }}</td>
+                                <td class="px-4 py-3 font-mono">{% if h.ramal %}{{ h.ramal.numero }}{% else %}{{ h.ramal_numero }}{% endif %}</td>
+                                <td class="px-4 py-3">{{ h.get_action_display }}</td>
+                                <td class="px-4 py-3 text-slate-600">{{ h.titular_nome|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm">Sem atribuições ainda.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        {% include "core/_audit_log_table.html" with registros=audit_logs titulo=audit_titulo %}
+    </div>
+</div>
+
+<script>
+(function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab') || 'acessos';
+    const tabBtns = document.querySelectorAll('.discador-tab-btn');
+    const tabPanels = document.querySelectorAll('.discador-tab-panel');
+    const actionGroups = document.querySelectorAll('[data-tab-actions]');
+
+    function showTab(tabId) {
+        tabBtns.forEach(function (btn) {
+            if (btn.dataset.tab === tabId) {
+                btn.classList.add('border-blue-600', 'text-blue-700');
+                btn.classList.remove('border-transparent', 'text-slate-500');
+            } else {
+                btn.classList.remove('border-blue-600', 'text-blue-700');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            }
+        });
+        tabPanels.forEach(function (panel) {
+            if (panel.dataset.tabPanel === tabId) {
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        });
+        actionGroups.forEach(function (group) {
+            if (group.dataset.tabActions === tabId) {
+                group.classList.remove('hidden');
+            } else {
+                group.classList.add('hidden');
+            }
+        });
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('tab', tabId);
+        window.history.replaceState({}, '', newUrl);
+    }
+
+    tabBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () { showTab(btn.dataset.tab); });
+    });
+    showTab(tab);
+})();
+</script>
+{% endblock %}

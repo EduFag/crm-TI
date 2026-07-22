@@ -1,0 +1,124 @@
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''"></div>
+
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full {{ modal_max_width|default:'max-w-2xl' }} max-h-[90vh] overflow-y-auto pointer-events-auto"
+         onclick="event.stopPropagation()">
+
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">{{ modal_title }}</h3>
+                {% if modal_subtitle %}
+                <p class="text-xs text-slate-500 mt-0.5">{{ modal_subtitle }}</p>
+                {% endif %}
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <form method="post"
+              action="{{ form_action }}"
+              hx-post="{{ form_action }}"
+              hx-target="#modal-container"
+              hx-swap="innerHTML"
+              class="p-6 space-y-5"
+              id="acesso-discador-form">
+            {% csrf_token %}
+
+            {% if form.errors %}
+            <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                <p class="font-semibold">Corrija os erros abaixo para continuar:</p>
+                <ul class="list-disc list-inside text-xs space-y-0.5">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                        <li><span class="font-medium">{{ field.label }}:</span> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">{{ form.tipo_titular.label }}</label>
+                {{ form.tipo_titular }}
+            </div>
+
+            <div id="campo-titular-nome">
+                <label for="{{ form.titular_nome.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.titular_nome.label }}</label>
+                {{ form.titular_nome }}
+            </div>
+
+            <div id="campo-titular-user" class="hidden">
+                <label for="{{ form.titular_user.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.titular_user.label }}</label>
+                {{ form.titular_user }}
+            </div>
+
+            <div>
+                <label for="{{ form.login_discador.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.login_discador.label }} <span class="text-red-500">*</span></label>
+                {{ form.login_discador }}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="{{ form.ramal.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.ramal.label }} <span class="text-red-500">*</span></label>
+                    {{ form.ramal }}
+                </div>
+                <div>
+                    <label for="{{ form.campanha.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.campanha.label }} <span class="text-red-500">*</span></label>
+                    {{ form.campanha }}
+                </div>
+            </div>
+
+            <div>
+                <label for="{{ form.tipo.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ form.tipo.label }} <span class="text-red-500">*</span></label>
+                {{ form.tipo }}
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
+                        class="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm">
+                    {{ modal_submit_label }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('acesso-discador-form');
+    if (!form) return;
+    const nomeBox = document.getElementById('campo-titular-nome');
+    const userBox = document.getElementById('campo-titular-user');
+    const radios = form.querySelectorAll('input[name="tipo_titular"]');
+
+    function syncTitular() {
+        let tipo = 'texto';
+        radios.forEach(function (r) { if (r.checked) tipo = r.value; });
+        if (tipo === 'usuario') {
+            nomeBox.classList.add('hidden');
+            userBox.classList.remove('hidden');
+        } else {
+            userBox.classList.add('hidden');
+            nomeBox.classList.remove('hidden');
+        }
+    }
+    radios.forEach(function (r) { r.addEventListener('change', syncTitular); });
+    syncTitular();
+})();
+</script>
+
+<style>
+    form ul { list-style: none; padding: 0; margin: 0.5rem 0 0 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    form ul li label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: #334155; font-weight: 500; cursor: pointer; }
+</style>

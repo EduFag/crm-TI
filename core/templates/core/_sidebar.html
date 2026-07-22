@@ -37,6 +37,16 @@
     </div>
     {% endif %}
 
+    {# Discadores #}
+    {% if 'discador' in modulos_permitidos %}
+    <div>
+        <p class="sidebar-category-header px-3 text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Discadores</p>
+        <div class="space-y-1">
+            {% include "core/_sidebar_items_discadores.html" %}
+        </div>
+    </div>
+    {% endif %}
+
     {# Administração #}
     {% if 'gestao_usuarios' in modulos_permitidos %}
     <div>

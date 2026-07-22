@@ -85,6 +85,7 @@ class RegistroAcao(models.Model):
         CHIPS = 'chips', 'Chips'
         EMAILS = 'emails', 'E-mails'
         EQUIPMENT = 'equipment', 'Equipamentos'
+        DISCADOR = 'discador', 'Discadores'
         CORE = 'core', 'Core'
 
     class AcaoChoices(models.TextChoices):
