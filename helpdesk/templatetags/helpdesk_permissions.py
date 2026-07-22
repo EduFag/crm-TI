@@ -42,7 +42,8 @@ def highlight_mentions(text):
     """Destaca @username no texto do comentário (HTML seguro)."""
     if not text:
         return ''
-    escaped = escape(text)
+    normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+    escaped = escape(normalized)
 
     def _repl(match):
         username = match.group(1)
@@ -53,4 +54,4 @@ def highlight_mentions(text):
 
     # reaplicamos no texto já escapado; padrão não contém HTML
     highlighted = MENTION_RE.sub(_repl, escaped)
-    return mark_safe(highlighted.replace('\n', '<br>'))
+    return mark_safe(highlighted)
