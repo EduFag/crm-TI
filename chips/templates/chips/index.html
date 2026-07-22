@@ -122,9 +122,16 @@
             </div>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <p class="text-sm text-slate-500">Gerencie chips do inventário, registre novos, transfira posse ou devolva à
                 TI. Ciclo de recarga: 90 dias.</p>
+            <button type="button" onclick="openColumnSelectorModal()"
+                class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 flex-shrink-0 self-end sm:self-auto">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2m0 10V7m6 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                </svg>
+                Selecionar colunas
+            </button>
         </div>
 
         <!-- Barra de Filtros -->
@@ -192,35 +199,35 @@
             <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Linha</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Operadora</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">E-mail</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Uso</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Envelope</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Funcionário</th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
-                            onclick="sortTable(6, 'data-activated')">
+                        <th data-col-key="linha" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Linha</th>
+                        <th data-col-key="operadora" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Operadora</th>
+                        <th data-col-key="email" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">E-mail</th>
+                        <th data-col-key="status" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Status</th>
+                        <th data-col-key="uso" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Uso</th>
+                        <th data-col-key="envelope" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Envelope</th>
+                        <th data-col-key="funcionario" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs">Funcionário</th>
+                        <th data-col-key="ativacao" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(7, 'data-activated')">
                             <span class="flex items-center gap-1">
                                 Data Ativação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
-                            onclick="sortTable(7, 'data-movement')">
+                        <th data-col-key="movimentacao" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(8, 'data-movement')">
                             <span class="flex items-center gap-1">
                                 Últ. Movimentação
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
-                            onclick="sortTable(8, 'data-recharge')">
+                        <th data-col-key="recarga" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs cursor-pointer hover:text-slate-700 select-none group"
+                            onclick="sortTable(9, 'data-recharge')">
                             <span class="flex items-center gap-1">
                                 Recarga
                                 <span class="sort-icon text-[9px] text-slate-400 group-hover:text-slate-600">↕</span>
                             </span>
                         </th>
-                        <th class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-left">Ações</th>
+                        <th data-col-key="acoes" class="px-6 py-4 font-semibold text-slate-500 uppercase text-xs text-left">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="chips-tbody" class="divide-y divide-slate-100">
@@ -231,9 +238,9 @@
                         data-recharge="{{ chip.recharge_due_at|date:'Y-m-d'|default:'' }}"
                         data-email="{{ chip.email_vinculado|yesno:'true,false' }}"
                         data-obs="{{ chip.observacao|yesno:'true,false' }}">
-                        <td class="px-6 py-4 font-mono font-bold text-slate-900 chip-linha">{{ chip.formatted_line_number }}</td>
-                        <td class="px-6 py-4 text-slate-800 chip-operadora">{{ chip.operator.name }}</td>
-                        <td class="px-6 py-4" id="email-td-{{ chip.id }}">
+                        <td data-col-key="linha" class="px-6 py-4 font-mono font-bold text-slate-900 chip-linha">{{ chip.formatted_line_number }}</td>
+                        <td data-col-key="operadora" class="px-6 py-4 text-slate-800 chip-operadora">{{ chip.operator.name }}</td>
+                        <td data-col-key="email" class="px-6 py-4" id="email-td-{{ chip.id }}">
                             {% if chip.email_vinculado %}
                             <div class="flex items-center gap-1">
                                 <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded">
@@ -246,24 +253,24 @@
                             </div>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4">
+                        <td data-col-key="status" class="px-6 py-4">
                             <span class="px-2.5 py-1 rounded text-xs font-bold
                                 {% if chip.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700
                                 {% elif chip.status == 'BLOCKED' %}bg-amber-100 text-amber-700
                                 {% elif chip.status == 'CANCELED' %}bg-red-100 text-red-700
                                 {% else %}bg-rose-100 text-rose-700{% endif %}">{{ chip.get_status_display }}</span>
                         </td>
-                        <td class="px-6 py-4">
+                        <td data-col-key="uso" class="px-6 py-4">
                             <span class="px-2.5 py-1 rounded text-xs font-bold
                                 {% if chip.usage_status == 'AVAILABLE' %}bg-slate-100 text-slate-700
                                 {% elif chip.usage_status == 'IN_USE' %}bg-blue-100 text-blue-700
                                 {% else %}bg-red-100 text-red-700{% endif %}">{{ chip.get_usage_status_display }}</span>
                         </td>
-                        <td class="px-6 py-4 text-slate-600 chip-envelope">{{ chip.batch.nome|default:"—" }}</td>
-                        <td class="px-6 py-4 font-medium text-slate-900 chip-funcionario">{{ chip.employee_name|default:"—" }}</td>
-                        <td class="px-6 py-4 text-slate-600">{{ chip.activated_at|date:"d/m/Y"|default:"—" }}</td>
-                        <td class="px-6 py-4 text-slate-600">{{ chip.last_movement_at|date:"d/m/Y"|default:"—" }}</td>
-                        <td class="px-6 py-4">
+                        <td data-col-key="envelope" class="px-6 py-4 text-slate-600 chip-envelope">{{ chip.batch.nome|default:"—" }}</td>
+                        <td data-col-key="funcionario" class="px-6 py-4 font-medium text-slate-900 chip-funcionario">{{ chip.employee_name|default:"—" }}</td>
+                        <td data-col-key="ativacao" class="px-6 py-4 text-slate-600">{{ chip.activated_at|date:"d/m/Y"|default:"—" }}</td>
+                        <td data-col-key="movimentacao" class="px-6 py-4 text-slate-600">{{ chip.last_movement_at|date:"d/m/Y"|default:"—" }}</td>
+                        <td data-col-key="recarga" class="px-6 py-4">
                             {% if chip.recharge_due_at %}
                             <div class="flex items-center gap-1.5">
                                 {% if chip.recharge_status == 'warning' %}
@@ -298,7 +305,7 @@
                             <span class="text-slate-400">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                        <td data-col-key="acoes" class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                             {% if chip.observacao %}
                             <button type="button" title="Observação"
                                 hx-get="{% url 'chips:chip_observation_modal' chip.id %}" hx-target="#modal-container"
@@ -370,7 +377,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td>
+                        <td id="chips-empty-td" colspan="11" class="p-6 text-center text-slate-400">Nenhum chip cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -746,6 +753,138 @@
             }
         }
     });
+
+    /* ---- Seleção de Colunas Visíveis ---- */
+    const CHIPS_COLUMNS = [
+        { key: 'linha', label: 'Linha' },
+        { key: 'operadora', label: 'Operadora' },
+        { key: 'email', label: 'E-mail' },
+        { key: 'status', label: 'Status' },
+        { key: 'uso', label: 'Uso' },
+        { key: 'envelope', label: 'Envelope' },
+        { key: 'funcionario', label: 'Funcionário' },
+        { key: 'ativacao', label: 'Data Ativação' },
+        { key: 'movimentacao', label: 'Últ. Movimentação' },
+        { key: 'recarga', label: 'Recarga' },
+        { key: 'acoes', label: 'Ações' }
+    ];
+
+    function getVisibleColumns() {
+        try {
+            const saved = localStorage.getItem('chips_visible_columns');
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch(e) {}
+        const def = {};
+        CHIPS_COLUMNS.forEach(function(c) { def[c.key] = true; });
+        return def;
+    }
+
+    function applyColumnVisibility() {
+        const visibleMap = getVisibleColumns();
+        let count = 0;
+        CHIPS_COLUMNS.forEach(function(col) {
+            const isVisible = visibleMap[col.key] !== false;
+            if (isVisible) count++;
+            $('[data-col-key="' + col.key + '"]').toggle(isVisible);
+        });
+        $('#chips-empty-td').attr('colspan', count || 1);
+    }
+    window.applyColumnVisibility = applyColumnVisibility;
+
+    function openColumnSelectorModal() {
+        const visibleMap = getVisibleColumns();
+        let optionsHtml = CHIPS_COLUMNS.map(function(col) {
+            const checked = visibleMap[col.key] !== false ? 'checked' : '';
+            return `
+                <label class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                    <span class="text-sm font-medium text-slate-700">${col.label}</span>
+                    <input type="checkbox" data-col-target="${col.key}" ${checked}
+                        class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                </label>
+            `;
+        }).join('');
+
+        const modalHtml = `
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40" onclick="closeColumnSelectorModal()"></div>
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto pointer-events-auto" onclick="event.stopPropagation()">
+                <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 tracking-tight">Selecionar Colunas Visíveis</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Escolha quais colunas deseja exibir na tabela de chips.</p>
+                    </div>
+                    <button type="button" onclick="closeColumnSelectorModal()" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-md shadow-sm border border-slate-200 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Colunas da Tabela</span>
+                        <div class="flex gap-3 text-xs">
+                            <button type="button" onclick="toggleAllColumns(true)" class="text-blue-600 hover:text-blue-800 font-semibold">Marcar todas</button>
+                            <span class="text-slate-300">|</span>
+                            <button type="button" onclick="toggleAllColumns(false)" class="text-slate-500 hover:text-slate-700 font-semibold">Desmarcar todas</button>
+                        </div>
+                    </div>
+                    <div class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                        ${optionsHtml}
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <button type="button" onclick="resetColumnSelector()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 underline">
+                        Restaurar Padrão
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeColumnSelectorModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">
+                            Cancelar
+                        </button>
+                        <button type="button" onclick="saveColumnSelector()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm">
+                            Aplicar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+
+        document.getElementById('modal-container').innerHTML = modalHtml;
+    }
+
+    function closeColumnSelectorModal() {
+        document.getElementById('modal-container').innerHTML = '';
+    }
+
+    function toggleAllColumns(select) {
+        $('#modal-container input[data-col-target]').prop('checked', select);
+    }
+
+    function resetColumnSelector() {
+        localStorage.removeItem('chips_visible_columns');
+        applyColumnVisibility();
+        closeColumnSelectorModal();
+    }
+
+    function saveColumnSelector() {
+        const visibleMap = {};
+        $('#modal-container input[data-col-target]').each(function() {
+            const key = $(this).attr('data-col-target');
+            visibleMap[key] = $(this).is(':checked');
+        });
+        localStorage.setItem('chips_visible_columns', JSON.stringify(visibleMap));
+        applyColumnVisibility();
+        closeColumnSelectorModal();
+    }
+
+    window.openColumnSelectorModal = openColumnSelectorModal;
+    window.closeColumnSelectorModal = closeColumnSelectorModal;
+    window.toggleAllColumns = toggleAllColumns;
+    window.resetColumnSelector = resetColumnSelector;
+    window.saveColumnSelector = saveColumnSelector;
+
+    // Apply saved column visibility on page load
+    applyColumnVisibility();
 });
 </script>
 {% endblock %}
