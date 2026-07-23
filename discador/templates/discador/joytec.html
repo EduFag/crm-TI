@@ -120,10 +120,14 @@
 
     {# ========== ABA DASHBOARD ========== #}
     <div class="discador-tab-panel hidden" data-tab-panel="dashboard">
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 w-full">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 w-full">
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Qtd. ramais</p>
                 <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.total_ramais }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Livres</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.livres }}</h3>
             </div>
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor por ramal</p>
@@ -137,7 +141,7 @@
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Acessos</p>
                 <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.total_acessos }}</h3>
             </div>
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Campanhas ativas</p>
                 <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.campanhas_ativas }}</h3>
             </div>
@@ -167,7 +171,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
             <div class="px-6 py-4 border-b border-slate-100">
                 <h4 class="font-bold text-slate-900 text-sm">Custos por campanha</h4>
-                <p class="text-xs text-slate-500 mt-0.5">Ramais associados × R$ {{ dashboard.valor_por_ramal }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">Ramais associados e livres × R$ {{ dashboard.valor_por_ramal }}</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm whitespace-nowrap">
@@ -233,7 +237,7 @@
                         <tr>
                             <td class="px-6 py-4"></td>
                             <td class="px-6 py-4 font-bold text-slate-900">Total alocado</td>
-                            <td class="px-6 py-4 font-bold text-slate-900">{{ dashboard.total_acessos }}</td>
+                            <td class="px-6 py-4 font-bold text-slate-900">{{ dashboard.qtd_alocada }}</td>
                             <td class="px-6 py-4"></td>
                             <td class="px-6 py-4 text-right font-bold text-slate-900">R$ {{ dashboard.valor_total }}</td>
                         </tr>
@@ -513,7 +517,7 @@
         </div>
     </div>
 
-    <div class="mt-8 mb-4">
+    <div id="discador-audit-section" class="mt-8 mb-4">
         {% include "core/_audit_log_table.html" with registros=audit_logs titulo=audit_titulo %}
     </div>
 </div>
@@ -527,10 +531,11 @@
     const tabPanels = document.querySelectorAll('.discador-tab-panel');
     const actionGroups = document.querySelectorAll('[data-tab-actions]');
     const kpisGlobais = document.getElementById('discador-kpis-globais');
+    const auditSection = document.getElementById('discador-audit-section');
     let chartsIniciados = false;
     const chartInstances = [];
 
-    const stackedColors = ['#2563eb', '#059669', '#d97706'];
+    const stackedColors = ['#2563eb', '#059669', '#d97706', '#64748b'];
 
     function initDashboardCharts() {
         if (chartsIniciados || typeof Chart === 'undefined') return;
@@ -691,6 +696,13 @@
                 requestAnimationFrame(function () { initDashboardCharts(); });
             } else {
                 kpisGlobais.classList.remove('hidden');
+            }
+        }
+        if (auditSection) {
+            if (tabId === 'dashboard') {
+                auditSection.classList.add('hidden');
+            } else {
+                auditSection.classList.remove('hidden');
             }
         }
         const newUrl = new URL(window.location.href);

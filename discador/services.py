@@ -68,16 +68,27 @@ def kpis_licencas(discador: Discador) -> dict:
 
 
 def dashboard_custos(discador: Discador) -> dict:
-    """Agrega custos: qtd de ramais (acessos) × valor_por_licenca, por campanha e tipo."""
+    """Agrega custos: qtd de ramais (acessos + livres) × valor_por_licenca, por campanha e tipo."""
     valor = discador.valor_por_licenca or Decimal('0.00')
-    total_ramais = Ramal.objects.filter(discador=discador).count()
+    ramais_qs = Ramal.objects.filter(discador=discador)
+    total_ramais = ramais_qs.count()
+    em_uso = ramais_qs.filter(status=Ramal.StatusChoices.IN_USE).count()
+    livres = ramais_qs.filter(status=Ramal.StatusChoices.FREE).count()
     total_acessos = AcessoDiscador.objects.filter(discador=discador).count()
     campanhas_ativas = Campanha.objects.filter(discador=discador, is_active=True).count()
+
+    # Livres sem acesso (consomem licença mas não estão em campanha)
+    livres_sem_acesso = ramais_qs.filter(
+        status=Ramal.StatusChoices.FREE,
+        acesso__isnull=True,
+    ).count()
+    # Livres com acesso já entram no rateio por campanha/tipo
+    livres_com_acesso = livres - livres_sem_acesso
 
     tipo_labels = dict(AcessoDiscador.TipoChoices.choices)
     tipos_ordem = [c[0] for c in AcessoDiscador.TipoChoices.choices]
 
-    # Contagem global por tipo
+    # Contagem global por tipo (só acessos vinculados)
     por_tipo_global = {
         row['tipo']: row['qtd']
         for row in (
@@ -95,6 +106,15 @@ def dashboard_custos(discador: Discador) -> dict:
             'qtd': qtd,
             'gasto': valor * qtd,
             'gasto_float': float(valor * qtd),
+        })
+    # Linha sintética: livres sem campanha
+    if livres_sem_acesso:
+        tipos_globais.append({
+            'tipo': 'LIVRE',
+            'label': 'Livre (sem campanha)',
+            'qtd': livres_sem_acesso,
+            'gasto': valor * livres_sem_acesso,
+            'gasto_float': float(valor * livres_sem_acesso),
         })
 
     # Contagem por campanha + tipo
@@ -137,20 +157,43 @@ def dashboard_custos(discador: Discador) -> dict:
             'gasto': valor * qtd_total,
             'gasto_float': float(valor * qtd_total),
             'tipos': tipos_detalhe,
+            'is_livres': False,
+        })
+
+    # Bloco "Livres" para ramais livres sem acesso (custo sem campanha)
+    if livres_sem_acesso:
+        campanhas.append({
+            'id': 'livres',
+            'nome': 'Livres (sem campanha)',
+            'is_active': True,
+            'qtd_ramais': livres_sem_acesso,
+            'gasto': valor * livres_sem_acesso,
+            'gasto_float': float(valor * livres_sem_acesso),
+            'tipos': [{
+                'tipo': 'LIVRE',
+                'label': 'Livre',
+                'qtd': livres_sem_acesso,
+                'gasto': valor * livres_sem_acesso,
+                'gasto_float': float(valor * livres_sem_acesso),
+            }],
+            'is_livres': True,
         })
 
     # Ordena campanhas com gasto primeiro, depois por nome
     campanhas.sort(key=lambda c: (-c['qtd_ramais'], c['nome'].lower()))
 
-    valor_total = valor * total_acessos
+    # Total = acessos alocados + livres sem acesso
+    qtd_alocada = total_acessos + livres_sem_acesso
+    valor_total = valor * qtd_alocada
 
+    campanhas_com_gasto = [c for c in campanhas if c['qtd_ramais'] > 0]
     charts = {
-        'campanhas_labels': [c['nome'] for c in campanhas if c['qtd_ramais'] > 0],
-        'campanhas_gastos': [c['gasto_float'] for c in campanhas if c['qtd_ramais'] > 0],
+        'campanhas_labels': [c['nome'] for c in campanhas_com_gasto],
+        'campanhas_gastos': [c['gasto_float'] for c in campanhas_com_gasto],
         'tipos_labels': [t['label'] for t in tipos_globais],
         'tipos_gastos': [t['gasto_float'] for t in tipos_globais],
         'tipos_qtds': [t['qtd'] for t in tipos_globais],
-        'stacked_labels': [c['nome'] for c in campanhas if c['qtd_ramais'] > 0],
+        'stacked_labels': [c['nome'] for c in campanhas_com_gasto],
         'stacked_datasets': [
             {
                 'label': tipo_labels[tipo],
@@ -159,18 +202,31 @@ def dashboard_custos(discador: Discador) -> dict:
                         (t['qtd'] for t in c['tipos'] if t['tipo'] == tipo),
                         0,
                     ))
-                    for c in campanhas
-                    if c['qtd_ramais'] > 0
+                    for c in campanhas_com_gasto
                 ],
             }
             for tipo in tipos_ordem
         ],
     }
+    # Série empilhada extra para livres sem campanha
+    if livres_sem_acesso:
+        charts['stacked_datasets'].append({
+            'label': 'Livre (sem campanha)',
+            'data': [
+                float(valor * livres_sem_acesso) if c.get('is_livres') else 0.0
+                for c in campanhas_com_gasto
+            ],
+        })
 
     return {
         'total_ramais': total_ramais,
+        'em_uso': em_uso,
+        'livres': livres,
+        'livres_sem_acesso': livres_sem_acesso,
+        'livres_com_acesso': livres_com_acesso,
         'valor_por_ramal': valor,
         'valor_total': valor_total,
+        'qtd_alocada': qtd_alocada,
         'total_acessos': total_acessos,
         'campanhas_ativas': campanhas_ativas,
         'campanhas': campanhas,
