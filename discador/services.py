@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Count
 
 from discador.models import (
     AcessoDiscador,
@@ -63,6 +64,118 @@ def kpis_licencas(discador: Discador) -> dict:
         'custo_mensal': discador.valor_por_licenca * contratadas,
         'estourado': consumidas > contratadas,
         'no_limite': consumidas >= contratadas,
+    }
+
+
+def dashboard_custos(discador: Discador) -> dict:
+    """Agrega custos: qtd de ramais (acessos) × valor_por_licenca, por campanha e tipo."""
+    valor = discador.valor_por_licenca or Decimal('0.00')
+    total_ramais = Ramal.objects.filter(discador=discador).count()
+    total_acessos = AcessoDiscador.objects.filter(discador=discador).count()
+    campanhas_ativas = Campanha.objects.filter(discador=discador, is_active=True).count()
+
+    tipo_labels = dict(AcessoDiscador.TipoChoices.choices)
+    tipos_ordem = [c[0] for c in AcessoDiscador.TipoChoices.choices]
+
+    # Contagem global por tipo
+    por_tipo_global = {
+        row['tipo']: row['qtd']
+        for row in (
+            AcessoDiscador.objects.filter(discador=discador)
+            .values('tipo')
+            .annotate(qtd=Count('id'))
+        )
+    }
+    tipos_globais = []
+    for tipo in tipos_ordem:
+        qtd = por_tipo_global.get(tipo, 0)
+        tipos_globais.append({
+            'tipo': tipo,
+            'label': tipo_labels.get(tipo, tipo),
+            'qtd': qtd,
+            'gasto': valor * qtd,
+            'gasto_float': float(valor * qtd),
+        })
+
+    # Contagem por campanha + tipo
+    por_campanha_tipo = {}
+    for row in (
+        AcessoDiscador.objects.filter(discador=discador)
+        .values('campanha_id', 'campanha__nome', 'tipo')
+        .annotate(qtd=Count('id'))
+    ):
+        cid = row['campanha_id']
+        if cid not in por_campanha_tipo:
+            por_campanha_tipo[cid] = {
+                'nome': row['campanha__nome'],
+                'tipos': {},
+            }
+        por_campanha_tipo[cid]['tipos'][row['tipo']] = row['qtd']
+
+    # Inclui campanhas sem acessos (gasto zero) para visão completa
+    campanhas_qs = Campanha.objects.filter(discador=discador).order_by('nome')
+    campanhas = []
+    for campanha in campanhas_qs:
+        info = por_campanha_tipo.get(campanha.pk, {'nome': campanha.nome, 'tipos': {}})
+        tipos_detalhe = []
+        qtd_total = 0
+        for tipo in tipos_ordem:
+            qtd = info['tipos'].get(tipo, 0)
+            qtd_total += qtd
+            tipos_detalhe.append({
+                'tipo': tipo,
+                'label': tipo_labels.get(tipo, tipo),
+                'qtd': qtd,
+                'gasto': valor * qtd,
+                'gasto_float': float(valor * qtd),
+            })
+        campanhas.append({
+            'id': campanha.pk,
+            'nome': campanha.nome,
+            'is_active': campanha.is_active,
+            'qtd_ramais': qtd_total,
+            'gasto': valor * qtd_total,
+            'gasto_float': float(valor * qtd_total),
+            'tipos': tipos_detalhe,
+        })
+
+    # Ordena campanhas com gasto primeiro, depois por nome
+    campanhas.sort(key=lambda c: (-c['qtd_ramais'], c['nome'].lower()))
+
+    valor_total = valor * total_acessos
+
+    charts = {
+        'campanhas_labels': [c['nome'] for c in campanhas if c['qtd_ramais'] > 0],
+        'campanhas_gastos': [c['gasto_float'] for c in campanhas if c['qtd_ramais'] > 0],
+        'tipos_labels': [t['label'] for t in tipos_globais],
+        'tipos_gastos': [t['gasto_float'] for t in tipos_globais],
+        'tipos_qtds': [t['qtd'] for t in tipos_globais],
+        'stacked_labels': [c['nome'] for c in campanhas if c['qtd_ramais'] > 0],
+        'stacked_datasets': [
+            {
+                'label': tipo_labels[tipo],
+                'data': [
+                    float(valor * next(
+                        (t['qtd'] for t in c['tipos'] if t['tipo'] == tipo),
+                        0,
+                    ))
+                    for c in campanhas
+                    if c['qtd_ramais'] > 0
+                ],
+            }
+            for tipo in tipos_ordem
+        ],
+    }
+
+    return {
+        'total_ramais': total_ramais,
+        'valor_por_ramal': valor,
+        'valor_total': valor_total,
+        'total_acessos': total_acessos,
+        'campanhas_ativas': campanhas_ativas,
+        'campanhas': campanhas,
+        'tipos_globais': tipos_globais,
+        'charts': charts,
     }
 
 

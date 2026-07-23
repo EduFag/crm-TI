@@ -59,41 +59,47 @@
     </div>
     {% endif %}
 
-    {# KPIs de licenças (sempre visíveis) #}
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 w-full">
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contratadas</p>
-            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.contratadas }}</h3>
+    {# KPIs de licenças — ocultos na aba Dashboard #}
+    <div id="discador-kpis-globais">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 w-full">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contratadas</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ kpis.contratadas }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 {% if kpis.no_limite %}border-l-amber-500{% else %}border-l-indigo-500{% endif %}">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Consumidas</p>
+                <h3 class="text-2xl font-bold {% if kpis.estourado %}text-red-600{% else %}text-slate-900{% endif %}">{{ kpis.consumidas }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Em uso</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ kpis.em_uso }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Livres</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ kpis.livres }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Não config.</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ kpis.nao_configurados }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-violet-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Custo mensal</p>
+                <h3 class="text-xl font-bold text-slate-900">R$ {{ kpis.custo_mensal }}</h3>
+            </div>
         </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 {% if kpis.no_limite %}border-l-amber-500{% else %}border-l-indigo-500{% endif %}">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Consumidas</p>
-            <h3 class="text-2xl font-bold {% if kpis.estourado %}text-red-600{% else %}text-slate-900{% endif %}">{{ kpis.consumidas }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Em uso</p>
-            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.em_uso }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Livres</p>
-            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.livres }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Não config.</p>
-            <h3 class="text-2xl font-bold text-slate-900">{{ kpis.nao_configurados }}</h3>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-violet-500">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Custo mensal</p>
-            <h3 class="text-xl font-bold text-slate-900">R$ {{ kpis.custo_mensal }}</h3>
-        </div>
-    </div>
 
-    {% if kpis.no_limite %}
-    <div class="mb-6 px-4 py-3 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200">
-        Limite de licenças atingido ({{ kpis.consumidas }}/{{ kpis.contratadas }}). Novos ramais Em uso/Livre serão bloqueados até liberar ou aumentar o contrato.
+        {% if kpis.no_limite %}
+        <div class="mb-6 px-4 py-3 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200">
+            Limite de licenças atingido ({{ kpis.consumidas }}/{{ kpis.contratadas }}). Novos ramais Em uso/Livre serão bloqueados até liberar ou aumentar o contrato.
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
 
     <nav class="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6" id="discador-tabs-nav" role="tablist">
+        <button type="button" role="tab" data-tab="dashboard"
+                class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            Dashboard
+        </button>
         <button type="button" role="tab" data-tab="acessos"
                 class="discador-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-800">
             Acessos
@@ -111,6 +117,133 @@
             Contrato / Licenças
         </button>
     </nav>
+
+    {# ========== ABA DASHBOARD ========== #}
+    <div class="discador-tab-panel hidden" data-tab-panel="dashboard">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 w-full">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Qtd. ramais</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.total_ramais }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor por ramal</p>
+                <h3 class="text-xl font-bold text-slate-900">R$ {{ dashboard.valor_por_ramal }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-violet-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor total</p>
+                <h3 class="text-xl font-bold text-slate-900">R$ {{ dashboard.valor_total }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Acessos</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.total_acessos }}</h3>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Campanhas ativas</p>
+                <h3 class="text-2xl font-bold text-slate-900">{{ dashboard.campanhas_ativas }}</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h4 class="font-bold text-slate-900 text-sm mb-4">Gasto por campanha</h4>
+                <div class="relative h-64">
+                    <canvas id="chart-gasto-campanha" aria-label="Gráfico de gasto por campanha"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h4 class="font-bold text-slate-900 text-sm mb-4">Distribuição por tipo</h4>
+                <div class="relative h-64">
+                    <canvas id="chart-gasto-tipo" aria-label="Gráfico de distribuição por tipo"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:col-span-2">
+                <h4 class="font-bold text-slate-900 text-sm mb-4">Gasto por campanha e tipo</h4>
+                <div class="relative h-72">
+                    <canvas id="chart-gasto-campanha-tipo" aria-label="Gráfico empilhado por campanha e tipo"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h4 class="font-bold text-slate-900 text-sm">Custos por campanha</h4>
+                <p class="text-xs text-slate-500 mt-0.5">Ramais associados × R$ {{ dashboard.valor_por_ramal }}</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs w-8"></th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Campanha</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Ramais</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Valor unitário</th>
+                            <th class="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for camp in dashboard.campanhas %}
+                        <tr class="hover:bg-blue-50 transition-colors cursor-pointer dashboard-camp-row"
+                            data-camp-toggle="camp-{{ camp.id }}"
+                            role="button"
+                            tabindex="0"
+                            aria-expanded="false">
+                            <td class="px-6 py-4 text-slate-400 text-xs">
+                                <span class="dashboard-camp-chevron inline-block transition-transform">▸</span>
+                            </td>
+                            <td class="px-6 py-4 font-bold text-slate-900">
+                                {{ camp.nome }}
+                                {% if not camp.is_active %}
+                                <span class="ml-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Inativa</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-slate-700">{{ camp.qtd_ramais }}</td>
+                            <td class="px-6 py-4 text-slate-600">R$ {{ dashboard.valor_por_ramal }}</td>
+                            <td class="px-6 py-4 text-right font-bold text-slate-900">R$ {{ camp.gasto }}</td>
+                        </tr>
+                        <tr id="camp-{{ camp.id }}" class="hidden bg-slate-50">
+                            <td colspan="5" class="px-6 py-3">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr>
+                                            <th class="py-2 pr-4 text-left text-xs font-bold text-slate-500 uppercase">Tipo</th>
+                                            <th class="py-2 pr-4 text-left text-xs font-bold text-slate-500 uppercase">Ramais</th>
+                                            <th class="py-2 text-right text-xs font-bold text-slate-500 uppercase">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for t in camp.tipos %}
+                                        <tr>
+                                            <td class="py-1.5 pr-4 text-slate-700">{{ t.label }}</td>
+                                            <td class="py-1.5 pr-4 text-slate-600">{{ t.qtd }}</td>
+                                            <td class="py-1.5 text-right text-slate-800 font-medium">R$ {{ t.gasto }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-10 text-center text-slate-400 text-sm">Nenhuma campanha cadastrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if dashboard.campanhas %}
+                    <tfoot class="bg-slate-50 border-t border-slate-200">
+                        <tr>
+                            <td class="px-6 py-4"></td>
+                            <td class="px-6 py-4 font-bold text-slate-900">Total alocado</td>
+                            <td class="px-6 py-4 font-bold text-slate-900">{{ dashboard.total_acessos }}</td>
+                            <td class="px-6 py-4"></td>
+                            <td class="px-6 py-4 text-right font-bold text-slate-900">R$ {{ dashboard.valor_total }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        {{ dashboard.charts|json_script:"dashboard-charts-data" }}
+    </div>
 
     {# ========== ABA ACESSOS ========== #}
     <div class="discador-tab-panel hidden" data-tab-panel="acessos">
@@ -385,6 +518,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 (function () {
     const urlParams = new URLSearchParams(window.location.search);
@@ -392,6 +526,139 @@
     const tabBtns = document.querySelectorAll('.discador-tab-btn');
     const tabPanels = document.querySelectorAll('.discador-tab-panel');
     const actionGroups = document.querySelectorAll('[data-tab-actions]');
+    const kpisGlobais = document.getElementById('discador-kpis-globais');
+    let chartsIniciados = false;
+    const chartInstances = [];
+
+    const stackedColors = ['#2563eb', '#059669', '#d97706'];
+
+    function initDashboardCharts() {
+        if (chartsIniciados || typeof Chart === 'undefined') return;
+        const dataEl = document.getElementById('dashboard-charts-data');
+        if (!dataEl) return;
+        let data;
+        try {
+            data = JSON.parse(dataEl.textContent);
+        } catch (e) {
+            return;
+        }
+        chartsIniciados = true;
+
+        const fmtBRL = function (v) {
+            return 'R$ ' + Number(v).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        };
+
+        const elCamp = document.getElementById('chart-gasto-campanha');
+        if (elCamp) {
+            chartInstances.push(new Chart(elCamp, {
+                type: 'bar',
+                data: {
+                    labels: data.campanhas_labels || [],
+                    datasets: [{
+                        label: 'Gasto (R$)',
+                        data: data.campanhas_gastos || [],
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) { return fmtBRL(ctx.raw); },
+                            },
+                        },
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (v) { return fmtBRL(v); },
+                            },
+                        },
+                    },
+                },
+            }));
+        }
+
+        const elTipo = document.getElementById('chart-gasto-tipo');
+        if (elTipo) {
+            chartInstances.push(new Chart(elTipo, {
+                type: 'doughnut',
+                data: {
+                    labels: data.tipos_labels || [],
+                    datasets: [{
+                        data: data.tipos_gastos || [],
+                        backgroundColor: stackedColors,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    const qtd = (data.tipos_qtds || [])[ctx.dataIndex] || 0;
+                                    return ctx.label + ': ' + fmtBRL(ctx.raw) + ' (' + qtd + ' ramais)';
+                                },
+                            },
+                        },
+                    },
+                },
+            }));
+        }
+
+        const elStack = document.getElementById('chart-gasto-campanha-tipo');
+        if (elStack) {
+            const datasets = (data.stacked_datasets || []).map(function (ds, i) {
+                return {
+                    label: ds.label,
+                    data: ds.data,
+                    backgroundColor: stackedColors[i % stackedColors.length],
+                    borderRadius: 4,
+                };
+            });
+            chartInstances.push(new Chart(elStack, {
+                type: 'bar',
+                data: {
+                    labels: data.stacked_labels || [],
+                    datasets: datasets,
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.dataset.label + ': ' + fmtBRL(ctx.raw);
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (v) { return fmtBRL(v); },
+                            },
+                        },
+                    },
+                },
+            }));
+        }
+    }
 
     function showTab(tabId) {
         tabBtns.forEach(function (btn) {
@@ -417,6 +684,15 @@
                 group.classList.add('hidden');
             }
         });
+        if (kpisGlobais) {
+            if (tabId === 'dashboard') {
+                kpisGlobais.classList.add('hidden');
+                // Charts precisam do canvas visível para medir tamanho
+                requestAnimationFrame(function () { initDashboardCharts(); });
+            } else {
+                kpisGlobais.classList.remove('hidden');
+            }
+        }
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.set('tab', tabId);
         window.history.replaceState({}, '', newUrl);
@@ -425,6 +701,30 @@
     tabBtns.forEach(function (btn) {
         btn.addEventListener('click', function () { showTab(btn.dataset.tab); });
     });
+
+    // Expande/recolhe detalhe por tipo na tabela do dashboard
+    document.querySelectorAll('.dashboard-camp-row').forEach(function (row) {
+        function toggle() {
+            const id = row.getAttribute('data-camp-toggle');
+            const detail = document.getElementById(id);
+            if (!detail) return;
+            const aberto = !detail.classList.contains('hidden');
+            detail.classList.toggle('hidden', aberto);
+            row.setAttribute('aria-expanded', aberto ? 'false' : 'true');
+            const chevron = row.querySelector('.dashboard-camp-chevron');
+            if (chevron) {
+                chevron.style.transform = aberto ? '' : 'rotate(90deg)';
+            }
+        }
+        row.addEventListener('click', toggle);
+        row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggle();
+            }
+        });
+    });
+
     showTab(tab);
 })();
 </script>

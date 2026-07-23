@@ -29,6 +29,7 @@ from discador.services import (
     criar_acesso,
     criar_campanha,
     criar_ramal,
+    dashboard_custos,
     excluir_acesso,
     excluir_campanha,
     excluir_ramal,
@@ -48,7 +49,7 @@ class _DiscadorMixin(ModuloObrigatorioMixin):
 
 
 class JoyTecDashboardView(_DiscadorMixin, TemplateView):
-    """Página JoyTec com abas: Acessos, Ramais, Campanhas, Contrato."""
+    """Página JoyTec com abas: Dashboard, Acessos, Ramais, Campanhas, Contrato."""
 
     template_name = 'discador/joytec.html'
 
@@ -57,6 +58,7 @@ class JoyTecDashboardView(_DiscadorMixin, TemplateView):
         discador = get_or_create_joytec()
         context['discador'] = discador
         context['kpis'] = kpis_licencas(discador)
+        context['dashboard'] = dashboard_custos(discador)
 
         acessos = (
             AcessoDiscador.objects.filter(discador=discador)
