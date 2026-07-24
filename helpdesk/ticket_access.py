@@ -260,14 +260,27 @@ def usuario_pode_refresh_assistente(user) -> bool:
     return usuario_pode_gerenciar_comentarios(user)
 
 
+def usuario_pode_ver_comentarios_internos(user) -> bool:
+    """Histórico interno: staff, superuser ou operador TI."""
+    return usuario_pode_gerenciar_comentarios(user)
+
+
+def filtrar_comentarios_visiveis(queryset, user):
+    """Remove mensagens internas do queryset se o usuário não puder vê-las."""
+    if usuario_pode_ver_comentarios_internos(user):
+        return queryset
+    return queryset.filter(is_interno=False)
+
+
 def ticket_sem_mensagem_assistente_ativa(ticket) -> bool:
-    """True se não há comentário ativo do Assistente no histórico visível."""
+    """True se não há comentário público ativo do Assistente."""
     from helpdesk.models import Comment
 
     return not Comment.objects.filter(
         ticket=ticket,
         is_active=True,
         is_assistente=True,
+        is_interno=False,
     ).exists()
 
 

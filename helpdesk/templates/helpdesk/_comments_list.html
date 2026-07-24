@@ -43,13 +43,16 @@
 {% for comment in comments %}
 {% if not comment.is_assistente and comment.author_id == request.user.id %}
 <div class="flex gap-3 flex-row-reverse" id="comment-{{ comment.id }}">
-    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
+    <div class="w-8 h-8 rounded-full {% if comment.is_interno %}bg-amber-600{% else %}bg-blue-600{% endif %} text-white flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
         {{ comment.author.username|make_list|first|upper|default:"S" }}
     </div>
-    <div class="max-w-[85%] bg-blue-50 border border-blue-100 shadow-sm p-3 rounded-lg rounded-tr-none">
+    <div class="max-w-[85%] {% if comment.is_interno %}bg-amber-50 border border-amber-200{% else %}bg-blue-50 border border-blue-100{% endif %} shadow-sm p-3 rounded-lg rounded-tr-none">
         <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="text-xs font-bold text-blue-800 truncate">
+            <span class="text-xs font-bold {% if comment.is_interno %}text-amber-900{% else %}text-blue-800{% endif %} truncate flex items-center gap-1.5">
                 {{ comment.author.get_full_name|default:comment.author.username|default:"Você" }}
+                {% if comment.is_interno %}
+                <span class="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">Interno</span>
+                {% endif %}
             </span>
             <div class="flex items-center gap-1 shrink-0">
                 <span class="text-[10px] text-blue-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
@@ -119,13 +122,16 @@
 </div>
 {% else %}
 <div class="flex gap-3" id="comment-{{ comment.id }}">
-    <div class="w-8 h-8 rounded-full {% if comment.is_assistente %}bg-violet-100 text-violet-700{% else %}bg-blue-100 text-blue-600{% endif %} flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
+    <div class="w-8 h-8 rounded-full {% if comment.is_interno %}bg-amber-100 text-amber-800{% elif comment.is_assistente %}bg-violet-100 text-violet-700{% else %}bg-blue-100 text-blue-600{% endif %} flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
         {% if comment.is_assistente %}A{% else %}{{ comment.author.username|make_list|first|upper|default:"S" }}{% endif %}
     </div>
-    <div class="max-w-[85%] bg-white border border-slate-100 shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_assistente %}border-violet-100{% endif %}">
+    <div class="max-w-[85%] shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_interno %}bg-amber-50 border border-amber-200{% elif comment.is_assistente %}bg-white border border-violet-100{% else %}bg-white border border-slate-100{% endif %}">
         <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="text-xs font-bold text-slate-800 truncate">
+            <span class="text-xs font-bold {% if comment.is_interno %}text-amber-900{% else %}text-slate-800{% endif %} truncate flex items-center gap-1.5">
                 {% if comment.is_assistente %}Assistente{% else %}{{ comment.author.get_full_name|default:comment.author.username|default:"Sistema" }}{% endif %}
+                {% if comment.is_interno %}
+                <span class="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">Interno</span>
+                {% endif %}
             </span>
             <div class="flex items-center gap-1 shrink-0">
                 <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>

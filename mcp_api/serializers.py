@@ -70,6 +70,7 @@ def serialize_comment(comment):
         'ticket_id': comment.ticket_id,
         'author': author,
         'is_assistente': comment.is_assistente,
+        'is_interno': bool(getattr(comment, 'is_interno', False)),
         'text': comment.text,
         'has_attachment': bool(comment.attachment),
         'is_active': comment.is_active,

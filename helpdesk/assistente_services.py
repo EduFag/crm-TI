@@ -37,6 +37,22 @@ def ticket_assumido_pela_ti(ticket: Ticket) -> bool:
     return usuario_eh_operador_helpdesk(ticket.assigned_to)
 
 
+def ticket_tem_orientacao_interna_pendente(ticket: Ticket) -> bool:
+    """
+    Último comentário ativo é interno de humano (TI/staff).
+    Nesse caso o Assistente deve ler e agir mesmo se já tiver escalado.
+    """
+    ultimo = (
+        Comment.objects.filter(ticket=ticket, is_active=True)
+        .order_by('-created_at')
+        .only('is_interno', 'is_assistente', 'author_id')
+        .first()
+    )
+    if not ultimo:
+        return False
+    return bool(ultimo.is_interno and not ultimo.is_assistente and ultimo.author_id)
+
+
 def assistente_motivo_bloqueio(ticket: Ticket) -> str | None:
     """Retorna o motivo se o Assistente não pode atuar; None se pode."""
     from integracoes.models import AssistenteConfig
@@ -48,9 +64,11 @@ def assistente_motivo_bloqueio(ticket: Ticket) -> str | None:
         return 'ticket_inativo_ou_arquivado'
     if ticket.status == Ticket.StatusChoices.RESOLVED:
         return 'ticket_resolvido'
-    if ticket.assistente_escalado:
+    # Orientação interna da TI libera atuação mesmo após escalar/assumir
+    orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
+    if ticket.assistente_escalado and not orientacao_interna:
         return 'assistente_escalado'
-    if ticket_assumido_pela_ti(ticket):
+    if ticket_assumido_pela_ti(ticket) and not orientacao_interna:
         return 'assumido_pela_ti'
     # Bloqueia só chamado interno: solicitante vinculado é operador TI
     if ticket.requester_user_id and usuario_eh_operador_helpdesk(ticket.requester_user):
@@ -191,19 +209,31 @@ def _notificar_comentario_assistente(ticket: Ticket, texto: str) -> None:
         pass
 
 
-def send_assistente_message(ticket_id: int, text: str) -> dict:
-    # Remove pensamento/meta da IA antes de gravar no chamado
-    texto = limpar_texto_para_solicitante(text)
+def send_assistente_message(ticket_id: int, text: str, *, interno: bool = False) -> dict:
+    interno = bool(interno)
+    # Interna à TI: não aplicar limpeza agressiva (pode ser orientação técnica)
+    if interno:
+        texto = (text or '').strip()
+    else:
+        texto = limpar_texto_para_solicitante(text)
     if not texto:
         raise AssistenteServiceError(
-            'Texto do comentário é obrigatório '
-            '(após remover raciocínio interno não restou mensagem ao solicitante).'
+            'Texto do comentário é obrigatório'
+            + (
+                '.'
+                if interno
+                else ' (após remover raciocínio interno não restou mensagem ao solicitante).'
+            )
         )
     ticket = Ticket.objects.filter(pk=ticket_id).first()
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
 
     pedacos = _partir_texto_assistente(texto)
+    # Mensagem interna: uma bolha só (orientação à TI)
+    if interno and len(pedacos) > 1:
+        pedacos = ['\n\n'.join(pedacos)]
+
     comment_ids: list[int] = []
     for pedaco in pedacos:
         comment = Comment.objects.create(
@@ -211,13 +241,31 @@ def send_assistente_message(ticket_id: int, text: str) -> dict:
             author=None,
             text=pedaco,
             is_assistente=True,
+            is_interno=interno,
         )
         comment_ids.append(comment.pk)
 
     ticket.updated_at = timezone.now()
     ticket.save(update_fields=['updated_at'])
-    # Uma notificação por lote (evita spam se partiu em várias bolhas)
-    _notificar_comentario_assistente(ticket, pedacos[0] if pedacos else texto)
+    # Pública: notifica solicitante; interna: só badge para TI (sem push ao solicitante)
+    if not interno:
+        _notificar_comentario_assistente(ticket, pedacos[0] if pedacos else texto)
+    else:
+        try:
+            from helpdesk.audit import log_comentario
+            log_comentario(
+                ticket,
+                None,
+                (pedacos[0] if pedacos else texto)[:120],
+                metadata={'is_assistente': True, 'is_interno': True},
+            )
+        except Exception:
+            pass
+        try:
+            from helpdesk.views.kanban import adicionar_nao_lido_operadores
+            adicionar_nao_lido_operadores(ticket, None)
+        except Exception:
+            pass
 
     return {
         'ok': True,
@@ -226,6 +274,7 @@ def send_assistente_message(ticket_id: int, text: str) -> dict:
         'ticket_id': ticket.pk,
         'text': pedacos[0] if len(pedacos) == 1 else '\n\n'.join(pedacos),
         'bolhas': len(pedacos),
+        'is_interno': interno,
     }
 
 

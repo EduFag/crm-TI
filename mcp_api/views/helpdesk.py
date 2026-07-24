@@ -119,7 +119,13 @@ def list_ticket_comments(request, pk):
 @requer_token_mcp
 def post_assistente_comentario(request, pk):
     data = _json_body(request)
-    return _service_response(send_assistente_message, pk, data.get('text', ''))
+    interno = bool(data.get('interno') or data.get('is_interno'))
+    return _service_response(
+        send_assistente_message,
+        pk,
+        data.get('text', ''),
+        interno=interno,
+    )
 
 
 @csrf_exempt

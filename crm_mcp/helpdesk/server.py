@@ -49,12 +49,12 @@ def list_ticket_comments(ticket_id: int, limit: int = 50) -> str:
 
 
 @mcp.tool()
-def send_assistente_message(ticket_id: int, text: str) -> str:
-    """Envia mensagem no chamado como Assistente de IA."""
+def send_assistente_message(ticket_id: int, text: str, interno: bool = False) -> str:
+    """Envia mensagem no chamado como Assistente. interno=True: só TI vê."""
     try:
         return get_client().post_text(
             f'tickets/{ticket_id}/assistente/comentarios/',
-            {'text': text},
+            {'text': text, 'interno': bool(interno)},
         )
     except CrmTiApiError as exc:
         return f'Erro: {exc}'

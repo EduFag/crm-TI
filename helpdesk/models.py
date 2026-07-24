@@ -340,6 +340,13 @@ class Comment(models.Model):
         default=False,
         help_text='Comentário gerado pelo Assistente de IA.',
     )
+    is_interno = models.BooleanField(
+        default=False,
+        help_text=(
+            'Mensagem interna: visível só para TI/staff/superuser e para o Assistente. '
+            'Solicitante/criador comum não vê.'
+        ),
+    )
 
     def __str__(self) -> str:
         autor = self.author.username if self.author_id else ('Assistente' if self.is_assistente else 'Sistema')

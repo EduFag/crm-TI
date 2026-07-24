@@ -35,6 +35,7 @@ from helpdesk.assistente_services import (
     send_assistente_message,
     set_ticket_priority,
     set_ticket_status,
+    ticket_tem_orientacao_interna_pendente,
     triar_chamado,
 )
 from helpdesk.models import Comment, Ticket
@@ -52,10 +53,11 @@ TOOLS_SPEC = [
         'function': {
             'name': 'send_assistente_message',
             'description': (
-                'Envia uma mensagem CURTA ao solicitante (1–3 frases). '
-                'Chame de novo para a próxima fala — prefira 2–4 bolhas. '
-                'O campo text deve conter APENAS a fala ao solicitante: '
-                'proibido raciocínio, "Ok, vou...", "1ª mensagem:", planos ou notas internas. '
+                'Envia uma mensagem CURTA. Por padrão (interno=false) vai ao solicitante. '
+                'Com interno=true: só TI/staff vê (canal privado) — use para orientar a TI '
+                'após triagem/escalonamento ou alinhar sem o solicitante ler. '
+                'Chame de novo para a próxima fala pública — prefira 2–4 bolhas. '
+                'O campo text: sem raciocínio, "Ok, vou...", "1ª mensagem:" ou planos. '
                 'Use Markdown leve (**negrito**, listas).'
             ),
             'parameters': {
@@ -64,7 +66,13 @@ TOOLS_SPEC = [
                     'text': {
                         'type': 'string',
                         'description': (
-                            'Somente o texto final ao solicitante (sem pensamento da IA).'
+                            'Texto da mensagem (pública ao solicitante ou interna à TI).'
+                        ),
+                    },
+                    'interno': {
+                        'type': 'boolean',
+                        'description': (
+                            'true = só TI/staff/Assistente veem; false (padrão) = solicitante vê.'
                         ),
                     },
                 },
@@ -493,8 +501,9 @@ def _montar_contexto(ticket: Ticket) -> str:
             autor = c.author.get_full_name() or c.author.username
         else:
             autor = 'Sistema'
+        marca = ' [INTERNO TI]' if c.is_interno else ''
         extra = ' [tem anexo]' if c.attachment else ''
-        linhas.append(f'[{autor}]{extra} {c.text}')
+        linhas.append(f'[{autor}]{marca}{extra} {c.text}')
 
     chunks = _chunks_relevantes(ticket)
     chunks_txt = '\n'.join(f'- {ch.titulo}: {ch.conteudo}' for ch in chunks) or '(sem chunks ainda)'
@@ -577,13 +586,22 @@ def _system_prompt() -> str:
         '- Rede/internet fora em loja: priorize esclarecer solicitante/unidade e escalar_para_ti '
         'quando for indisponibilidade real de link — não fique só perguntando se "já voltou" '
         'como se fosse oscilação leve, a menos que o texto sugira isso.\n\n'
+        'Canal interno [INTERNO TI]:\n'
+        '- Mensagens marcadas [INTERNO TI] NÃO são vistas pelo solicitante/criador comum. '
+        'Só TI, staff, superuser e você.\n'
+        '- Se a TI corrigir algo seu em [INTERNO TI], envie mensagem PÚBLICA (interno=false) '
+        'corrigindo/esclarecendo ao solicitante (ex.: "desculpe, o correto é…"). '
+        'Não diga que a TI te orientou em privado.\n'
+        '- Após triar ou escalar_para_ti, você PODE enviar uma nota com interno=true '
+        'à TI (ex.: "Precisa fazer X, Y, Z") sem o solicitante ver.\n'
+        '- Entre TI: se o pedido interno for só alinhamento (sem falar com o solicitante), '
+        'responda só com interno=true.\n\n'
         'Formato das mensagens:\n'
         '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
-        '- Envie 2–4 mensagens curtas via send_assistente_message (1–3 frases cada). '
+        '- Ao solicitante: 2–4 mensagens curtas via send_assistente_message (1–3 frases). '
         'Nunca um único bloco longo.\n'
-        '- CRÍTICO: o campo text é só a fala ao solicitante. '
-        'Nunca inclua raciocínio, "Ok, sem chips...", "Vou passar...", '
-        '"1ª mensagem:", planos ou notas internas — isso não pode aparecer no chamado.\n\n'
+        '- CRÍTICO: o campo text não deve ter raciocínio, "Ok, sem chips...", "Vou passar...", '
+        '"1ª mensagem:" — isso não pode aparecer no chamado.\n\n'
         'Procedimentos:\n'
         '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
         '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
@@ -615,7 +633,14 @@ def _system_prompt() -> str:
 def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
     try:
         if name == 'send_assistente_message':
-            return json.dumps(send_assistente_message(ticket_id, args.get('text', '')), ensure_ascii=False)
+            return json.dumps(
+                send_assistente_message(
+                    ticket_id,
+                    args.get('text', ''),
+                    interno=bool(args.get('interno')),
+                ),
+                ensure_ascii=False,
+            )
         if name == 'set_ticket_priority':
             return json.dumps(set_ticket_priority(ticket_id, args.get('priority', '')), ensure_ascii=False)
         if name == 'set_ticket_status':
@@ -767,7 +792,11 @@ def _rodada_tools(
     ticket = Ticket.objects.get(pk=ticket_id)
     if not assistente_pode_atuar(ticket) and enviou_mensagem:
         return enviou_mensagem
-    if ticket.assistente_escalado and enviou_mensagem:
+    if (
+        ticket.assistente_escalado
+        and enviou_mensagem
+        and not ticket_tem_orientacao_interna_pendente(ticket)
+    ):
         return enviou_mensagem
     if ticket.is_rejected and enviou_mensagem:
         return enviou_mensagem
@@ -906,12 +935,19 @@ def processar_assistente(ticket_id: int) -> None:
                 'MoneyConsig é sistema INTERNO da Money Promotora; escale para a TI interna.'
             )
 
+    orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
+    pedido = 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto
+    if orientacao_interna:
+        pedido += (
+            '\n\nHá orientação INTERNA recente da TI ([INTERNO TI]). '
+            'Priorize: se pedirem correção do que você falou, mande mensagem PÚBLICA '
+            'corrigindo o solicitante; se pedirem só nota à TI, use interno=true. '
+            'Não mencione o canal privado ao solicitante.'
+        )
+
     messages: list[dict[str, Any]] = [
         {'role': 'system', 'content': _system_prompt()},
-        {
-            'role': 'user',
-            'content': 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto,
-        },
+        {'role': 'user', 'content': pedido},
     ]
 
     enviou_mensagem = False
@@ -920,7 +956,12 @@ def processar_assistente(ticket_id: int) -> None:
             ticket.refresh_from_db()
             if not assistente_pode_atuar(ticket) and enviou_mensagem:
                 break
-            if ticket.assistente_escalado and enviou_mensagem:
+            # Após escalar, ainda permite terminar se veio de orientação interna
+            if (
+                ticket.assistente_escalado
+                and enviou_mensagem
+                and not ticket_tem_orientacao_interna_pendente(ticket)
+            ):
                 break
             if ticket.is_rejected and enviou_mensagem:
                 break
@@ -937,17 +978,24 @@ def processar_assistente(ticket_id: int) -> None:
             if len(messages) == qtd_msgs:
                 break
 
-        if not enviou_mensagem and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id)):
+        if (
+            not enviou_mensagem
+            and not orientacao_interna
+            and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id))
+        ):
             send_assistente_message(ticket_id, _MSG_FALLBACK)
             enviou_mensagem = True
 
-        _garantir_triagem(ticket_id, messages)
+        if not orientacao_interna:
+            _garantir_triagem(ticket_id, messages)
     except (LlmError, AssistenteServiceError, Exception):
         logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
-        # Best-effort: chamado não fica mudo se o LLM falhar
+        # Best-effort: chamado não fica mudo se o LLM falhar (exceto trigger só-interno)
         try:
-            if not enviou_mensagem and assistente_pode_atuar(
-                Ticket.objects.get(pk=ticket_id),
+            if (
+                not enviou_mensagem
+                and not orientacao_interna
+                and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id))
             ):
                 send_assistente_message(ticket_id, _MSG_FALLBACK_ERRO)
         except Exception:
@@ -955,10 +1003,11 @@ def processar_assistente(ticket_id: int) -> None:
                 'Falha ao enviar fallback do Assistente no ticket %s',
                 ticket_id,
             )
-        try:
-            _garantir_triagem(ticket_id, messages)
-        except Exception:
-            pass
+        if not orientacao_interna:
+            try:
+                _garantir_triagem(ticket_id, messages)
+            except Exception:
+                pass
 
 
 def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:

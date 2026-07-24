@@ -238,7 +238,7 @@
     <!-- Input de Comentário (Fixo no Rodapé) -->
     <div class="p-4 border-t border-slate-200 bg-slate-50">
         {% if pode_comentar %}
-        <form id="comment-form-{{ ticket.id }}" hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-encoding="multipart/form-data" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset(); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.add('hidden'); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.remove('flex'); var _m=document.getElementById('mention-dropdown-{{ ticket.id }}'); if(_m) _m.classList.add('hidden');" class="flex flex-col gap-3">
+        <form id="comment-form-{{ ticket.id }}" hx-post="{% url 'helpdesk:ticket_add_comment' ticket.id %}" hx-encoding="multipart/form-data" hx-target="#comments-list" hx-swap="innerHTML" hx-on::after-request="this.reset(); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.add('hidden'); document.getElementById('comment-attachment-preview-{{ ticket.id }}').classList.remove('flex'); var _m=document.getElementById('mention-dropdown-{{ ticket.id }}'); if(_m) _m.classList.add('hidden'); var _t=document.getElementById('comment-interno-{{ ticket.id }}'); if(_t){ _t.checked=false; var _lbl=document.getElementById('comment-interno-label-{{ ticket.id }}'); if(_lbl){ _lbl.classList.remove('bg-amber-100','border-amber-300','text-amber-900'); _lbl.classList.add('bg-white','border-slate-200','text-slate-600'); } }" class="flex flex-col gap-3">
             <div class="relative">
                 <textarea id="comment-text-{{ ticket.id }}" name="text" rows="2" placeholder="{% if eh_operador_helpdesk %}Adicione uma nota… Use @ para mencionar{% else %}Adicione uma nota ou atualização...{% endif %}" class="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner bg-white"></textarea>
                 {% if eh_operador_helpdesk %}
@@ -259,12 +259,24 @@
                 </button>
             </div>
             
-            <div class="flex justify-between items-center">
-                <label class="cursor-pointer text-slate-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-slate-100 flex items-center gap-1 group">
-                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                    <span class="text-xs font-medium">Anexar</span>
-                    <input type="file" id="comment-file-{{ ticket.id }}" name="attachment" class="hidden" accept="image/*,.gif,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a">
-                </label>
+            <div class="flex justify-between items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <label class="cursor-pointer text-slate-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-slate-100 flex items-center gap-1 group">
+                        <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                        <span class="text-xs font-medium">Anexar</span>
+                        <input type="file" id="comment-file-{{ ticket.id }}" name="attachment" class="hidden" accept="image/*,.gif,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,.mp3,.wav,.ogg,.m4a">
+                    </label>
+                    {% if pode_ver_internos %}
+                    <label id="comment-interno-label-{{ ticket.id }}"
+                           class="cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-amber-300 transition-colors"
+                           title="Só TI, staff e o Assistente veem. O solicitante não.">
+                        <input type="checkbox" id="comment-interno-{{ ticket.id }}" name="is_interno" value="1"
+                               class="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                               onchange="var l=document.getElementById('comment-interno-label-{{ ticket.id }}'); if(this.checked){ l.classList.add('bg-amber-100','border-amber-300','text-amber-900'); l.classList.remove('bg-white','border-slate-200','text-slate-600'); } else { l.classList.remove('bg-amber-100','border-amber-300','text-amber-900'); l.classList.add('bg-white','border-slate-200','text-slate-600'); }">
+                        Interno (só TI)
+                    </label>
+                    {% endif %}
+                </div>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                     Enviar Comentário
                 </button>

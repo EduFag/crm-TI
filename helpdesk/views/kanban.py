@@ -40,6 +40,7 @@ from helpdesk.notifications import (
 from helpdesk.queue import aplicar_posicoes_fila
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
+    filtrar_comentarios_visiveis,
     ticket_pode_mostrar_refresh_ia,
     usuario_eh_operador_helpdesk,
     usuario_pode_acessar_chamado,
@@ -52,6 +53,7 @@ from helpdesk.ticket_access import (
     usuario_pode_operar_kanban,
     usuario_pode_refresh_assistente,
     usuario_pode_transferir_chamado,
+    usuario_pode_ver_comentarios_internos,
     usuario_pode_ver_quem_abriu_chamado,
     usuarios_tecnicos_para_transferencia,
 )
@@ -94,6 +96,32 @@ def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False, usuarios_e
         obj, created = TicketUnread.objects.get_or_create(
             ticket=ticket, user=usuario,
             defaults={'count': 1}
+        )
+        if not created:
+            obj.count = F('count') + 1
+            obj.save(update_fields=['count'])
+
+
+def adicionar_nao_lido_operadores(ticket, ator):
+    """Badge só para operadores TI/admin/staff (mensagens internas)."""
+    from django.db.models import F, Q
+
+    from core.models import CustomUser
+
+    qs = CustomUser.objects.filter(is_active=True).filter(
+        Q(role__in=[CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER])
+        | Q(is_superuser=True)
+        | Q(is_staff=True)
+    )
+    ator_id = getattr(ator, 'pk', None) if ator else None
+    for usuario in qs:
+        if ator_id and usuario.pk == ator_id:
+            continue
+        if not usuario_pode_acessar_chamado(usuario, ticket):
+            continue
+        obj, created = TicketUnread.objects.get_or_create(
+            ticket=ticket, user=usuario,
+            defaults={'count': 1},
         )
         if not created:
             obj.count = F('count') + 1
@@ -191,10 +219,15 @@ def _metadata_alteracao_ticket(antes, depois):
 
 
 def _contexto_comentarios(request, ticket):
+    comments = filtrar_comentarios_visiveis(
+        ticket.comments.filter(is_active=True).order_by('-created_at'),
+        request.user,
+    )
     return {
         'ticket': ticket,
-        'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
+        'comments': comments,
         'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
+        'pode_ver_internos': usuario_pode_ver_comentarios_internos(request.user),
         'pode_refresh_ia': (
             usuario_pode_refresh_assistente(request.user)
             and ticket_pode_mostrar_refresh_ia(ticket)
@@ -208,9 +241,13 @@ def _contexto_drawer(request, ticket, edit_form=None):
         usuario_pode_refresh_assistente(request.user)
         and ticket_pode_mostrar_refresh_ia(ticket)
     )
+    comments = filtrar_comentarios_visiveis(
+        ticket.comments.filter(is_active=True).order_by('-created_at'),
+        request.user,
+    )
     return {
         'ticket': ticket,
-        'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
+        'comments': comments,
         'pode_ver_quem_abriu': usuario_pode_ver_quem_abriu_chamado(request.user, ticket),
         'pode_editar': pode_editar,
         'pode_comentar': usuario_pode_comentar_chamado(request.user, ticket),
@@ -218,6 +255,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'total_contestacoes': ticket.contestations.count(),
         'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
         'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
+        'pode_ver_internos': usuario_pode_ver_comentarios_internos(request.user),
         'pode_refresh_ia': pode_refresh,
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
@@ -849,6 +887,8 @@ def ticket_add_comment(request, pk):
         return HttpResponseForbidden('Sem permissão para comentar neste chamado.')
     text = request.POST.get('text', '').strip()
     attachment = request.FILES.get('attachment')
+    quer_interno = request.POST.get('is_interno') in ('1', 'true', 'on', 'yes')
+    is_interno = quer_interno and usuario_pode_ver_comentarios_internos(request.user)
     if text or attachment:
         if attachment:
             from django.core.exceptions import ValidationError
@@ -858,35 +898,54 @@ def ticket_add_comment(request, pk):
             except ValidationError as e:
                 return HttpResponse(e.messages[0], status=400)
         comment = Comment.objects.create(
-            ticket=ticket, author=request.user, text=text, attachment=attachment,
+            ticket=ticket,
+            author=request.user,
+            text=text,
+            attachment=attachment,
+            is_interno=is_interno,
         )
         # Menções @: só operadores; concede co_authors + notifica (inclui TI↔TI)
-        mencionados = processar_mencoes(ticket, comment, request.user) if text else []
+        mencionados = []
+        if text and not is_interno:
+            mencionados = processar_mencoes(ticket, comment, request.user) or []
+        elif text and is_interno:
+            # Menções em interno só entre quem vê interno
+            mencionados = processar_mencoes(ticket, comment, request.user) or []
 
         if text:
-            meta = {}
+            meta = {'is_interno': is_interno}
             if mencionados:
                 meta['mention_user_ids'] = [u.pk for u in mencionados]
                 meta['acao_ui'] = 'MENTION'
             log_comentario(ticket, request.user, text, metadata=meta or None)
         else:
-            log_comentario(ticket, request.user, 'Anexou uma imagem.')
+            log_comentario(
+                ticket,
+                request.user,
+                'Anexou uma imagem' + (' (interno).' if is_interno else '.'),
+                metadata={'is_interno': is_interno},
+            )
 
         ticket.save(update_fields=['updated_at'])
-        # Badge geral + mencionados (silêncio TI não se aplica a quem foi @mencionado)
-        adicionar_nao_lido(ticket, request.user, usuarios_extra=mencionados)
 
         preview = text[:120] if text else 'Nova imagem anexada.'
-        agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
-        if mencionados:
-            # Push dedicado de menção — ignora silêncio TI↔TI
-            agendar_notificacao_mencoes(ticket, mencionados, preview)
+        if is_interno:
+            adicionar_nao_lido_operadores(ticket, request.user)
+            # Push só para mencionados (TI) — solicitante não recebe
+            if mencionados:
+                agendar_notificacao_mencoes(ticket, mencionados, f'[Interno] {preview}')
+        else:
+            adicionar_nao_lido(ticket, request.user, usuarios_extra=mencionados)
+            agendar_notificacao_chamado(ticket, request.user, EVENTO_COMMENT, preview)
+            if mencionados:
+                agendar_notificacao_mencoes(ticket, mencionados, preview)
 
-        # Assistente responde a comentários de solicitante/não-TI
-        if not usuario_eh_operador_helpdesk(request.user) and not getattr(comment, 'is_assistente', False):
+        # Assistente: responde a solicitante OU a orientação interna da TI
+        if is_interno and usuario_pode_ver_comentarios_internos(request.user):
+            _agendar_assistente(ticket.pk)
+        elif not usuario_eh_operador_helpdesk(request.user) and not getattr(comment, 'is_assistente', False):
             _agendar_assistente(ticket.pk)
 
-    comments = ticket.comments.filter(is_active=True).order_by('-created_at')
     response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
     return response
@@ -1106,6 +1165,9 @@ def ticket_attachments(request, pk):
     if comment_id:
         from helpdesk.models import Comment
         comment = get_object_or_404(Comment, pk=comment_id, ticket=ticket)
+        # Anexo de mensagem interna: solicitante não acessa
+        if comment.is_interno and not usuario_pode_ver_comentarios_internos(request.user):
+            return HttpResponseForbidden('Sem permissão para ver este anexo.')
         if comment.attachment:
             attachments = [MockAttachment(comment.attachment, comment.created_at)]
     else:
