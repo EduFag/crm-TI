@@ -1,4 +1,5 @@
 {% load helpdesk_permissions integracoes_extras %}
+{% usuario_pode_menu_comentario as pode_menu_comentario %}
 <style>
 .assistente-md { font-size: 0.875rem; line-height: 1.55; color: #475569; }
 .assistente-md .memoria-md-p { margin: 0.4em 0; }
@@ -18,6 +19,8 @@
     padding: 0.1em 0.35em; border-radius: 0.25rem;
 }
 .assistente-md .memoria-md-link { color: #6d28d9; text-decoration: underline; text-underline-offset: 2px; }
+.comment-menu > summary { list-style: none; }
+.comment-menu > summary::-webkit-details-marker { display: none; }
 </style>
 {% for comment in comments %}
 {% if not comment.is_assistente and comment.author_id == request.user.id %}
@@ -26,11 +29,41 @@
         {{ comment.author.username|make_list|first|upper|default:"S" }}
     </div>
     <div class="max-w-[85%] bg-blue-50 border border-blue-100 shadow-sm p-3 rounded-lg rounded-tr-none">
-        <div class="flex items-center justify-between gap-3 mb-1">
-            <span class="text-xs font-bold text-blue-800">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-bold text-blue-800 truncate">
                 {{ comment.author.get_full_name|default:comment.author.username|default:"Você" }}
             </span>
-            <span class="text-[10px] text-blue-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
+            <div class="flex items-center gap-1 shrink-0">
+                <span class="text-[10px] text-blue-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
+                {% if pode_menu_comentario %}
+                <details class="comment-menu relative">
+                    <summary class="cursor-pointer p-1 rounded-md text-blue-500 hover:bg-blue-100 hover:text-blue-800 transition-colors"
+                             title="Opções da mensagem"
+                             aria-label="Opções da mensagem">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                        </svg>
+                    </summary>
+                    <div class="absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-30 py-1">
+                        <button type="button"
+                                hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
+                                hx-target="#comment-{{ comment.id }}"
+                                hx-swap="outerHTML"
+                                class="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                            Editar
+                        </button>
+                        <button type="button"
+                                hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
+                                hx-confirm="Excluir esta mensagem do histórico?"
+                                hx-target="#comments-list"
+                                hx-swap="innerHTML"
+                                class="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                            Excluir
+                        </button>
+                    </div>
+                </details>
+                {% endif %}
+            </div>
         </div>
         {% if comment.text %}
         <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{{ comment.text|highlight_mentions }}</p>
@@ -64,25 +97,6 @@
             {% endif %}
         </div>
         {% endif %}
-        {% if pode_gerenciar_comentarios %}
-        <div class="mt-2 flex items-center gap-2 justify-end">
-            <button type="button"
-                    hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
-                    hx-target="#comment-{{ comment.id }}"
-                    hx-swap="outerHTML"
-                    class="text-[11px] font-medium text-amber-700 hover:text-amber-900">
-                Editar
-            </button>
-            <button type="button"
-                    hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
-                    hx-confirm="Excluir esta mensagem do histórico?"
-                    hx-target="#comments-list"
-                    hx-swap="innerHTML"
-                    class="text-[11px] font-medium text-red-600 hover:text-red-800">
-                Excluir
-            </button>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% else %}
@@ -91,11 +105,41 @@
         {% if comment.is_assistente %}A{% else %}{{ comment.author.username|make_list|first|upper|default:"S" }}{% endif %}
     </div>
     <div class="max-w-[85%] bg-white border border-slate-100 shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_assistente %}border-violet-100{% endif %}">
-        <div class="flex items-center justify-between gap-3 mb-1">
-            <span class="text-xs font-bold text-slate-800">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-bold text-slate-800 truncate">
                 {% if comment.is_assistente %}Assistente{% else %}{{ comment.author.get_full_name|default:comment.author.username|default:"Sistema" }}{% endif %}
             </span>
-            <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
+            <div class="flex items-center gap-1 shrink-0">
+                <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
+                {% if pode_menu_comentario %}
+                <details class="comment-menu relative">
+                    <summary class="cursor-pointer p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                             title="Opções da mensagem"
+                             aria-label="Opções da mensagem">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                        </svg>
+                    </summary>
+                    <div class="absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-30 py-1">
+                        <button type="button"
+                                hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
+                                hx-target="#comment-{{ comment.id }}"
+                                hx-swap="outerHTML"
+                                class="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                            Editar
+                        </button>
+                        <button type="button"
+                                hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
+                                hx-confirm="Excluir esta mensagem do histórico?"
+                                hx-target="#comments-list"
+                                hx-swap="innerHTML"
+                                class="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                            Excluir
+                        </button>
+                    </div>
+                </details>
+                {% endif %}
+            </div>
         </div>
         {% if comment.text %}
         {% if comment.is_assistente %}
@@ -131,25 +175,6 @@
                 Ver Anexo
             </button>
             {% endif %}
-        </div>
-        {% endif %}
-        {% if pode_gerenciar_comentarios %}
-        <div class="mt-2 flex items-center gap-2">
-            <button type="button"
-                    hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
-                    hx-target="#comment-{{ comment.id }}"
-                    hx-swap="outerHTML"
-                    class="text-[11px] font-medium text-amber-700 hover:text-amber-900">
-                Editar
-            </button>
-            <button type="button"
-                    hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
-                    hx-confirm="Excluir esta mensagem do histórico?"
-                    hx-target="#comments-list"
-                    hx-swap="innerHTML"
-                    class="text-[11px] font-medium text-red-600 hover:text-red-800">
-                Excluir
-            </button>
         </div>
         {% endif %}
     </div>

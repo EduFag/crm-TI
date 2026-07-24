@@ -5,7 +5,10 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from helpdesk.mentions import MENTION_RE
-from helpdesk.ticket_access import usuario_pode_contestar_chamado
+from helpdesk.ticket_access import (
+    usuario_pode_contestar_chamado,
+    usuario_pode_gerenciar_comentarios,
+)
 
 register = template.Library()
 
@@ -35,6 +38,15 @@ def pode_contestar_chamado(context, ticket):
     if not request or not request.user.is_authenticated:
         return False
     return usuario_pode_contestar_chamado(request.user, ticket)
+
+
+@register.simple_tag(takes_context=True)
+def usuario_pode_menu_comentario(context):
+    """Staff/superuser — menu ⋮ editar/excluir no chat."""
+    request = context.get('request')
+    if not request or not request.user.is_authenticated:
+        return False
+    return usuario_pode_gerenciar_comentarios(request.user)
 
 
 @register.filter(name='highlight_mentions')
