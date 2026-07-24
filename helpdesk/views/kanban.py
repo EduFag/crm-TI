@@ -40,6 +40,7 @@ from helpdesk.notifications import (
 from helpdesk.queue import aplicar_posicoes_fila
 from helpdesk.ticket_access import (
     filtrar_chamados_para_usuario,
+    ticket_pode_mostrar_refresh_ia,
     usuario_eh_operador_helpdesk,
     usuario_pode_acessar_chamado,
     usuario_pode_comentar_chamado,
@@ -49,6 +50,7 @@ from helpdesk.ticket_access import (
     usuario_pode_gerenciar_categorias,
     usuario_pode_gerenciar_comentarios,
     usuario_pode_operar_kanban,
+    usuario_pode_refresh_assistente,
     usuario_pode_transferir_chamado,
     usuario_pode_ver_quem_abriu_chamado,
     usuarios_tecnicos_para_transferencia,
@@ -193,11 +195,19 @@ def _contexto_comentarios(request, ticket):
         'ticket': ticket,
         'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
         'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
+        'pode_refresh_ia': (
+            usuario_pode_refresh_assistente(request.user)
+            and ticket_pode_mostrar_refresh_ia(ticket)
+        ),
     }
 
 
 def _contexto_drawer(request, ticket, edit_form=None):
     pode_editar = usuario_pode_editar_chamado(request.user, ticket)
+    pode_refresh = (
+        usuario_pode_refresh_assistente(request.user)
+        and ticket_pode_mostrar_refresh_ia(ticket)
+    )
     return {
         'ticket': ticket,
         'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
@@ -208,6 +218,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'total_contestacoes': ticket.contestations.count(),
         'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
         'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
+        'pode_refresh_ia': pode_refresh,
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
         'edit_form': edit_form or (TicketUpdateForm(instance=ticket, user=request.user) if pode_editar else None),
@@ -1009,6 +1020,57 @@ def ticket_delete(request, pk):
         return response
         
     return redirect('helpdesk:kanban')
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def ticket_refresh_assistente(request, pk):
+    """
+    Reaciona o Assistente em chamado Novos sem mensagens ativas da IA
+    (ex.: histórico do Assistente foi apagado). Usa o histórico visível.
+    """
+    ticket = get_object_or_404(
+        Ticket.objects.select_related('assigned_to', 'requester_user', 'created_by'),
+        pk=pk,
+        is_active=True,
+    )
+    if not usuario_pode_refresh_assistente(request.user):
+        return HttpResponseForbidden('Sem permissão para reativar o Assistente.')
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão para acessar este chamado.')
+    if ticket.status != Ticket.StatusChoices.NEW:
+        return HttpResponseForbidden('Refresh IA só está disponível em chamados Novos.')
+    if not ticket_pode_mostrar_refresh_ia(ticket):
+        return HttpResponseForbidden(
+            'Já existem mensagens do Assistente no histórico, ou o chamado não está em Novos.'
+        )
+
+    # Libera flag que impede a IA de falar de novo
+    ticket.assistente_escalado = False
+    ticket.save(update_fields=['assistente_escalado', 'updated_at'])
+
+    autor = request.user.get_full_name() or request.user.username
+    Comment.objects.create(
+        ticket=ticket,
+        author=request.user,
+        text=f'Assistente reacionado ({autor}) — Refresh IA.',
+        is_assistente=False,
+    )
+    try:
+        log_edicao(
+            ticket,
+            request.user,
+            {'acao': 'refresh_ia'},
+            f'Assistente reacionado no chamado #{ticket.pk} (Refresh IA).',
+        )
+    except Exception:
+        pass
+
+    _agendar_assistente(ticket.pk)
+    ticket.refresh_from_db()
+    response = render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
 
 
 @requer_modulo(MODULO_HELPDESK)

@@ -255,6 +255,31 @@ def usuario_pode_gerenciar_comentarios(user) -> bool:
     return usuario_eh_operador_helpdesk(user)
 
 
+def usuario_pode_refresh_assistente(user) -> bool:
+    """Botão Refresh IA — mesmo público do menu de mensagens."""
+    return usuario_pode_gerenciar_comentarios(user)
+
+
+def ticket_sem_mensagem_assistente_ativa(ticket) -> bool:
+    """True se não há comentário ativo do Assistente no histórico visível."""
+    from helpdesk.models import Comment
+
+    return not Comment.objects.filter(
+        ticket=ticket,
+        is_active=True,
+        is_assistente=True,
+    ).exists()
+
+
+def ticket_pode_mostrar_refresh_ia(ticket) -> bool:
+    """Refresh IA só em Novos e sem mensagens ativas do Assistente."""
+    if not ticket or ticket.status != ticket.StatusChoices.NEW:
+        return False
+    if not ticket.is_active or ticket.is_archived:
+        return False
+    return ticket_sem_mensagem_assistente_ativa(ticket)
+
+
 def usuario_pode_editar_chamado(user, ticket=None) -> bool:
     """Somente is_staff ou is_superuser veem/usam Editar no chamado."""
     if not usuario_eh_staff_ou_superuser(user):

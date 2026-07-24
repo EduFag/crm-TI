@@ -42,6 +42,7 @@ urlpatterns = [
     path('ticket/<int:pk>/drawer/', views.ticket_drawer, name='ticket_drawer'),
     path('ticket/<int:pk>/edit/', views.ticket_edit, name='ticket_edit'),
     path('ticket/<int:pk>/delete/', views.ticket_delete, name='ticket_delete'),
+    path('ticket/<int:pk>/refresh-ia/', views.ticket_refresh_assistente, name='ticket_refresh_assistente'),
     path('ticket/<int:pk>/attachments/', views.ticket_attachments, name='ticket_attachments'),
     path('ticket/<int:pk>/transfer/', views.ticket_transfer, name='ticket_transfer'),
     path('ticket/<int:pk>/comment/', views.ticket_add_comment, name='ticket_add_comment'),
