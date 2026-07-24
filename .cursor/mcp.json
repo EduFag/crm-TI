@@ -16,6 +16,14 @@
         "CRM_TI_MCP_TOKEN": "SUBSTITUA_PELO_MESMO_VALOR_DE_MCP_API_TOKEN"
       }
     },
+    "crm-ti-discador": {
+      "command": "python",
+      "args": ["-m", "crm_mcp.discador.server"],
+      "env": {
+        "CRM_TI_API_BASE": "https://ti.moneypromotora.com.br",
+        "CRM_TI_MCP_TOKEN": "SUBSTITUA_PELO_MESMO_VALOR_DE_MCP_API_TOKEN"
+      }
+    },
     "crm-ti-equipment": {
       "command": "python",
       "args": ["-m", "crm_mcp.equipment.server"],

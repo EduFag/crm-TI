@@ -1,6 +1,6 @@
 from django.urls import path
 
-from mcp_api.views import audit, chips, emails, equipment, helpdesk, users
+from mcp_api.views import audit, chips, discador, emails, equipment, helpdesk, users
 
 urlpatterns = [
     # Helpdesk
@@ -18,6 +18,15 @@ urlpatterns = [
     path('categorias-especificas/', helpdesk.get_categorias_especificas, name='mcp_categorias_especificas'),
     path('assistente/consultar-chips/', helpdesk.get_consultar_chips, name='mcp_consultar_chips'),
     path('assistente/consultar-usuario/', helpdesk.get_consultar_usuario, name='mcp_consultar_usuario'),
+
+    # Discador (JoyTec)
+    path('discador/licencas/', discador.get_licencas, name='mcp_discador_licencas'),
+    path('discador/ramais/', discador.get_ramais, name='mcp_discador_ramais'),
+    path('discador/acessos/', discador.get_acessos, name='mcp_discador_acessos'),
+    path('discador/campanhas/', discador.get_campanhas, name='mcp_discador_campanhas'),
+    path('discador/acessos/criar/', discador.post_criar_acesso, name='mcp_discador_criar_acesso'),
+    path('discador/acessos/liberar/', discador.post_liberar_acesso, name='mcp_discador_liberar_acesso'),
+    path('discador/ramais/liberar-licenca/', discador.post_liberar_licenca, name='mcp_discador_liberar_licenca'),
 
     # Chips
     path('chips/', chips.list_chips, name='mcp_list_chips'),

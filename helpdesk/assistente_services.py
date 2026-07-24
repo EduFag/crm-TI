@@ -616,3 +616,361 @@ def consultar_usuario(q: str, limit: int = 15) -> dict:
     ).distinct()[:limit]
     itens = [serialize_user(u) for u in qs]
     return {'ok': True, 'q': termo, 'count': len(itens), 'results': itens}
+
+
+# --- Discador (JoyTec) ---
+
+
+def _resolver_discador(slug: str = 'joytec'):
+    from discador.models import Discador
+    from discador.services import get_or_create_joytec
+
+    slug_limpo = (slug or 'joytec').strip().lower() or 'joytec'
+    if slug_limpo == 'joytec':
+        return get_or_create_joytec()
+    discador = Discador.objects.filter(slug=slug_limpo, is_active=True).first()
+    if not discador:
+        raise AssistenteServiceError(f'Discador "{slug_limpo}" não encontrado.', 404)
+    return discador
+
+
+def _serialize_ramal(ramal) -> dict:
+    acesso = None
+    try:
+        acesso = ramal.acesso
+    except Exception:
+        acesso = None
+    return {
+        'id': ramal.pk,
+        'numero': ramal.numero,
+        'status': ramal.status,
+        'status_display': ramal.get_status_display(),
+        'consome_licenca': ramal.consome_licenca,
+        'tem_acesso': acesso is not None,
+        'acesso_id': acesso.pk if acesso else None,
+        'titular': (acesso.nome_exibicao if acesso else None),
+        'login_discador': (acesso.login_discador if acesso else None),
+    }
+
+
+def _serialize_acesso(acesso) -> dict:
+    return {
+        'id': acesso.pk,
+        'titular_nome': acesso.titular_nome,
+        'titular': acesso.nome_exibicao,
+        'titular_user_id': acesso.titular_user_id,
+        'login_discador': acesso.login_discador,
+        'tipo': acesso.tipo,
+        'tipo_display': acesso.get_tipo_display(),
+        'status': acesso.status,
+        'ramal_id': acesso.ramal_id,
+        'ramal': acesso.ramal.numero if acesso.ramal_id else None,
+        'campanha_id': acesso.campanha_id,
+        'campanha': acesso.campanha.nome if acesso.campanha_id else None,
+    }
+
+
+def consultar_licencas_discador(slug: str = 'joytec') -> dict:
+    """KPIs de licenças: contratadas, livres (FREE), disponíveis no contrato, etc."""
+    from discador.services import kpis_licencas
+
+    discador = _resolver_discador(slug)
+    kpis = kpis_licencas(discador)
+    return {
+        'ok': True,
+        'discador': discador.nome,
+        'slug': discador.slug,
+        'contratadas': kpis['contratadas'],
+        'consumidas': kpis['consumidas'],
+        'em_uso': kpis['em_uso'],
+        'ramais_livres': kpis['livres'],
+        'nao_configurados': kpis['nao_configurados'],
+        'licencas_disponiveis_contrato': kpis['disponiveis'],
+        'estourado': kpis['estourado'],
+        'no_limite': kpis['no_limite'],
+        'custo_mensal': str(kpis['custo_mensal']),
+        'orientacao': (
+            'ramais_livres = status FREE (ainda consomem licença). '
+            'licencas_disponiveis_contrato = slots novos no contrato. '
+            'Para liberar slot do contrato, use liberar_licenca_ramal (NOT_CONFIGURED).'
+        ),
+    }
+
+
+def listar_ramais_discador(
+    status: str = '',
+    slug: str = 'joytec',
+    limit: int = 40,
+) -> dict:
+    """Lista ramais; status opcional: FREE|IN_USE|NOT_CONFIGURED."""
+    from discador.models import Ramal
+
+    discador = _resolver_discador(slug)
+    limit = max(1, min(int(limit or 40), 80))
+    qs = (
+        Ramal.objects.filter(discador=discador)
+        .select_related('acesso', 'acesso__campanha', 'acesso__titular_user')
+        .order_by('numero')
+    )
+    status_limpo = (status or '').strip().upper()
+    if status_limpo:
+        validos = {c.value for c in Ramal.StatusChoices}
+        if status_limpo not in validos:
+            raise AssistenteServiceError(
+                f'Status inválido. Use: {", ".join(sorted(validos))}.'
+            )
+        qs = qs.filter(status=status_limpo)
+
+    itens = [_serialize_ramal(r) for r in qs[:limit]]
+    return {
+        'ok': True,
+        'discador': discador.nome,
+        'slug': discador.slug,
+        'status': status_limpo or None,
+        'count': len(itens),
+        'results': itens,
+    }
+
+
+def consultar_acesso_discador(q: str, slug: str = 'joytec', limit: int = 20) -> dict:
+    """Busca acessos por titular, login ou número do ramal."""
+    from discador.models import AcessoDiscador
+
+    termo = (q or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe nome do titular, login ou ramal.')
+
+    discador = _resolver_discador(slug)
+    limit = max(1, min(int(limit or 20), 40))
+    qs = (
+        AcessoDiscador.objects.filter(discador=discador)
+        .select_related('ramal', 'campanha', 'titular_user')
+        .filter(
+            Q(titular_nome__icontains=termo)
+            | Q(login_discador__icontains=termo)
+            | Q(ramal__numero__icontains=termo)
+            | Q(titular_user__username__icontains=termo)
+            | Q(titular_user__first_name__icontains=termo)
+            | Q(titular_user__last_name__icontains=termo)
+        )
+        .order_by('titular_nome', 'login_discador')[:limit]
+    )
+    itens = [_serialize_acesso(a) for a in qs]
+    return {
+        'ok': True,
+        'discador': discador.nome,
+        'q': termo,
+        'count': len(itens),
+        'results': itens,
+    }
+
+
+def listar_campanhas_discador(slug: str = 'joytec', so_ativas: bool = True) -> dict:
+    from discador.models import Campanha
+
+    discador = _resolver_discador(slug)
+    qs = Campanha.objects.filter(discador=discador).order_by('nome')
+    if so_ativas:
+        qs = qs.filter(is_active=True)
+    itens = [
+        {'id': c.pk, 'nome': c.nome, 'is_active': c.is_active}
+        for c in qs[:80]
+    ]
+    return {
+        'ok': True,
+        'discador': discador.nome,
+        'count': len(itens),
+        'results': itens,
+    }
+
+
+def liberar_acesso_discador(acesso_id: int) -> dict:
+    """Remove o acesso e deixa o ramal em FREE (ainda consome licença)."""
+    from django.core.exceptions import ValidationError
+
+    from discador.models import AcessoDiscador
+    from discador.services import excluir_acesso
+
+    acesso = (
+        AcessoDiscador.objects.select_related('ramal', 'campanha')
+        .filter(pk=acesso_id)
+        .first()
+    )
+    if not acesso:
+        raise AssistenteServiceError('Acesso não encontrado.', 404)
+    ramal_numero = acesso.ramal.numero
+    ramal_id = acesso.ramal_id
+    titular = acesso.nome_exibicao
+    try:
+        excluir_acesso(acesso=acesso, actor=None)
+    except ValidationError as exc:
+        raise AssistenteServiceError(_msg_validacao(exc)) from exc
+    return {
+        'ok': True,
+        'acesso_id': acesso_id,
+        'titular': titular,
+        'ramal_id': ramal_id,
+        'ramal': ramal_numero,
+        'status_ramal': 'FREE',
+        'orientacao': (
+            'Ramal liberado (FREE). Ainda consome licença. '
+            'Para liberar slot do contrato use liberar_licenca_ramal.'
+        ),
+    }
+
+
+def liberar_licenca_ramal(
+    ramal_id: int | None = None,
+    ramal_numero: str = '',
+    slug: str = 'joytec',
+) -> dict:
+    """Marca ramal como NOT_CONFIGURED (deixa de consumir licença). Exige sem acesso."""
+    from django.core.exceptions import ValidationError
+
+    from discador.models import Ramal
+    from discador.services import atualizar_ramal
+
+    discador = _resolver_discador(slug)
+    ramal = _buscar_ramal(discador, ramal_id=ramal_id, ramal_numero=ramal_numero)
+    try:
+        atualizar_ramal(
+            ramal=ramal,
+            numero=ramal.numero,
+            status=Ramal.StatusChoices.NOT_CONFIGURED,
+            actor=None,
+        )
+    except ValidationError as exc:
+        raise AssistenteServiceError(_msg_validacao(exc)) from exc
+    ramal.refresh_from_db()
+    return {
+        'ok': True,
+        'ramal_id': ramal.pk,
+        'ramal': ramal.numero,
+        'status': ramal.status,
+        'consome_licenca': ramal.consome_licenca,
+    }
+
+
+def criar_acesso_discador(
+    titular_nome: str,
+    login_discador: str,
+    tipo: str = 'CONSULTOR',
+    ramal_id: int | None = None,
+    ramal_numero: str = '',
+    campanha_id: int | None = None,
+    campanha_nome: str = '',
+    slug: str = 'joytec',
+) -> dict:
+    """Cria acesso em ramal FREE/NOT_CONFIGURED (escolhe FREE se ramal omitido)."""
+    from django.core.exceptions import ValidationError
+
+    from discador.models import AcessoDiscador, Campanha, Ramal
+    from discador.services import criar_acesso, kpis_licencas
+
+    discador = _resolver_discador(slug)
+    titular = (titular_nome or '').strip()
+    login = (login_discador or '').strip()
+    if not login:
+        raise AssistenteServiceError('login_discador é obrigatório.')
+
+    tipo_limpo = (tipo or 'CONSULTOR').strip().upper()
+    tipos = {c.value for c in AcessoDiscador.TipoChoices}
+    if tipo_limpo not in tipos:
+        raise AssistenteServiceError(f'Tipo inválido. Use: {", ".join(sorted(tipos))}.')
+
+    campanha = _buscar_campanha(discador, campanha_id=campanha_id, campanha_nome=campanha_nome)
+    if ramal_id or (ramal_numero or '').strip():
+        ramal = _buscar_ramal(discador, ramal_id=ramal_id, ramal_numero=ramal_numero)
+    else:
+        ramal = (
+            Ramal.objects.filter(discador=discador, status=Ramal.StatusChoices.FREE)
+            .filter(acesso__isnull=True)
+            .order_by('numero')
+            .first()
+        )
+        if not ramal:
+            # Tenta NOT_CONFIGURED se houver slot no contrato
+            kpis = kpis_licencas(discador)
+            if kpis['disponiveis'] <= 0:
+                raise AssistenteServiceError(
+                    'Sem ramais livres e sem licenças disponíveis no contrato. '
+                    'Libere um acesso/licença ou peça aumento de contrato à TI.'
+                )
+            ramal = (
+                Ramal.objects.filter(
+                    discador=discador,
+                    status=Ramal.StatusChoices.NOT_CONFIGURED,
+                )
+                .order_by('numero')
+                .first()
+            )
+        if not ramal:
+            raise AssistenteServiceError(
+                'Não há ramal FREE/NOT_CONFIGURED disponível. Cadastre um ramal ou libere um.'
+            )
+
+    try:
+        acesso = criar_acesso(
+            discador=discador,
+            titular_nome=titular,
+            titular_user=None,
+            login_discador=login,
+            ramal=ramal,
+            campanha=campanha,
+            tipo=tipo_limpo,
+            actor=None,
+        )
+    except ValidationError as exc:
+        raise AssistenteServiceError(_msg_validacao(exc)) from exc
+
+    return {
+        'ok': True,
+        'acesso': _serialize_acesso(acesso),
+        'licencas': consultar_licencas_discador(slug),
+    }
+
+
+def _buscar_ramal(discador, *, ramal_id=None, ramal_numero: str = ''):
+    from discador.models import Ramal
+
+    if ramal_id:
+        ramal = Ramal.objects.filter(pk=ramal_id, discador=discador).first()
+        if not ramal:
+            raise AssistenteServiceError('Ramal não encontrado.', 404)
+        return ramal
+    numero = (ramal_numero or '').strip()
+    if not numero:
+        raise AssistenteServiceError('Informe ramal_id ou ramal_numero.')
+    ramal = Ramal.objects.filter(discador=discador, numero__iexact=numero).first()
+    if not ramal:
+        raise AssistenteServiceError(f'Ramal "{numero}" não encontrado.', 404)
+    return ramal
+
+
+def _buscar_campanha(discador, *, campanha_id=None, campanha_nome: str = ''):
+    from discador.models import Campanha
+
+    if campanha_id:
+        campanha = Campanha.objects.filter(pk=campanha_id, discador=discador).first()
+        if not campanha:
+            raise AssistenteServiceError('Campanha não encontrada.', 404)
+        return campanha
+    nome = (campanha_nome or '').strip()
+    if not nome:
+        raise AssistenteServiceError('Informe campanha_id ou campanha_nome.')
+    campanha = Campanha.objects.filter(
+        discador=discador, nome__iexact=nome, is_active=True,
+    ).first()
+    if not campanha:
+        campanha = Campanha.objects.filter(
+            discador=discador, nome__icontains=nome, is_active=True,
+        ).first()
+    if not campanha:
+        raise AssistenteServiceError(f'Campanha "{nome}" não encontrada.', 404)
+    return campanha
+
+
+def _msg_validacao(exc) -> str:
+    if hasattr(exc, 'messages'):
+        return '; '.join(str(m) for m in exc.messages)
+    return str(exc)

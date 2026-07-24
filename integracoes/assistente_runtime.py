@@ -13,12 +13,19 @@ from helpdesk.assistente_services import (
     AssistenteServiceError,
     assistente_motivo_bloqueio,
     assistente_pode_atuar,
+    consultar_acesso_discador,
     consultar_chips,
+    consultar_licencas_discador,
     consultar_usuario,
+    criar_acesso_discador,
     descrever_imagem_anexo,
     escalar_para_ti,
+    liberar_acesso_discador,
+    liberar_licenca_ramal,
     listar_anexos_ticket,
+    listar_campanhas_discador,
     listar_categorias_especificas,
+    listar_ramais_discador,
     recusar_chamado,
     send_assistente_message,
     set_ticket_priority,
@@ -200,10 +207,133 @@ TOOLS_SPEC = [
     {
         'type': 'function',
         'function': {
+            'name': 'consultar_licencas_discador',
+            'description': (
+                'Consulta licenças do discador (JoyTec): contratadas, ramais livres (FREE), '
+                'em uso, slots disponíveis no contrato. Use em pedidos de ramal/campanha.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'slug': {'type': 'string', 'description': 'Padrão joytec.'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'listar_ramais_discador',
+            'description': 'Lista ramais do discador. Filtre status FREE|IN_USE|NOT_CONFIGURED.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'status': {'type': 'string', 'enum': ['FREE', 'IN_USE', 'NOT_CONFIGURED', '']},
+                    'slug': {'type': 'string'},
+                    'limit': {'type': 'integer'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'consultar_acesso_discador',
+            'description': 'Busca acesso no discador por titular, login ou número do ramal.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'q': {'type': 'string'},
+                    'slug': {'type': 'string'},
+                },
+                'required': ['q'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'listar_campanhas_discador',
+            'description': 'Lista campanhas ativas do discador (id e nome).',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'slug': {'type': 'string'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'criar_acesso_discador',
+            'description': (
+                'Cria acesso no discador (titular + login + campanha). '
+                'Se omitir ramal, usa um FREE. Consulte licenças antes.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'titular_nome': {'type': 'string'},
+                    'login_discador': {'type': 'string'},
+                    'tipo': {
+                        'type': 'string',
+                        'enum': ['CONSULTOR', 'VENDEDOR', 'NEGOCIADOR'],
+                    },
+                    'ramal_numero': {'type': 'string'},
+                    'ramal_id': {'type': 'integer'},
+                    'campanha_nome': {'type': 'string'},
+                    'campanha_id': {'type': 'integer'},
+                    'slug': {'type': 'string'},
+                },
+                'required': ['titular_nome', 'login_discador'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'liberar_acesso_discador',
+            'description': 'Remove acesso (ramal fica FREE; ainda consome licença). Use acesso_id de consultar_acesso_discador.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'acesso_id': {'type': 'integer'},
+                },
+                'required': ['acesso_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'liberar_licenca_ramal',
+            'description': (
+                'Marca ramal como NOT_CONFIGURED (libera slot do contrato). '
+                'Só se não houver acesso — liberar_acesso_discador antes se precisar.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'ramal_id': {'type': 'integer'},
+                    'ramal_numero': {'type': 'string'},
+                    'slug': {'type': 'string'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'escalar_para_ti',
             'description': (
-                'Encerra o Assistente e pede técnico de TI. Use para ações externas: '
-                'Joytec/MoneyConsig, AnyDesk, discador/campanha, hardware, permissões.'
+                'Encerra o Assistente e pede técnico de TI. Use para MoneyConsig, AnyDesk, '
+                'hardware, permissões ou quando o discador estiver no limite e precisar '
+                'aumentar contrato.'
             ),
             'parameters': {
                 'type': 'object',
@@ -298,11 +428,14 @@ def _system_prompt() -> str:
         'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
         'ANTES ou JUNTO das mensagens ao solicitante.\n'
         '- WhatsApp/chip: consulte consultar_chips pelo nome do consultor; se já tiver 2 em uso, questione.\n'
-        '- Acesso: pergunte qual sistema; use consultar_usuario para caso individual.\n'
+        '- Discador/JoyTec: use consultar_licencas_discador e listar_ramais_discador (FREE); '
+        'consultar_acesso_discador para achar titular; criar_acesso_discador / '
+        'liberar_acesso_discador / liberar_licenca_ramal conforme o caso. '
+        'Se no_limite/estourado e precisar de slot novo, explique e escalar_para_ti.\n'
+        '- Acesso CRM: pergunte qual sistema; use consultar_usuario para caso individual.\n'
         '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
-        '- Ações externas (Joytec, MoneyConsig, campanha discador, AnyDesk, hardware): '
+        '- Ações externas (MoneyConsig, AnyDesk, hardware, permissões fora do CRM/discador): '
         'oriente conforme o chunk e escalar_para_ti com motivo.\n'
-        '- Não crie acessos externos nem controle discador/AnyDesk — só CRM + orientação.\n'
         '- Só use RESOLVED se o problema foi resolvido sem TI (recusa usa recusar_chamado).\n'
         '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
         '- Não invente procedimentos fora dos chunks e do histórico.'
@@ -341,11 +474,68 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
             return json.dumps(consultar_chips(args.get('q', '')), ensure_ascii=False)
         if name == 'consultar_usuario':
             return json.dumps(consultar_usuario(args.get('q', '')), ensure_ascii=False)
+        if name == 'consultar_licencas_discador':
+            return json.dumps(
+                consultar_licencas_discador(args.get('slug') or 'joytec'),
+                ensure_ascii=False,
+            )
+        if name == 'listar_ramais_discador':
+            return json.dumps(
+                listar_ramais_discador(
+                    args.get('status') or '',
+                    args.get('slug') or 'joytec',
+                    args.get('limit') or 40,
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'consultar_acesso_discador':
+            return json.dumps(
+                consultar_acesso_discador(
+                    args.get('q', ''),
+                    args.get('slug') or 'joytec',
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'listar_campanhas_discador':
+            return json.dumps(
+                listar_campanhas_discador(args.get('slug') or 'joytec'),
+                ensure_ascii=False,
+            )
+        if name == 'criar_acesso_discador':
+            return json.dumps(
+                criar_acesso_discador(
+                    args.get('titular_nome', ''),
+                    args.get('login_discador', ''),
+                    args.get('tipo') or 'CONSULTOR',
+                    args.get('ramal_id'),
+                    args.get('ramal_numero') or '',
+                    args.get('campanha_id'),
+                    args.get('campanha_nome') or '',
+                    args.get('slug') or 'joytec',
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'liberar_acesso_discador':
+            return json.dumps(
+                liberar_acesso_discador(int(args.get('acesso_id') or 0)),
+                ensure_ascii=False,
+            )
+        if name == 'liberar_licenca_ramal':
+            return json.dumps(
+                liberar_licenca_ramal(
+                    args.get('ramal_id'),
+                    args.get('ramal_numero') or '',
+                    args.get('slug') or 'joytec',
+                ),
+                ensure_ascii=False,
+            )
         if name == 'escalar_para_ti':
             return json.dumps(escalar_para_ti(ticket_id, args.get('motivo', '')), ensure_ascii=False)
         return json.dumps({'ok': False, 'error': f'Tool desconhecida: {name}'})
     except AssistenteServiceError as exc:
         return json.dumps({'ok': False, 'error': str(exc)})
+    except (TypeError, ValueError) as exc:
+        return json.dumps({'ok': False, 'error': f'Argumentos inválidos: {exc}'})
 
 
 def _parse_args(raw: Any) -> dict:
