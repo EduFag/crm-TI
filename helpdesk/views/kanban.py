@@ -55,12 +55,22 @@ from helpdesk.ticket_access import (
 
 
 def _agendar_assistente(ticket_id: int) -> None:
-    """Agenda processamento do Assistente após o commit da request."""
-    def _run():
+    """Agenda processamento do Assistente em thread após o commit da request."""
+    def _processar():
+        from django.db import close_old_connections
         from integracoes.assistente_runtime import processar_assistente
-        processar_assistente(ticket_id)
 
-    transaction.on_commit(_run)
+        close_old_connections()
+        try:
+            processar_assistente(ticket_id)
+        finally:
+            close_old_connections()
+
+    def _agendar_async():
+        import threading
+        threading.Thread(target=_processar, daemon=True).start()
+
+    transaction.on_commit(_agendar_async)
 
 
 def adicionar_nao_lido(ticket, ator, *, somente_nao_operadores=False, usuarios_extra=None):

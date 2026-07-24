@@ -27,24 +27,30 @@ def ticket_assumido_pela_ti(ticket: Ticket) -> bool:
     return usuario_eh_operador_helpdesk(ticket.assigned_to)
 
 
-def assistente_pode_atuar(ticket: Ticket) -> bool:
-    """Regras para o Assistente continuar conversando no chamado."""
+def assistente_motivo_bloqueio(ticket: Ticket) -> str | None:
+    """Retorna o motivo se o Assistente não pode atuar; None se pode."""
     from integracoes.models import AssistenteConfig
 
     config = AssistenteConfig.get_solo()
     if not config.ativo:
-        return False
+        return 'assistente_inativo'
     if not ticket.is_active or ticket.is_archived:
-        return False
+        return 'ticket_inativo_ou_arquivado'
     if ticket.status == Ticket.StatusChoices.RESOLVED:
-        return False
+        return 'ticket_resolvido'
     if ticket.assistente_escalado:
-        return False
+        return 'assistente_escalado'
     if ticket_assumido_pela_ti(ticket):
-        return False
-    if usuario_eh_operador_helpdesk(ticket.created_by):
-        return False
-    return True
+        return 'assumido_pela_ti'
+    # Bloqueia só chamado interno: solicitante vinculado é operador TI
+    if ticket.requester_user_id and usuario_eh_operador_helpdesk(ticket.requester_user):
+        return 'solicitante_eh_operador_ti'
+    return None
+
+
+def assistente_pode_atuar(ticket: Ticket) -> bool:
+    """Regras para o Assistente continuar conversando no chamado."""
+    return assistente_motivo_bloqueio(ticket) is None
 
 
 def send_assistente_message(ticket_id: int, text: str) -> dict:

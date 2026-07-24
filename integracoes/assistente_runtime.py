@@ -11,6 +11,7 @@ from django.db.models import Q
 
 from helpdesk.assistente_services import (
     AssistenteServiceError,
+    assistente_motivo_bloqueio,
     assistente_pode_atuar,
     consultar_chips,
     consultar_usuario,
@@ -345,8 +346,18 @@ def _parse_args(raw: Any) -> dict:
         return {}
 
 
+_MSG_FALLBACK = (
+    'Olá! Recebi seu chamado e estou analisando. Em breve retorno com orientações '
+    'ou encaminho para a equipe de TI.'
+)
+_MSG_FALLBACK_ERRO = (
+    'Olá! Recebi seu chamado. Estou com dificuldade técnica no momento; '
+    'a equipe de TI já pode acompanhar por aqui.'
+)
+
+
 def processar_assistente(ticket_id: int) -> None:
-    """Processa uma rodada do Assistente no chamado. Seguro para on_commit."""
+    """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
         ticket = Ticket.objects.select_related(
             'category', 'specific_category', 'created_by', 'assigned_to', 'requester_user',
@@ -354,7 +365,13 @@ def processar_assistente(ticket_id: int) -> None:
     except Ticket.DoesNotExist:
         return
 
-    if not assistente_pode_atuar(ticket):
+    motivo = assistente_motivo_bloqueio(ticket)
+    if motivo:
+        logger.info(
+            'Assistente não atuou no ticket %s: %s',
+            ticket_id,
+            motivo,
+        )
         return
 
     messages: list[dict[str, Any]] = [
@@ -409,13 +426,20 @@ def processar_assistente(ticket_id: int) -> None:
                 })
 
         if not enviou_mensagem and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id)):
-            send_assistente_message(
-                ticket_id,
-                'Olá! Recebi seu chamado e estou analisando. Em breve retorno com orientações '
-                'ou encaminho para a equipe de TI.',
-            )
+            send_assistente_message(ticket_id, _MSG_FALLBACK)
     except (LlmError, AssistenteServiceError, Exception):
         logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
+        # Best-effort: chamado não fica mudo se o LLM falhar
+        try:
+            if not enviou_mensagem and assistente_pode_atuar(
+                Ticket.objects.get(pk=ticket_id),
+            ):
+                send_assistente_message(ticket_id, _MSG_FALLBACK_ERRO)
+        except Exception:
+            logger.exception(
+                'Falha ao enviar fallback do Assistente no ticket %s',
+                ticket_id,
+            )
 
 
 def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
