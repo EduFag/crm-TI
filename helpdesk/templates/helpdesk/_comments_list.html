@@ -21,7 +21,7 @@
 </style>
 {% for comment in comments %}
 {% if not comment.is_assistente and comment.author_id == request.user.id %}
-<div class="flex gap-3 flex-row-reverse">
+<div class="flex gap-3 flex-row-reverse" id="comment-{{ comment.id }}">
     <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
         {{ comment.author.username|make_list|first|upper|default:"S" }}
     </div>
@@ -64,10 +64,29 @@
             {% endif %}
         </div>
         {% endif %}
+        {% if pode_gerenciar_comentarios %}
+        <div class="mt-2 flex items-center gap-2 justify-end">
+            <button type="button"
+                    hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
+                    hx-target="#comment-{{ comment.id }}"
+                    hx-swap="outerHTML"
+                    class="text-[11px] font-medium text-amber-700 hover:text-amber-900">
+                Editar
+            </button>
+            <button type="button"
+                    hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
+                    hx-confirm="Excluir esta mensagem do histórico?"
+                    hx-target="#comments-list"
+                    hx-swap="innerHTML"
+                    class="text-[11px] font-medium text-red-600 hover:text-red-800">
+                Excluir
+            </button>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% else %}
-<div class="flex gap-3">
+<div class="flex gap-3" id="comment-{{ comment.id }}">
     <div class="w-8 h-8 rounded-full {% if comment.is_assistente %}bg-violet-100 text-violet-700{% else %}bg-blue-100 text-blue-600{% endif %} flex-shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-white">
         {% if comment.is_assistente %}A{% else %}{{ comment.author.username|make_list|first|upper|default:"S" }}{% endif %}
     </div>
@@ -112,6 +131,25 @@
                 Ver Anexo
             </button>
             {% endif %}
+        </div>
+        {% endif %}
+        {% if pode_gerenciar_comentarios %}
+        <div class="mt-2 flex items-center gap-2">
+            <button type="button"
+                    hx-get="{% url 'helpdesk:comment_edit' ticket.id comment.id %}"
+                    hx-target="#comment-{{ comment.id }}"
+                    hx-swap="outerHTML"
+                    class="text-[11px] font-medium text-amber-700 hover:text-amber-900">
+                Editar
+            </button>
+            <button type="button"
+                    hx-post="{% url 'helpdesk:comment_delete' ticket.id comment.id %}"
+                    hx-confirm="Excluir esta mensagem do histórico?"
+                    hx-target="#comments-list"
+                    hx-swap="innerHTML"
+                    class="text-[11px] font-medium text-red-600 hover:text-red-800">
+                Excluir
+            </button>
         </div>
         {% endif %}
     </div>

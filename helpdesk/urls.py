@@ -46,6 +46,16 @@ urlpatterns = [
     path('ticket/<int:pk>/transfer/', views.ticket_transfer, name='ticket_transfer'),
     path('ticket/<int:pk>/comment/', views.ticket_add_comment, name='ticket_add_comment'),
     path('ticket/<int:pk>/comments/', views.ticket_comments, name='ticket_comments'),
+    path(
+        'ticket/<int:ticket_pk>/comment/<int:comment_pk>/edit/',
+        views.comment_edit,
+        name='comment_edit',
+    ),
+    path(
+        'ticket/<int:ticket_pk>/comment/<int:comment_pk>/delete/',
+        views.comment_delete,
+        name='comment_delete',
+    ),
     path('api/clipboard-image/', views.fetch_clipboard_image, name='fetch_clipboard_image'),
     path('api/mention-users/', views.mention_users_search, name='mention_users_search'),
 ]

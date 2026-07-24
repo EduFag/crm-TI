@@ -45,12 +45,13 @@ from helpdesk.ticket_access import (
     usuario_pode_comentar_chamado,
     usuario_pode_contestar_chamado,
     usuario_pode_editar_chamado,
+    usuario_pode_excluir_chamado,
     usuario_pode_gerenciar_categorias,
+    usuario_pode_gerenciar_comentarios,
     usuario_pode_operar_kanban,
     usuario_pode_transferir_chamado,
     usuario_pode_ver_quem_abriu_chamado,
     usuarios_tecnicos_para_transferencia,
-    usuario_pode_excluir_chamado,
 )
 
 
@@ -187,6 +188,14 @@ def _metadata_alteracao_ticket(antes, depois):
     return metadata
 
 
+def _contexto_comentarios(request, ticket):
+    return {
+        'ticket': ticket,
+        'comments': ticket.comments.filter(is_active=True).order_by('-created_at'),
+        'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
+    }
+
+
 def _contexto_drawer(request, ticket, edit_form=None):
     pode_editar = usuario_pode_editar_chamado(request.user, ticket)
     return {
@@ -198,6 +207,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'pode_contestar': usuario_pode_contestar_chamado(request.user, ticket),
         'total_contestacoes': ticket.contestations.count(),
         'pode_excluir': usuario_pode_excluir_chamado(request.user, ticket),
+        'pode_gerenciar_comentarios': usuario_pode_gerenciar_comentarios(request.user),
         'pode_transferir': usuario_pode_transferir_chamado(request.user),
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
         'edit_form': edit_form or (TicketUpdateForm(instance=ticket, user=request.user) if pode_editar else None),
@@ -866,7 +876,7 @@ def ticket_add_comment(request, pk):
             _agendar_assistente(ticket.pk)
 
     comments = ticket.comments.filter(is_active=True).order_by('-created_at')
-    response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
     return response
 
@@ -895,6 +905,7 @@ def mention_users_search(request):
     ]
     return JsonResponse({'results': results})
 
+
 @requer_modulo(MODULO_HELPDESK)
 def ticket_comments(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk, is_active=True)
@@ -903,12 +914,79 @@ def ticket_comments(request, pk):
 
     deleted, _ = TicketUnread.objects.filter(ticket=ticket, user=request.user).delete()
     mencoes_vistas = marcar_mencoes_vistas(ticket, request.user)
-    comments = ticket.comments.filter(is_active=True).order_by('-created_at')
 
-    response = render(request, 'helpdesk/_comments_list.html', {'ticket': ticket, 'comments': comments})
+    response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
     if deleted or mencoes_vistas:
         response['HX-Trigger'] = json.dumps({'ticketRead': True})
     return response
+
+
+@requer_modulo(MODULO_HELPDESK)
+def comment_edit(request, ticket_pk, comment_pk):
+    """Edita texto de comentário/mensagem — só is_staff / is_superuser."""
+    ticket = get_object_or_404(Ticket, pk=ticket_pk, is_active=True)
+    comment = get_object_or_404(Comment, pk=comment_pk, ticket=ticket, is_active=True)
+    if not usuario_pode_gerenciar_comentarios(request.user):
+        return HttpResponseForbidden('Sem permissão para editar mensagens.')
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão.')
+
+    if request.method == 'GET':
+        return render(
+            request,
+            'helpdesk/_comment_edit_form.html',
+            {'ticket': ticket, 'comment': comment},
+        )
+
+    novo = (request.POST.get('text') or '').strip()
+    if not novo:
+        return HttpResponse('Informe o texto da mensagem.', status=400)
+
+    antes = comment.text
+    comment.text = novo
+    comment.save(update_fields=['text'])
+    try:
+        log_edicao(
+            ticket,
+            request.user,
+            {'comment_id': comment.pk, 'text': {'antes': (antes or '')[:200], 'depois': novo[:200]}},
+            f'Mensagem #{comment.pk} editada no chamado.',
+        )
+    except Exception:
+        pass
+
+    response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
+
+
+@requer_modulo(MODULO_HELPDESK)
+@require_POST
+def comment_delete(request, ticket_pk, comment_pk):
+    """Exclui (soft) comentário/mensagem — só is_staff / is_superuser."""
+    ticket = get_object_or_404(Ticket, pk=ticket_pk, is_active=True)
+    comment = get_object_or_404(Comment, pk=comment_pk, ticket=ticket, is_active=True)
+    if not usuario_pode_gerenciar_comentarios(request.user):
+        return HttpResponseForbidden('Sem permissão para excluir mensagens.')
+    if not usuario_pode_acessar_chamado(request.user, ticket):
+        return HttpResponseForbidden('Sem permissão.')
+
+    comment.is_active = False
+    comment.save(update_fields=['is_active'])
+    try:
+        log_edicao(
+            ticket,
+            request.user,
+            {'comment_id': comment.pk, 'acao': 'excluido'},
+            f'Mensagem #{comment.pk} excluída do chamado.',
+        )
+    except Exception:
+        pass
+
+    response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
+    response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+    return response
+
 
 class KanbanBoardPartialView(KanbanView):
     """Retorna apenas o HTML do quadro para ser injetado via HTMX no evento SSE."""

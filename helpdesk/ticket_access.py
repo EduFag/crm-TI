@@ -238,34 +238,34 @@ def usuario_pode_contestar_chamado(user, ticket) -> bool:
     return usuario_eh_autor_ou_coautor(user, ticket)
 
 
-def usuario_pode_editar_chamado(user, ticket=None) -> bool:
+def usuario_eh_staff_ou_superuser(user) -> bool:
+    """Staff Django ou superuser — editar/excluir chamado e gerenciar mensagens do chat."""
     if not user or not user.is_authenticated:
         return False
-    if usuario_eh_operador_helpdesk(user):
-        return True
-        
-    role = _role(user)
-    if role in (CustomUser.RoleChoices.MULTIPLIER, CustomUser.RoleChoices.STANDARD):
+    return bool(user.is_superuser or user.is_staff)
+
+
+def usuario_pode_gerenciar_comentarios(user) -> bool:
+    """Editar ou excluir comentários/mensagens no histórico do chamado."""
+    return usuario_eh_staff_ou_superuser(user)
+
+
+def usuario_pode_editar_chamado(user, ticket=None) -> bool:
+    """Somente is_staff ou is_superuser veem/usam Editar no chamado."""
+    if not usuario_eh_staff_ou_superuser(user):
         return False
-        
-    if ticket:
-        return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
-    return False
+    if ticket is not None and not usuario_pode_acessar_chamado(user, ticket):
+        return False
+    return True
 
 
 def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
-    if not user or not user.is_authenticated:
+    """Somente is_staff ou is_superuser veem/usam Excluir no chamado."""
+    if not usuario_eh_staff_ou_superuser(user):
         return False
-    if usuario_eh_operador_helpdesk(user):
-        return True
-        
-    role = _role(user)
-    if role in (CustomUser.RoleChoices.MULTIPLIER, CustomUser.RoleChoices.STANDARD, CustomUser.RoleChoices.SUPERVISOR):
+    if ticket is not None and not usuario_pode_acessar_chamado(user, ticket):
         return False
-        
-    if ticket:
-        return usuario_pode_acessar_chamado(user, ticket) and usuario_eh_autor_ou_coautor(user, ticket)
-    return False
+    return True
 
 
 def usuario_pode_ver_quem_abriu_chamado(user, ticket) -> bool:
