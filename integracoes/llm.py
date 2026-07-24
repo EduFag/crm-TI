@@ -63,19 +63,20 @@ def obter_integracao_visao() -> IntegracaoIA | None:
 
 
 def _resolver_endpoint_e_modelo(integracao: IntegracaoIA) -> tuple[str, str, str]:
+    from integracoes.providers import base_url_do_provedor, normalizar_modelo_para_api
+
     creds = integracao.get_credentials()
     api_key = (creds.get('api_key') or '').strip()
     if not api_key:
         raise LlmError('Integração sem api_key.')
     base_url = (creds.get('base_url') or '').strip().rstrip('/')
     if not base_url:
-        from integracoes.providers import base_url_do_provedor
         base_url = (base_url_do_provedor(integracao.provider) or '').rstrip('/')
     if not base_url:
         raise LlmError('Integração sem base_url.')
     models = creds.get('models') or []
     if models:
-        model = models[0]
+        model = str(models[0]).strip()
     elif integracao.provider == IntegracaoIA.Provider.DEEPSEEK:
         model = 'deepseek-v4-flash'
     elif integracao.provider == IntegracaoIA.Provider.CHATGPT:
@@ -84,6 +85,8 @@ def _resolver_endpoint_e_modelo(integracao: IntegracaoIA) -> tuple[str, str, str
         model = 'gemini-2.0-flash'
     else:
         model = 'gpt-4o-mini'
+    # Aliases legados (ex.: deepseek-chat) → id aceito pela API atual
+    model = normalizar_modelo_para_api(integracao.provider, model)
     return api_key, base_url, model
 
 
@@ -153,7 +156,19 @@ def chat_completion(
         raise LlmError(f'Falha de rede: {exc}') from exc
 
     if resp.status_code >= 400:
-        logger.error('LLM HTTP %s: %s', resp.status_code, resp.text[:500])
+        corpo = (resp.text or '')[:500]
+        logger.error('LLM HTTP %s model=%s: %s', resp.status_code, model, corpo)
+        detalhe = ''
+        try:
+            err = resp.json().get('error') or {}
+            if isinstance(err, dict):
+                detalhe = (err.get('message') or '').strip()
+            elif isinstance(err, str):
+                detalhe = err.strip()
+        except Exception:
+            detalhe = ''
+        if detalhe:
+            raise LlmError(f'LLM retornou HTTP {resp.status_code}: {detalhe[:240]}')
         raise LlmError(f'LLM retornou HTTP {resp.status_code}')
 
     data = resp.json()

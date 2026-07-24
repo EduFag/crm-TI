@@ -4,23 +4,33 @@ URL e catálogo de modelos são definidos pelo sistema.
 O usuário só escolhe quais modelos liberar (checklist).
 """
 
+import logging
+
 from integracoes.models import IntegracaoIA
+
+logger = logging.getLogger(__name__)
 
 # Campos que ficam no model (não no blob de credenciais)
 CAMPOS_META = frozenset({'name', 'provider', 'is_active'})
+
+# API DeepSeek V4 só aceita estes ids (aliases legados são remapeados em runtime)
+DEEPSEEK_MODELOS_API = frozenset({'deepseek-v4-flash', 'deepseek-v4-pro'})
+DEEPSEEK_ALIAS_PARA_API = {
+    'deepseek-chat': 'deepseek-v4-flash',
+    'deepseek-reasoner': 'deepseek-v4-pro',
+    'deepseek-coder': 'deepseek-v4-flash',
+}
 
 # Catálogo oficial por provedor (URL + modelos suportados pelo sistema)
 PROVIDER_CONFIG = {
     IntegracaoIA.Provider.DEEPSEEK: {
         'label': 'DeepSeek',
-        'descricao': 'Modelos DeepSeek Chat / Reasoner (somente texto — prints usam ChatGPT/Gemini)',
+        'descricao': 'Modelos DeepSeek V4 (somente texto — prints usam ChatGPT/Gemini)',
         'accent': 'slate',
         'base_url': 'https://api.deepseek.com',
         'models': [
             {'id': 'deepseek-v4-flash', 'label': 'DeepSeek V4 Flash (texto)'},
             {'id': 'deepseek-v4-pro', 'label': 'DeepSeek V4 Pro (texto)'},
-            {'id': 'deepseek-chat', 'label': 'DeepSeek Chat (alias legado)'},
-            {'id': 'deepseek-reasoner', 'label': 'DeepSeek Reasoner (alias legado)'},
         ],
         'default_models': ['deepseek-v4-flash'],
         'fields': [
@@ -174,12 +184,50 @@ def lista_provedores() -> list[dict]:
     return itens
 
 
-def normalizar_modelos_salvos(credenciais: dict) -> list[str]:
+def normalizar_modelos_salvos(credenciais: dict, provider: str | None = None) -> list[str]:
     """Converte formato legado (model str) ou lista models para lista de ids."""
     modelos = credenciais.get('models')
     if isinstance(modelos, list):
-        return [str(m) for m in modelos if m]
-    model = credenciais.get('model')
-    if model:
-        return [str(model)]
-    return []
+        ids = [str(m) for m in modelos if m]
+    else:
+        model = credenciais.get('model')
+        ids = [str(model)] if model else []
+    if provider == IntegracaoIA.Provider.DEEPSEEK:
+        # Persiste já no id da API atual (evita deepseek-chat na credencial)
+        ids = [modelo_api_deepseek(m) for m in ids]
+        # Remove duplicatas mantendo ordem
+        vistos: set[str] = set()
+        limpos: list[str] = []
+        for m in ids:
+            if m not in vistos:
+                vistos.add(m)
+                limpos.append(m)
+        return limpos or ['deepseek-v4-flash']
+    return ids
+
+
+def modelo_api_deepseek(model_id: str) -> str:
+    """
+    Converte id salvo (incl. aliases legados) para o nome aceito pela API DeepSeek.
+    Ex.: deepseek-chat → deepseek-v4-flash.
+    """
+    mid = (model_id or '').strip()
+    if not mid:
+        return 'deepseek-v4-flash'
+    mapeado = DEEPSEEK_ALIAS_PARA_API.get(mid.lower(), mid)
+    if mapeado not in DEEPSEEK_MODELOS_API:
+        logger.warning(
+            'Modelo DeepSeek inválido na API (%s) — usando deepseek-v4-flash.',
+            mid,
+        )
+        return 'deepseek-v4-flash'
+    if mapeado != mid:
+        logger.info('Modelo DeepSeek legado %s → %s', mid, mapeado)
+    return mapeado
+
+
+def normalizar_modelo_para_api(provider: str, model_id: str) -> str:
+    """Ajusta o id do modelo ao que a API do provedor aceita hoje."""
+    if provider == IntegracaoIA.Provider.DEEPSEEK:
+        return modelo_api_deepseek(model_id)
+    return (model_id or '').strip()

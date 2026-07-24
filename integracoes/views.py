@@ -154,7 +154,10 @@ class IAUpdateView(ModuloObrigatorioMixin, View):
         creds = integracao.get_credentials()
         valores = {'name': integracao.name, **creds}
         valores.pop('api_key', None)
-        modelos_sel = normalizar_modelos_salvos(creds) or modelos_padrao(integracao.provider)
+        modelos_sel = (
+            normalizar_modelos_salvos(creds, integracao.provider)
+            or modelos_padrao(integracao.provider)
+        )
         return render(request, 'integracoes/_ia_edit_modal.html', {
             'integracao': integracao,
             'campos': campos_do_provedor(integracao.provider),
