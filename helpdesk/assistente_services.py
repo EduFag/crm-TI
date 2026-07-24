@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 import os
 import re
@@ -13,6 +14,8 @@ from django.utils import timezone
 from helpdesk.models import Comment, Ticket, TicketAttachment, TicketSpecificCategory
 from helpdesk.ticket_access import usuario_eh_operador_helpdesk
 
+
+logger = logging.getLogger(__name__)
 
 PRIORIDADES = {c.value for c in Ticket.PriorityChoices}
 STATUS_VALIDOS = {c.value for c in Ticket.StatusChoices}
@@ -429,6 +432,7 @@ def _mime_e_ext(nome: str, content_type: str | None = None) -> tuple[str, str]:
         '.webp': 'image/webp',
         '.gif': 'image/gif',
         '.bmp': 'image/bmp',
+        '.pdf': 'application/pdf',
     }
     if ext in por_ext:
         mime = por_ext[ext]
@@ -436,6 +440,16 @@ def _mime_e_ext(nome: str, content_type: str | None = None) -> tuple[str, str]:
         guessed, _ = mimetypes.guess_type(nome or '')
         mime = (guessed or 'application/octet-stream').split(';')[0].strip().lower()
     return mime, ext
+
+
+def _eh_imagem(ext: str, mime: str) -> bool:
+    return ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'] or (
+        mime or ''
+    ).startswith('image/')
+
+
+def _eh_pdf(ext: str, mime: str) -> bool:
+    return ext == '.pdf' or (mime or '') == 'application/pdf'
 
 
 def _normalizar_imagem_para_visao(raw: bytes, mime: str, ext: str) -> tuple[bytes, str]:
@@ -484,7 +498,8 @@ def listar_anexos_ticket(ticket_id: int) -> dict:
             'nome': att.file_name or os.path.basename(att.file.name),
             'ext': ext,
             'mime': mime,
-            'is_image': ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'] or mime.startswith('image/'),
+            'is_image': _eh_imagem(ext, mime),
+            'is_pdf': _eh_pdf(ext, mime),
             'url': att.file.url if att.file else None,
         })
 
@@ -505,7 +520,8 @@ def listar_anexos_ticket(ticket_id: int) -> dict:
             'nome': nome,
             'ext': ext,
             'mime': mime,
-            'is_image': c.is_image,
+            'is_image': c.is_image if hasattr(c, 'is_image') else _eh_imagem(ext, mime),
+            'is_pdf': _eh_pdf(ext, mime),
             'url': c.attachment.url,
             'comment_id': c.pk,
         })
@@ -559,50 +575,72 @@ def _resolver_anexo(ticket_id: int, attachment_ref: str):
     raise AssistenteServiceError('attachment_ref deve ser ticket:<id> ou comment:<id>.')
 
 
-def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
-    """Lê bytes da imagem e pede descrição à visão do LLM."""
-    from integracoes.llm import LlmError, chat_completion_vision
-
-    file_field, nome, mime, ext = _resolver_anexo(ticket_id, attachment_ref)
-    is_image = ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'] or mime.startswith('image/')
-    if not is_image:
-        raise AssistenteServiceError('O anexo não é uma imagem.')
-
+def _ler_bytes_anexo(file_field) -> bytes:
     try:
         file_field.open('rb')
-        raw = file_field.read()
+        return file_field.read()
     finally:
         try:
             file_field.close()
         except Exception:
             pass
 
+
+def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
+    """
+    Lê imagem: tenta visão multimodal se houver; senão OCR local → texto para DeepSeek.
+    """
+    from integracoes.llm import LlmError, chat_completion_vision, obter_integracao_visao
+    from integracoes.texto_local import extrair_texto_imagem_bytes, formatar_resultado_ocr
+
+    file_field, nome, mime, ext = _resolver_anexo(ticket_id, attachment_ref)
+    if not _eh_imagem(ext, mime or ''):
+        raise AssistenteServiceError('O anexo não é uma imagem.')
+
+    raw = _ler_bytes_anexo(file_field)
     if not raw:
         raise AssistenteServiceError('Arquivo de imagem vazio.')
 
-    # Sempre normaliza para JPEG (webp/gif/bmp e mime errado quebram a visão)
-    raw, mime = _normalizar_imagem_para_visao(raw, mime or '', ext or '')
-
-    if len(raw) > 4 * 1024 * 1024:
+    # Normaliza para JPEG (visão e OCR)
+    raw_jpeg, mime_jpeg = _normalizar_imagem_para_visao(raw, mime or '', ext or '')
+    if len(raw_jpeg) > 4 * 1024 * 1024:
         raise AssistenteServiceError(
             'Imagem ainda grande demais após compressão. Peça um print menor.'
         )
 
-    prompt = (
-        'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
-        'Inclua textos visíveis (OCR), URLs, nomes de sistema (ex.: MoneyConsig, sistema.moneypromotora.com.br), '
-        'números de telefone, nomes de campanha, erros na tela, menus/abas e qualquer detalhe relevante. '
-        'Se reconhecer o sistema Money Promotora / MoneyConsig, diga explicitamente que é o sistema interno. '
-        'Se a imagem estiver ilegível, diga isso claramente.'
-    )
-    try:
-        descricao = chat_completion_vision(prompt, raw, mime or 'image/jpeg')
-    except LlmError as exc:
-        raise AssistenteServiceError(
-            f'Não foi possível ler a imagem (visão/LLM): {exc}. '
-            'Continue com título, descrição e categoria do chamado; '
-            'não peça ao solicitante descrever o print se o texto já for suficiente.'
-        ) from exc
+    metodo = 'ocr_local'
+    descricao = ''
+    integracao_visao = obter_integracao_visao()
+    if integracao_visao:
+        prompt = (
+            'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
+            'Inclua textos visíveis (OCR), URLs, nomes de sistema (ex.: MoneyConsig, sistema.moneypromotora.com.br), '
+            'números de telefone, nomes de campanha, erros na tela, menus/abas e qualquer detalhe relevante. '
+            'Se reconhecer o sistema Money Promotora / MoneyConsig, diga explicitamente que é o sistema interno. '
+            'Se a imagem estiver ilegível, diga isso claramente.'
+        )
+        try:
+            descricao = chat_completion_vision(prompt, raw_jpeg, mime_jpeg or 'image/jpeg')
+            metodo = f'visao:{integracao_visao.provider}'
+        except LlmError as exc:
+            logger.warning(
+                'Visão falhou (%s); caindo para OCR local. Motivo: %s',
+                integracao_visao.provider,
+                exc,
+            )
+
+    if not descricao:
+        try:
+            texto = extrair_texto_imagem_bytes(raw_jpeg)
+            descricao = formatar_resultado_ocr(texto, origem='imagem')
+            metodo = 'ocr_local'
+        except Exception as exc:
+            logger.exception('OCR local falhou para anexo %s', attachment_ref)
+            raise AssistenteServiceError(
+                f'Não foi possível ler a imagem (OCR local): {exc}. '
+                'Continue com título, descrição e categoria do chamado; '
+                'não peça ao solicitante descrever o print se o texto já for suficiente.'
+            ) from exc
 
     return {
         'ok': True,
@@ -610,7 +648,53 @@ def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
         'ref': attachment_ref,
         'nome': nome,
         'descricao': descricao,
+        'metodo': metodo,
     }
+
+
+def extrair_texto_pdf_anexo(ticket_id: int, attachment_ref: str) -> dict:
+    """Extrai texto de PDF (nativo ou OCR local) para enviar ao LLM só-texto."""
+    from integracoes.texto_local import extrair_texto_pdf_bytes, formatar_resultado_ocr
+
+    file_field, nome, mime, ext = _resolver_anexo(ticket_id, attachment_ref)
+    if not _eh_pdf(ext, mime or ''):
+        raise AssistenteServiceError('O anexo não é um PDF.')
+
+    raw = _ler_bytes_anexo(file_field)
+    if not raw:
+        raise AssistenteServiceError('Arquivo PDF vazio.')
+    if len(raw) > 20 * 1024 * 1024:
+        raise AssistenteServiceError('PDF maior que 20MB.')
+
+    try:
+        texto, metodo = extrair_texto_pdf_bytes(raw)
+    except Exception as exc:
+        logger.exception('Falha ao extrair PDF %s', attachment_ref)
+        raise AssistenteServiceError(f'Falha ao ler PDF: {exc}') from exc
+
+    origem = metodo if metodo in ('pdf_texto', 'pdf_ocr') else 'pdf_texto'
+    return {
+        'ok': True,
+        'ticket_id': ticket_id,
+        'ref': attachment_ref,
+        'nome': nome,
+        'descricao': formatar_resultado_ocr(texto, origem=origem),
+        'metodo': metodo,
+        'tem_texto': bool((texto or '').strip()),
+    }
+
+
+def ler_anexo_como_texto(ticket_id: int, attachment_ref: str) -> dict:
+    """Imagem (visão/OCR) ou PDF → texto para o Assistente."""
+    file_field, nome, mime, ext = _resolver_anexo(ticket_id, attachment_ref)
+    if _eh_imagem(ext, mime or ''):
+        return descrever_imagem_anexo(ticket_id, attachment_ref)
+    if _eh_pdf(ext, mime or ''):
+        return extrair_texto_pdf_anexo(ticket_id, attachment_ref)
+    raise AssistenteServiceError(
+        f'Anexo não suportado para leitura de texto ({ext or mime or nome}). '
+        'Aceitos: imagem (jpg/png/webp/gif) ou PDF.'
+    )
 
 
 def consultar_chips(q: str, limit: int = 20) -> dict:

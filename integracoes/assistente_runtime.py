@@ -20,9 +20,11 @@ from helpdesk.assistente_services import (
     criar_acesso_discador,
     descrever_imagem_anexo,
     escalar_para_ti,
+    extrair_texto_pdf_anexo,
     liberar_acesso_discador,
     liberar_licenca_ramal,
     limpar_texto_para_solicitante,
+    ler_anexo_como_texto,
     listar_anexos_ticket,
     listar_campanhas_discador,
     listar_categorias_especificas,
@@ -154,7 +156,10 @@ TOOLS_SPEC = [
         'type': 'function',
         'function': {
             'name': 'listar_anexos',
-            'description': 'Lista anexos do chamado e dos comentários (refs para ler_imagem_anexo).',
+            'description': (
+                'Lista anexos do chamado (refs para ler_imagem_anexo / ler_pdf_anexo / '
+                'ler_anexo_texto).'
+            ),
             'parameters': {'type': 'object', 'properties': {}, 'required': []},
         },
     },
@@ -163,11 +168,10 @@ TOOLS_SPEC = [
         'function': {
             'name': 'ler_imagem_anexo',
             'description': (
-                'Lê/descreve uma imagem anexada (print). Use ref de listar_anexos '
-                '(ticket:ID ou comment:ID). Se o contexto já trouxer '
-                '"Descrição das imagens anexadas", use esses dados. '
-                'Se a leitura falhar, continue com título/descrição/categoria — '
-                'NÃO peça ao solicitante para descrever o print se o texto já explicar o pedido.'
+                'Lê um print/imagem: visão multimodal se disponível, senão OCR local → texto. '
+                'Use ref de listar_anexos (ticket:ID ou comment:ID). '
+                'Se o contexto já trouxer texto dos anexos, use esses dados. '
+                'NÃO peça ao solicitante descrever o print se o texto já explicar o pedido.'
             ),
             'parameters': {
                 'type': 'object',
@@ -176,6 +180,44 @@ TOOLS_SPEC = [
                         'type': 'string',
                         'description': 'Ex.: ticket:12 ou comment:34',
                     },
+                },
+                'required': ['attachment_ref'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'ler_pdf_anexo',
+            'description': (
+                'Extrai texto de um PDF anexado (texto nativo ou OCR local). '
+                'Use quando listar_anexos mostrar is_pdf. '
+                'Se o contexto já trouxer o texto do PDF, use esses dados.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'attachment_ref': {
+                        'type': 'string',
+                        'description': 'Ex.: ticket:12 ou comment:34',
+                    },
+                },
+                'required': ['attachment_ref'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'ler_anexo_texto',
+            'description': (
+                'Converte imagem ou PDF em texto (visão/OCR/extração). '
+                'Útil quando a IA do chat é só texto (ex.: DeepSeek).'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'attachment_ref': {'type': 'string'},
                 },
                 'required': ['attachment_ref'],
             },
@@ -379,7 +421,12 @@ def _resumo_anexos(ticket: Ticket) -> str:
         return '(nenhum anexo)'
     linhas = []
     for a in itens:
-        tipo = 'imagem' if a.get('is_image') else 'arquivo'
+        if a.get('is_image'):
+            tipo = 'imagem'
+        elif a.get('is_pdf'):
+            tipo = 'pdf'
+        else:
+            tipo = 'arquivo'
         linhas.append(f"- {a.get('ref')} [{tipo}] {a.get('nome')}")
     return '\n'.join(linhas)
 
@@ -445,10 +492,9 @@ def _system_prompt() -> str:
         'Procedimentos:\n'
         '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
         '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
-        '- Se houver anexos de imagem, use listar_anexos e ler_imagem_anexo ANTES de decidir. '
-        'Se o contexto já trouxer "Descrição das imagens anexadas", use essa descrição '
-        'e NÃO diga que não conseguiu ver o print.\n'
-        '- Se a leitura da imagem falhar, NÃO peça para descrever o print quando título, '
+        '- Se houver anexos de imagem/PDF, o contexto pode já trazer o texto (visão, OCR local '
+        'ou extração de PDF). Use esses dados; NÃO diga que não conseguiu ver o print.\n'
+        '- Se a leitura falhar, NÃO peça para descrever o anexo quando título, '
         'descrição ou categoria já deixarem o pedido claro — aja com esse texto.\n'
         '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
         'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
@@ -495,6 +541,16 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
         if name == 'ler_imagem_anexo':
             return json.dumps(
                 descrever_imagem_anexo(ticket_id, args.get('attachment_ref', '')),
+                ensure_ascii=False,
+            )
+        if name == 'ler_pdf_anexo':
+            return json.dumps(
+                extrair_texto_pdf_anexo(ticket_id, args.get('attachment_ref', '')),
+                ensure_ascii=False,
+            )
+        if name == 'ler_anexo_texto':
+            return json.dumps(
+                ler_anexo_como_texto(ticket_id, args.get('attachment_ref', '')),
                 ensure_ascii=False,
             )
         if name == 'consultar_chips':
@@ -670,30 +726,35 @@ def _garantir_triagem(ticket_id: int, messages: list[dict[str, Any]]) -> None:
             logger.exception('Falha no fallback de triagem do ticket %s', ticket_id)
 
 
-def _descricoes_imagens_anexo(ticket_id: int) -> str:
-    """Pré-lê imagens do chamado para o contexto (não depende da IA chamar a tool)."""
+def _textos_anexos_prelidos(ticket_id: int) -> str:
+    """Pré-lê imagens e PDFs → texto (visão ou OCR/extração local)."""
     try:
         data = listar_anexos_ticket(ticket_id)
     except AssistenteServiceError:
         return ''
-    imagens = [a for a in (data.get('results') or []) if a.get('is_image')]
-    if not imagens:
+    anexos = [
+        a for a in (data.get('results') or [])
+        if a.get('is_image') or a.get('is_pdf')
+    ]
+    if not anexos:
         return ''
 
     linhas = []
-    for a in imagens[:4]:
+    for a in anexos[:4]:
         ref = a.get('ref') or ''
         nome = a.get('nome') or ref
+        tipo = 'pdf' if a.get('is_pdf') else 'imagem'
         try:
-            res = descrever_imagem_anexo(ticket_id, ref)
+            res = ler_anexo_como_texto(ticket_id, ref)
             desc = (res.get('descricao') or '').strip()
-            linhas.append(f'- {ref} ({nome}): {desc}')
+            metodo = res.get('metodo') or ''
+            linhas.append(f'- {ref} [{tipo}/{metodo}] ({nome}): {desc}')
         except AssistenteServiceError as exc:
-            logger.warning('Falha ao pré-ler imagem %s ticket %s: %s', ref, ticket_id, exc)
-            linhas.append(f'- {ref} ({nome}): [falha ao ler imagem: {exc}]')
+            logger.warning('Falha ao pré-ler anexo %s ticket %s: %s', ref, ticket_id, exc)
+            linhas.append(f'- {ref} ({nome}): [falha ao ler {tipo}: {exc}]')
         except Exception:
-            logger.exception('Erro inesperado ao pré-ler imagem %s', ref)
-            linhas.append(f'- {ref} ({nome}): [erro ao ler imagem]')
+            logger.exception('Erro inesperado ao pré-ler anexo %s', ref)
+            linhas.append(f'- {ref} ({nome}): [erro ao ler {tipo}]')
     return '\n'.join(linhas)
 
 
@@ -716,17 +777,16 @@ def processar_assistente(ticket_id: int) -> None:
         return
 
     contexto = _montar_contexto(ticket)
-    desc_imgs = _descricoes_imagens_anexo(ticket_id)
-    if desc_imgs:
+    textos_anexos = _textos_anexos_prelidos(ticket_id)
+    if textos_anexos:
         contexto += (
-            '\n\nDescrição das imagens anexadas (já lidas pela visão — use estes dados; '
-            'não diga que não conseguiu ver o print):\n' + desc_imgs
+            '\n\nTexto dos anexos (imagem/PDF já convertidos — visão ou OCR/extração local; '
+            'use estes dados; não diga que não conseguiu ver o anexo):\n' + textos_anexos
         )
-        if 'falha ao ler imagem' in desc_imgs.lower() or 'erro ao ler imagem' in desc_imgs.lower():
+        if 'falha ao ler' in textos_anexos.lower() or 'erro ao ler' in textos_anexos.lower():
             contexto += (
-                '\n\nNota: a leitura automática do print falhou (provedor de visão pode '
-                'estar ausente — DeepSeek é só texto). NÃO peça ao solicitante para '
-                'descrever a imagem se título/descrição/categoria já explicarem o pedido. '
+                '\n\nNota: alguma leitura de anexo falhou. NÃO peça ao solicitante para '
+                'descrever o arquivo se título/descrição/categoria já explicarem o pedido. '
                 'MoneyConsig é sistema INTERNO da Money Promotora; escale para a TI interna.'
             )
 

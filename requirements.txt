@@ -13,8 +13,14 @@ pywebpush>=2.0,<3
 # MySQL/MariaDB — só se DB_ENGINE=mysql
 # mysqlclient>=2.2,<3
 
-# Processamento de imagem (compressão)
+# Processamento de imagem (compressão + OCR)
 Pillow>=10.0,<11
+numpy>=1.26,<3
+rapidocr-onnxruntime>=1.3,<1.5
+
+# Extração de texto de PDF (nativo + OCR de páginas)
+pypdf>=4.0,<6
+pymupdf>=1.24,<1.27
 
 # Criptografia de credenciais (integrações IA)
 cryptography>=42.0,<46

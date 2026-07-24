@@ -140,10 +140,34 @@ def listar_anexos(ticket_id: int) -> str:
 
 @mcp.tool()
 def ler_imagem_anexo(ticket_id: int, attachment_ref: str) -> str:
-    """Descreve imagem anexada via visão (attachment_ref ex.: ticket:12 ou comment:34)."""
+    """Lê print: visão multimodal se houver, senão OCR local → texto."""
     try:
         return get_client().post_text(
             f'tickets/{ticket_id}/anexos/ler-imagem/',
+            {'attachment_ref': attachment_ref},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def ler_pdf_anexo(ticket_id: int, attachment_ref: str) -> str:
+    """Extrai texto de PDF (nativo ou OCR local)."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/anexos/ler-pdf/',
+            {'attachment_ref': attachment_ref},
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def ler_anexo_texto(ticket_id: int, attachment_ref: str) -> str:
+    """Converte imagem ou PDF em texto para IA só-texto (ex.: DeepSeek)."""
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/anexos/ler-texto/',
             {'attachment_ref': attachment_ref},
         )
     except CrmTiApiError as exc:

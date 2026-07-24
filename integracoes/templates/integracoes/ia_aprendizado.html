@@ -84,8 +84,9 @@
                         {% endfor %}
                     </select>
                     <p class="text-[11px] text-slate-500 mt-1.5">
-                        DeepSeek não lê imagem na API. Para o Assistente ver prints, cadastre e selecione
-                        ChatGPT (gpt-4o) ou Gemini aqui.
+                        DeepSeek não lê imagem na API. Se não houver ChatGPT/Gemini aqui,
+                        o sistema usa OCR local (prints) e extração de texto (PDFs) e envia
+                        só o texto ao DeepSeek.
                     </p>
                 </div>
                 <button type="submit"

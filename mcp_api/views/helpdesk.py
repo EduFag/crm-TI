@@ -10,6 +10,8 @@ from helpdesk.assistente_services import (
     consultar_usuario,
     descrever_imagem_anexo,
     escalar_para_ti,
+    extrair_texto_pdf_anexo,
+    ler_anexo_como_texto,
     listar_anexos_ticket,
     listar_categorias_especificas,
     recusar_chamado,
@@ -181,6 +183,22 @@ def get_ticket_anexos(request, pk):
 def post_ler_imagem_anexo(request, pk):
     data = _json_body(request)
     return _service_response(descrever_imagem_anexo, pk, data.get('attachment_ref', ''))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_ler_pdf_anexo(request, pk):
+    data = _json_body(request)
+    return _service_response(extrair_texto_pdf_anexo, pk, data.get('attachment_ref', ''))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_ler_anexo_texto(request, pk):
+    data = _json_body(request)
+    return _service_response(ler_anexo_como_texto, pk, data.get('attachment_ref', ''))
 
 
 @require_GET
