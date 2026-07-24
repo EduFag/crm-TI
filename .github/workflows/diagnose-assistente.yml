@@ -1,0 +1,31 @@
+name: Diagnose Assistente
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: Journal Assistente
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Buscar logs do Assistente na VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 3m
+          script: |
+            set -e
+            echo "=== journal crm-ti (Assistente / LLM / ticket 378) ==="
+            sudo -n journalctl -u crm-ti --since "2026-07-24 16:00:00" --no-pager 2>/dev/null \
+              | grep -E "Assistente|LLM|ticket 378|Traceback|Error|Exception|is_interno|HTTP" \
+              | tail -n 200 || true
+            echo "=== últimas 80 linhas crm-ti ==="
+            sudo -n journalctl -u crm-ti -n 80 --no-pager 2>/dev/null || true
+            echo "=== migrate show helpdesk 0024 ==="
+            cd /home/edufa/crm-TI
+            source myvenv/bin/activate
+            python manage.py showmigrations helpdesk 2>/dev/null | tail -n 20 || true
