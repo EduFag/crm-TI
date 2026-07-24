@@ -1,8 +1,8 @@
-"""Cliente HTTP OpenAI-compatible (DeepSeek e similares)."""
+"""Cliente HTTP OpenAI-compatible (DeepSeek e similares) + visão multimodal."""
 
 from __future__ import annotations
 
-import json
+import base64
 import logging
 from typing import Any
 from urllib.parse import urljoin
@@ -13,9 +13,20 @@ from integracoes.models import AssistenteConfig, IntegracaoIA
 
 logger = logging.getLogger(__name__)
 
+# DeepSeek (api.deepseek.com) é só texto — image_url é rejeitado pelo schema.
+PROVEDORES_COM_VISAO = frozenset({
+    IntegracaoIA.Provider.CHATGPT,
+    IntegracaoIA.Provider.GEMINI,
+    IntegracaoIA.Provider.GROK,
+})
+
 
 class LlmError(Exception):
     pass
+
+
+def provedor_tem_visao(provider: str) -> bool:
+    return provider in PROVEDORES_COM_VISAO
 
 
 def obter_integracao_ativa() -> IntegracaoIA | None:
@@ -27,6 +38,27 @@ def obter_integracao_ativa() -> IntegracaoIA | None:
         .order_by('-updated_at')
         .first()
         or IntegracaoIA.objects.filter(is_active=True).order_by('-updated_at').first()
+    )
+
+
+def obter_integracao_visao() -> IntegracaoIA | None:
+    """
+    Integração multimodal para ler prints.
+    Prioridade: integracao_visao → integração principal (se multimodal) → qualquer ativa com visão.
+    """
+    config = AssistenteConfig.get_solo()
+    visao = getattr(config, 'integracao_visao', None)
+    if visao is not None and visao.is_active and provedor_tem_visao(visao.provider):
+        return visao
+
+    ativa = obter_integracao_ativa()
+    if ativa and provedor_tem_visao(ativa.provider):
+        return ativa
+
+    return (
+        IntegracaoIA.objects.filter(is_active=True, provider__in=PROVEDORES_COM_VISAO)
+        .order_by('-updated_at')
+        .first()
     )
 
 
@@ -46,28 +78,40 @@ def _resolver_endpoint_e_modelo(integracao: IntegracaoIA) -> tuple[str, str, str
         model = models[0]
     elif integracao.provider == IntegracaoIA.Provider.DEEPSEEK:
         model = 'deepseek-v4-flash'
+    elif integracao.provider == IntegracaoIA.Provider.CHATGPT:
+        model = 'gpt-4o-mini'
+    elif integracao.provider == IntegracaoIA.Provider.GEMINI:
+        model = 'gemini-2.0-flash'
     else:
-        model = 'deepseek-chat'
+        model = 'gpt-4o-mini'
     return api_key, base_url, model
 
 
 def _resolver_modelo_visao(integracao: IntegracaoIA) -> tuple[str, str, str]:
-    """Prefere modelo com visão (vl/vision/v4); DeepSeek → v4-flash se só houver alias legado."""
+    """Escolhe modelo multimodal na integração (nunca DeepSeek)."""
+    if not provedor_tem_visao(integracao.provider):
+        raise LlmError(
+            f'O provedor {integracao.get_provider_display()} não aceita imagem na API. '
+            'Cadastre ChatGPT (gpt-4o) ou Gemini para ler prints.'
+        )
+
     api_key, base_url, model_texto = _resolver_endpoint_e_modelo(integracao)
     creds = integracao.get_credentials()
     models = [str(m).strip() for m in (creds.get('models') or []) if str(m).strip()]
 
+    preferidos = ('gpt-4o', 'gemini', 'vision', 'vl', 'flash')
     for m in models:
         low = m.lower()
-        if any(x in low for x in ('vl', 'vision', 'v4', 'gpt-4o', 'gemini')):
+        if any(x in low for x in preferidos):
             return api_key, base_url, m
 
-    if integracao.provider == IntegracaoIA.Provider.DEEPSEEK:
-        # Alias legado deepseek-chat/reasoner: visão estável em v4-flash
-        return api_key, base_url, 'deepseek-v4-flash'
+    if integracao.provider == IntegracaoIA.Provider.GEMINI:
+        return api_key, base_url, models[0] if models else 'gemini-2.0-flash'
+    if integracao.provider == IntegracaoIA.Provider.CHATGPT:
+        return api_key, base_url, models[0] if models else 'gpt-4o-mini'
+    if integracao.provider == IntegracaoIA.Provider.GROK:
+        return api_key, base_url, models[0] if models else 'grok-2-vision-latest'
 
-    if len(models) > 1:
-        return api_key, base_url, models[1]
     return api_key, base_url, model_texto or (models[0] if models else 'gpt-4o-mini')
 
 
@@ -87,12 +131,6 @@ def chat_completion(
         raise LlmError('Nenhuma integração IA ativa.')
 
     api_key, base_url, model = _resolver_endpoint_e_modelo(integracao)
-    # DeepSeek: aliases antigos ainda funcionam, mas v4 é o padrão atual
-    if integracao.provider == IntegracaoIA.Provider.DEEPSEEK and model in (
-        'deepseek-chat', 'deepseek-reasoner',
-    ):
-        # Mantém alias se configurado; visão usa _resolver_modelo_visao
-        pass
     url = urljoin(base_url + '/', 'chat/completions')
     payload: dict[str, Any] = {
         'model': model,
@@ -130,41 +168,19 @@ def chat_text(messages: list[dict[str, Any]], **kwargs) -> str:
     return (msg.get('content') or '').strip()
 
 
-def chat_completion_vision(
+def _visao_openai_compatible(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
     prompt: str,
     image_bytes: bytes,
-    mime: str = 'image/jpeg',
-    *,
-    timeout: float = 90.0,
+    mime: str,
+    timeout: float,
 ) -> str:
-    """
-    Descreve uma imagem via content multimodal (OpenAI-compatible).
-    Preferir JPEG; imagem antes do texto no content (melhor compatibilidade).
-    """
-    import base64
-
-    integracao = obter_integracao_ativa()
-    if not integracao:
-        raise LlmError('Nenhuma integração IA ativa.')
-
-    if not image_bytes:
-        raise LlmError('Imagem vazia.')
-    if len(image_bytes) > 5 * 1024 * 1024:
-        raise LlmError('Imagem maior que 5MB.')
-
-    mime = (mime or 'image/jpeg').split(';')[0].strip().lower() or 'image/jpeg'
-    # Aceita octet-stream só se já normalizado como jpeg no caller; força jpeg
-    if mime == 'application/octet-stream':
-        mime = 'image/jpeg'
-    if not mime.startswith('image/'):
-        raise LlmError(f'Arquivo não é imagem (mime={mime}).')
-
-    api_key, base_url, model = _resolver_modelo_visao(integracao)
     b64 = base64.b64encode(image_bytes).decode('ascii')
     data_url = f'data:{mime};base64,{b64}'
-
     url = urljoin(base_url + '/', 'chat/completions')
-    # Imagem antes do texto — alguns provedores preferem essa ordem
     payload = {
         'model': model,
         'temperature': 0.2,
@@ -182,7 +198,7 @@ def chat_completion_vision(
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
-    logger.info('LLM visão model=%s mime=%s bytes=%s', model, mime, len(image_bytes))
+    logger.info('LLM visão (OpenAI-compat) model=%s mime=%s bytes=%s', model, mime, len(image_bytes))
     try:
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, headers=headers, json=payload)
@@ -194,7 +210,7 @@ def chat_completion_vision(
         logger.error('LLM visão HTTP %s model=%s: %s', resp.status_code, model, resp.text[:800])
         raise LlmError(
             f'Visão indisponível (HTTP {resp.status_code}, modelo {model}). '
-            'Use um modelo multimodal (ex.: deepseek-v4-flash / gpt-4o) na integração IA.'
+            'Cadastre ChatGPT (gpt-4o) ou Gemini na integração de visão.'
         )
 
     data = resp.json()
@@ -206,3 +222,108 @@ def chat_completion_vision(
     if not texto:
         raise LlmError('Modelo de visão retornou descrição vazia.')
     return texto
+
+
+def _visao_gemini(
+    *,
+    api_key: str,
+    model: str,
+    prompt: str,
+    image_bytes: bytes,
+    mime: str,
+    timeout: float,
+) -> str:
+    """Gemini generateContent com inline_data (visão nativa)."""
+    b64 = base64.b64encode(image_bytes).decode('ascii')
+    # model pode vir como "models/gemini-2.0-flash" ou só o id
+    model_id = model.split('/')[-1] if model else 'gemini-2.0-flash'
+    url = (
+        f'https://generativelanguage.googleapis.com/v1beta/models/'
+        f'{model_id}:generateContent'
+    )
+    payload = {
+        'contents': [
+            {
+                'parts': [
+                    {'inline_data': {'mime_type': mime, 'data': b64}},
+                    {'text': (prompt or '').strip() or 'Descreva a imagem.'},
+                ],
+            }
+        ],
+        'generationConfig': {'temperature': 0.2},
+    }
+    logger.info('LLM visão (Gemini) model=%s mime=%s bytes=%s', model_id, mime, len(image_bytes))
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, params={'key': api_key}, json=payload)
+    except httpx.HTTPError as exc:
+        logger.exception('Falha de rede no Gemini visão')
+        raise LlmError(f'Falha de rede (visão Gemini): {exc}') from exc
+
+    if resp.status_code >= 400:
+        logger.error('Gemini visão HTTP %s: %s', resp.status_code, resp.text[:800])
+        raise LlmError(f'Visão Gemini indisponível (HTTP {resp.status_code}).')
+
+    data = resp.json()
+    try:
+        parts = data['candidates'][0]['content']['parts']
+        textos = [p.get('text', '') for p in parts if isinstance(p, dict)]
+        texto = '\n'.join(t for t in textos if t).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmError('Resposta de visão Gemini inválida.') from exc
+    if not texto:
+        raise LlmError('Gemini retornou descrição vazia.')
+    return texto
+
+
+def chat_completion_vision(
+    prompt: str,
+    image_bytes: bytes,
+    mime: str = 'image/jpeg',
+    *,
+    timeout: float = 90.0,
+) -> str:
+    """
+    Descreve uma imagem via provedor multimodal (ChatGPT / Gemini / Grok).
+    DeepSeek não entra aqui — a API oficial é só texto.
+    """
+    integracao = obter_integracao_visao()
+    if not integracao:
+        raise LlmError(
+            'Nenhuma integração com visão configurada. '
+            'DeepSeek lê só texto: cadastre ChatGPT (gpt-4o) ou Gemini em '
+            'Integrações → Aprendizado IA → Integração de visão (prints).'
+        )
+
+    if not image_bytes:
+        raise LlmError('Imagem vazia.')
+    if len(image_bytes) > 5 * 1024 * 1024:
+        raise LlmError('Imagem maior que 5MB.')
+
+    mime = (mime or 'image/jpeg').split(';')[0].strip().lower() or 'image/jpeg'
+    if mime == 'application/octet-stream':
+        mime = 'image/jpeg'
+    if not mime.startswith('image/'):
+        raise LlmError(f'Arquivo não é imagem (mime={mime}).')
+
+    api_key, base_url, model = _resolver_modelo_visao(integracao)
+
+    if integracao.provider == IntegracaoIA.Provider.GEMINI:
+        return _visao_gemini(
+            api_key=api_key,
+            model=model,
+            prompt=prompt,
+            image_bytes=image_bytes,
+            mime=mime,
+            timeout=timeout,
+        )
+
+    return _visao_openai_compatible(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        prompt=prompt,
+        image_bytes=image_bytes,
+        mime=mime,
+        timeout=timeout,
+    )

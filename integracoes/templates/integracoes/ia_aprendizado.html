@@ -61,7 +61,7 @@
                     <span class="text-sm font-semibold text-slate-800">Ativar Assistente no Helpdesk</span>
                 </label>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração preferencial</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração preferencial (chat/tools)</label>
                     <select name="integracao"
                             class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2.5">
                         <option value="">Primeira integração ativa (DeepSeek se houver)</option>
@@ -71,6 +71,22 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração de visão (prints)</label>
+                    <select name="integracao_visao"
+                            class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2.5">
+                        <option value="">Automático (ChatGPT/Gemini ativos)</option>
+                        {% for integ in integracoes %}
+                        <option value="{{ integ.pk }}" {% if config.integracao_visao_id == integ.pk %}selected{% endif %}>
+                            {{ integ.name }} ({{ integ.get_provider_display }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-[11px] text-slate-500 mt-1.5">
+                        DeepSeek não lê imagem na API. Para o Assistente ver prints, cadastre e selecione
+                        ChatGPT (gpt-4o) ou Gemini aqui.
+                    </p>
                 </div>
                 <button type="submit"
                         class="inline-flex items-center px-5 py-2.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">

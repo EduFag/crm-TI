@@ -164,7 +164,10 @@ TOOLS_SPEC = [
             'name': 'ler_imagem_anexo',
             'description': (
                 'Lê/descreve uma imagem anexada (print). Use ref de listar_anexos '
-                '(ticket:ID ou comment:ID). Se falhar, peça ao usuário descrever o print.'
+                '(ticket:ID ou comment:ID). Se o contexto já trouxer '
+                '"Descrição das imagens anexadas", use esses dados. '
+                'Se a leitura falhar, continue com título/descrição/categoria — '
+                'NÃO peça ao solicitante para descrever o print se o texto já explicar o pedido.'
             ),
             'parameters': {
                 'type': 'object',
@@ -336,9 +339,11 @@ TOOLS_SPEC = [
         'function': {
             'name': 'escalar_para_ti',
             'description': (
-                'Encerra o Assistente e pede técnico de TI. Use para MoneyConsig, AnyDesk, '
-                'hardware, permissões ou quando o discador estiver no limite e precisar '
-                'aumentar contrato.'
+                'Encerra o Assistente e pede técnico de TI. Use para MoneyConsig '
+                '(sistema interno Money Promotora), AnyDesk, hardware, permissões '
+                'ou quando o discador estiver no limite e precisar aumentar contrato. '
+                'Nunca diga que MoneyConsig é de terceiros ou que o solicitante deve '
+                'abrir chamado no suporte JoyTec/fornecedor externo.'
             ),
             'parameters': {
                 'type': 'object',
@@ -421,6 +426,15 @@ def _system_prompt() -> str:
     return (
         'Você é o Assistente de TI da Money Promotora no helpdesk. '
         'Responda em português, claro e profissional, alinhado aos chunks de aprendizado.\n\n'
+        'Sistemas da empresa (NÃO são terceiros):\n'
+        '- MoneyConsig / sistema.moneypromotora.com.br: sistema INTERNO da Money Promotora. '
+        'A equipe de TI desta empresa é responsável (abas, presença, rankings, acessos, UI). '
+        'Nunca diga que é sistema externo, JoyTec de terceiros, ou que o solicitante deve '
+        'abrir chamado no suporte do fornecedor. Para alteração de aba/permissão/acesso → '
+        'escalar_para_ti com motivo.\n'
+        '- Discador JoyTec: ferramenta usada internamente; a TI gerencia acessos/licenças '
+        'pelas tools do discador. Só escale se precisar de ação humana (limite de contrato, etc.).\n'
+        '- CRM e este helpdesk: também internos.\n\n'
         'Formato das mensagens:\n'
         '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
         '- Envie 2–4 mensagens curtas via send_assistente_message (1–3 frases cada). '
@@ -434,6 +448,8 @@ def _system_prompt() -> str:
         '- Se houver anexos de imagem, use listar_anexos e ler_imagem_anexo ANTES de decidir. '
         'Se o contexto já trouxer "Descrição das imagens anexadas", use essa descrição '
         'e NÃO diga que não conseguiu ver o print.\n'
+        '- Se a leitura da imagem falhar, NÃO peça para descrever o print quando título, '
+        'descrição ou categoria já deixarem o pedido claro — aja com esse texto.\n'
         '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
         'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
         'ANTES ou JUNTO das mensagens ao solicitante.\n'
@@ -444,8 +460,9 @@ def _system_prompt() -> str:
         'Se no_limite/estourado e precisar de slot novo, explique e escalar_para_ti.\n'
         '- Acesso CRM: pergunte qual sistema; use consultar_usuario para caso individual.\n'
         '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
-        '- Ações externas (MoneyConsig, AnyDesk, hardware, permissões fora do CRM/discador): '
-        'oriente conforme o chunk e escalar_para_ti com motivo.\n'
+        '- Hardware, AnyDesk, permissões de rede e mudanças no MoneyConsig (UI/abas/acessos): '
+        'explique que a TI interna trata e use escalar_para_ti. '
+        'Não oriente a procurar suporte externo para MoneyConsig.\n'
         '- Só use RESOLVED se o problema foi resolvido sem TI (recusa usa recusar_chamado).\n'
         '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
         '- Não invente procedimentos fora dos chunks e do histórico.'
@@ -705,6 +722,13 @@ def processar_assistente(ticket_id: int) -> None:
             '\n\nDescrição das imagens anexadas (já lidas pela visão — use estes dados; '
             'não diga que não conseguiu ver o print):\n' + desc_imgs
         )
+        if 'falha ao ler imagem' in desc_imgs.lower() or 'erro ao ler imagem' in desc_imgs.lower():
+            contexto += (
+                '\n\nNota: a leitura automática do print falhou (provedor de visão pode '
+                'estar ausente — DeepSeek é só texto). NÃO peça ao solicitante para '
+                'descrever a imagem se título/descrição/categoria já explicarem o pedido. '
+                'MoneyConsig é sistema INTERNO da Money Promotora; escale para a TI interna.'
+            )
 
     messages: list[dict[str, Any]] = [
         {'role': 'system', 'content': _system_prompt()},

@@ -79,6 +79,17 @@ class AssistenteConfig(models.Model):
         related_name='configs_assistente',
         help_text='Integração IA preferencial (senão usa a primeira ativa).',
     )
+    integracao_visao = models.ForeignKey(
+        IntegracaoIA,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='configs_assistente_visao',
+        help_text=(
+            'Integração multimodal para ler prints (ChatGPT/Gemini). '
+            'DeepSeek não lê imagem — use outro provedor aqui.'
+        ),
+    )
     atualizado_em = models.DateTimeField(auto_now=True)
     ultima_geracao_em = models.DateTimeField(
         null=True,

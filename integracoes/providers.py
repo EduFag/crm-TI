@@ -13,12 +13,12 @@ CAMPOS_META = frozenset({'name', 'provider', 'is_active'})
 PROVIDER_CONFIG = {
     IntegracaoIA.Provider.DEEPSEEK: {
         'label': 'DeepSeek',
-        'descricao': 'Modelos DeepSeek Chat / Reasoner',
+        'descricao': 'Modelos DeepSeek Chat / Reasoner (somente texto — prints usam ChatGPT/Gemini)',
         'accent': 'slate',
         'base_url': 'https://api.deepseek.com',
         'models': [
-            {'id': 'deepseek-v4-flash', 'label': 'DeepSeek V4 Flash (texto + visão)'},
-            {'id': 'deepseek-v4-pro', 'label': 'DeepSeek V4 Pro (texto + visão)'},
+            {'id': 'deepseek-v4-flash', 'label': 'DeepSeek V4 Flash (texto)'},
+            {'id': 'deepseek-v4-pro', 'label': 'DeepSeek V4 Pro (texto)'},
             {'id': 'deepseek-chat', 'label': 'DeepSeek Chat (alias legado)'},
             {'id': 'deepseek-reasoner', 'label': 'DeepSeek Reasoner (alias legado)'},
         ],

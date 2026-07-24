@@ -590,8 +590,9 @@ def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
 
     prompt = (
         'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
-        'Inclua textos visíveis (OCR), números de telefone, nomes de campanha, erros na tela, '
-        'prints de discador/WhatsApp/sistemas e qualquer detalhe relevante para o chamado. '
+        'Inclua textos visíveis (OCR), URLs, nomes de sistema (ex.: MoneyConsig, sistema.moneypromotora.com.br), '
+        'números de telefone, nomes de campanha, erros na tela, menus/abas e qualquer detalhe relevante. '
+        'Se reconhecer o sistema Money Promotora / MoneyConsig, diga explicitamente que é o sistema interno. '
         'Se a imagem estiver ilegível, diga isso claramente.'
     )
     try:
@@ -599,7 +600,8 @@ def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
     except LlmError as exc:
         raise AssistenteServiceError(
             f'Não foi possível ler a imagem (visão/LLM): {exc}. '
-            'Peça ao solicitante descrever o print em texto.'
+            'Continue com título, descrição e categoria do chamado; '
+            'não peça ao solicitante descrever o print se o texto já for suficiente.'
         ) from exc
 
     return {

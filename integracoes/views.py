@@ -282,6 +282,11 @@ def ia_aprendizado_toggle(request):
         config.integracao_id = int(integracao_id)
     elif integracao_id == '':
         config.integracao = None
+    visao_id = (request.POST.get('integracao_visao') or '').strip()
+    if visao_id.isdigit():
+        config.integracao_visao_id = int(visao_id)
+    elif visao_id == '':
+        config.integracao_visao = None
     config.save()
     estado = 'ativado' if config.ativo else 'desativado'
     registrar_acao(
