@@ -42,17 +42,33 @@ def _resolver_endpoint_e_modelo(integracao: IntegracaoIA) -> tuple[str, str, str
     if not base_url:
         raise LlmError('Integração sem base_url.')
     models = creds.get('models') or []
-    model = models[0] if models else 'deepseek-chat'
+    if models:
+        model = models[0]
+    elif integracao.provider == IntegracaoIA.Provider.DEEPSEEK:
+        model = 'deepseek-v4-flash'
+    else:
+        model = 'deepseek-chat'
     return api_key, base_url, model
 
 
 def _resolver_modelo_visao(integracao: IntegracaoIA) -> tuple[str, str, str]:
-    """Usa o 2º modelo da lista (VL) se existir; senão o 1º."""
+    """Prefere modelo com visão (vl/vision/v4); DeepSeek → v4-flash se só houver alias legado."""
     api_key, base_url, model_texto = _resolver_endpoint_e_modelo(integracao)
     creds = integracao.get_credentials()
-    models = creds.get('models') or []
-    model = models[1] if len(models) > 1 else model_texto
-    return api_key, base_url, model
+    models = [str(m).strip() for m in (creds.get('models') or []) if str(m).strip()]
+
+    for m in models:
+        low = m.lower()
+        if any(x in low for x in ('vl', 'vision', 'v4', 'gpt-4o', 'gemini')):
+            return api_key, base_url, m
+
+    if integracao.provider == IntegracaoIA.Provider.DEEPSEEK:
+        # Alias legado deepseek-chat/reasoner: visão estável em v4-flash
+        return api_key, base_url, 'deepseek-v4-flash'
+
+    if len(models) > 1:
+        return api_key, base_url, models[1]
+    return api_key, base_url, model_texto or (models[0] if models else 'gpt-4o-mini')
 
 
 def chat_completion(
@@ -71,6 +87,12 @@ def chat_completion(
         raise LlmError('Nenhuma integração IA ativa.')
 
     api_key, base_url, model = _resolver_endpoint_e_modelo(integracao)
+    # DeepSeek: aliases antigos ainda funcionam, mas v4 é o padrão atual
+    if integracao.provider == IntegracaoIA.Provider.DEEPSEEK and model in (
+        'deepseek-chat', 'deepseek-reasoner',
+    ):
+        # Mantém alias se configurado; visão usa _resolver_modelo_visao
+        pass
     url = urljoin(base_url + '/', 'chat/completions')
     payload: dict[str, Any] = {
         'model': model,
@@ -113,11 +135,11 @@ def chat_completion_vision(
     image_bytes: bytes,
     mime: str = 'image/jpeg',
     *,
-    timeout: float = 60.0,
+    timeout: float = 90.0,
 ) -> str:
     """
     Descreve uma imagem via content multimodal (OpenAI-compatible).
-    Modelo: 2º da lista de credenciais (visão), ou o 1º se só houver um.
+    Preferir JPEG; imagem antes do texto no content (melhor compatibilidade).
     """
     import base64
 
@@ -131,14 +153,18 @@ def chat_completion_vision(
         raise LlmError('Imagem maior que 5MB.')
 
     mime = (mime or 'image/jpeg').split(';')[0].strip().lower() or 'image/jpeg'
+    # Aceita octet-stream só se já normalizado como jpeg no caller; força jpeg
+    if mime == 'application/octet-stream':
+        mime = 'image/jpeg'
     if not mime.startswith('image/'):
-        raise LlmError('Arquivo não é imagem.')
+        raise LlmError(f'Arquivo não é imagem (mime={mime}).')
 
     api_key, base_url, model = _resolver_modelo_visao(integracao)
     b64 = base64.b64encode(image_bytes).decode('ascii')
     data_url = f'data:{mime};base64,{b64}'
 
     url = urljoin(base_url + '/', 'chat/completions')
+    # Imagem antes do texto — alguns provedores preferem essa ordem
     payload = {
         'model': model,
         'temperature': 0.2,
@@ -146,8 +172,8 @@ def chat_completion_vision(
             {
                 'role': 'user',
                 'content': [
-                    {'type': 'text', 'text': (prompt or '').strip() or 'Descreva a imagem.'},
                     {'type': 'image_url', 'image_url': {'url': data_url}},
+                    {'type': 'text', 'text': (prompt or '').strip() or 'Descreva a imagem.'},
                 ],
             }
         ],
@@ -156,6 +182,7 @@ def chat_completion_vision(
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
+    logger.info('LLM visão model=%s mime=%s bytes=%s', model, mime, len(image_bytes))
     try:
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, headers=headers, json=payload)
@@ -164,10 +191,10 @@ def chat_completion_vision(
         raise LlmError(f'Falha de rede (visão): {exc}') from exc
 
     if resp.status_code >= 400:
-        logger.error('LLM visão HTTP %s: %s', resp.status_code, resp.text[:500])
+        logger.error('LLM visão HTTP %s model=%s: %s', resp.status_code, model, resp.text[:800])
         raise LlmError(
-            f'Visão indisponível (HTTP {resp.status_code}). '
-            'Configure um modelo multimodal como 2º modelo na integração IA.'
+            f'Visão indisponível (HTTP {resp.status_code}, modelo {model}). '
+            'Use um modelo multimodal (ex.: deepseek-v4-flash / gpt-4o) na integração IA.'
         )
 
     data = resp.json()

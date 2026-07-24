@@ -17,10 +17,12 @@ PROVIDER_CONFIG = {
         'accent': 'slate',
         'base_url': 'https://api.deepseek.com',
         'models': [
-            {'id': 'deepseek-chat', 'label': 'DeepSeek Chat'},
-            {'id': 'deepseek-reasoner', 'label': 'DeepSeek Reasoner'},
+            {'id': 'deepseek-v4-flash', 'label': 'DeepSeek V4 Flash (texto + visão)'},
+            {'id': 'deepseek-v4-pro', 'label': 'DeepSeek V4 Pro (texto + visão)'},
+            {'id': 'deepseek-chat', 'label': 'DeepSeek Chat (alias legado)'},
+            {'id': 'deepseek-reasoner', 'label': 'DeepSeek Reasoner (alias legado)'},
         ],
-        'default_models': ['deepseek-chat'],
+        'default_models': ['deepseek-v4-flash'],
         'fields': [
             {'name': 'name', 'label': 'Nome', 'type': 'text', 'required': True, 'placeholder': 'Ex.: DeepSeek produção'},
             {'name': 'api_key', 'label': 'API Key', 'type': 'password', 'required': True, 'sensitive': True, 'placeholder': 'sk-...'},

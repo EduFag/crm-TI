@@ -431,7 +431,9 @@ def _system_prompt() -> str:
         'Procedimentos:\n'
         '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
         '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
-        '- Se houver anexos de imagem, use listar_anexos e ler_imagem_anexo ANTES de decidir.\n'
+        '- Se houver anexos de imagem, use listar_anexos e ler_imagem_anexo ANTES de decidir. '
+        'Se o contexto já trouxer "Descrição das imagens anexadas", use essa descrição '
+        'e NÃO diga que não conseguiu ver o print.\n'
         '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
         'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
         'ANTES ou JUNTO das mensagens ao solicitante.\n'
@@ -651,6 +653,33 @@ def _garantir_triagem(ticket_id: int, messages: list[dict[str, Any]]) -> None:
             logger.exception('Falha no fallback de triagem do ticket %s', ticket_id)
 
 
+def _descricoes_imagens_anexo(ticket_id: int) -> str:
+    """Pré-lê imagens do chamado para o contexto (não depende da IA chamar a tool)."""
+    try:
+        data = listar_anexos_ticket(ticket_id)
+    except AssistenteServiceError:
+        return ''
+    imagens = [a for a in (data.get('results') or []) if a.get('is_image')]
+    if not imagens:
+        return ''
+
+    linhas = []
+    for a in imagens[:4]:
+        ref = a.get('ref') or ''
+        nome = a.get('nome') or ref
+        try:
+            res = descrever_imagem_anexo(ticket_id, ref)
+            desc = (res.get('descricao') or '').strip()
+            linhas.append(f'- {ref} ({nome}): {desc}')
+        except AssistenteServiceError as exc:
+            logger.warning('Falha ao pré-ler imagem %s ticket %s: %s', ref, ticket_id, exc)
+            linhas.append(f'- {ref} ({nome}): [falha ao ler imagem: {exc}]')
+        except Exception:
+            logger.exception('Erro inesperado ao pré-ler imagem %s', ref)
+            linhas.append(f'- {ref} ({nome}): [erro ao ler imagem]')
+    return '\n'.join(linhas)
+
+
 def processar_assistente(ticket_id: int) -> None:
     """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
@@ -669,11 +698,19 @@ def processar_assistente(ticket_id: int) -> None:
         )
         return
 
+    contexto = _montar_contexto(ticket)
+    desc_imgs = _descricoes_imagens_anexo(ticket_id)
+    if desc_imgs:
+        contexto += (
+            '\n\nDescrição das imagens anexadas (já lidas pela visão — use estes dados; '
+            'não diga que não conseguiu ver o print):\n' + desc_imgs
+        )
+
     messages: list[dict[str, Any]] = [
         {'role': 'system', 'content': _system_prompt()},
         {
             'role': 'user',
-            'content': 'Analise o chamado e aja (tools). Contexto:\n\n' + _montar_contexto(ticket),
+            'content': 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto,
         },
     ]
 

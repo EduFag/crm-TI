@@ -421,10 +421,52 @@ def recusar_chamado(ticket_id: int, motivo: str) -> dict:
 def _mime_e_ext(nome: str, content_type: str | None = None) -> tuple[str, str]:
     ext = os.path.splitext(nome or '')[1].lower()
     mime = (content_type or '').split(';')[0].strip().lower()
-    if not mime:
+    # Mapeia extensão → mime (Windows às vezes não conhece webp)
+    por_ext = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif',
+        '.bmp': 'image/bmp',
+    }
+    if ext in por_ext:
+        mime = por_ext[ext]
+    elif not mime or mime == 'application/octet-stream':
         guessed, _ = mimetypes.guess_type(nome or '')
-        mime = guessed or 'application/octet-stream'
+        mime = (guessed or 'application/octet-stream').split(';')[0].strip().lower()
     return mime, ext
+
+
+def _normalizar_imagem_para_visao(raw: bytes, mime: str, ext: str) -> tuple[bytes, str]:
+    """
+    Converte qualquer formato (webp/png/gif/bmp) para JPEG RGB e reduz se grande.
+    APIs de visão costumam falhar com webp ou mime octet-stream.
+    """
+    import io
+
+    from PIL import Image
+
+    try:
+        img = Image.open(io.BytesIO(raw))
+        if getattr(img, 'n_frames', 1) > 1:
+            img.seek(0)
+        img = img.convert('RGB')
+        # Limita dimensão para caber no payload e acelerar OCR
+        max_lado = 1600
+        w, h = img.size
+        if max(w, h) > max_lado:
+            img.thumbnail((max_lado, max_lado), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=85, optimize=True)
+        return buf.getvalue(), 'image/jpeg'
+    except Exception as exc:
+        # Se Pillow falhar e já for jpeg/png reconhecido, devolve original
+        if mime in ('image/jpeg', 'image/png') and raw:
+            return raw, mime
+        raise AssistenteServiceError(
+            f'Não foi possível processar a imagem ({ext or mime}): {exc}'
+        ) from exc
 
 
 def listar_anexos_ticket(ticket_id: int) -> dict:
@@ -538,20 +580,13 @@ def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
     if not raw:
         raise AssistenteServiceError('Arquivo de imagem vazio.')
 
-    # GIF animado: usa 1º frame via Pillow para reduzir payload
-    if ext == '.gif' or mime == 'image/gif':
-        try:
-            import io
-            from PIL import Image
-            img = Image.open(io.BytesIO(raw))
-            img.seek(0)
-            buf = io.BytesIO()
-            frame = img.convert('RGB')
-            frame.save(buf, format='JPEG', quality=85)
-            raw = buf.getvalue()
-            mime = 'image/jpeg'
-        except Exception:
-            pass
+    # Sempre normaliza para JPEG (webp/gif/bmp e mime errado quebram a visão)
+    raw, mime = _normalizar_imagem_para_visao(raw, mime or '', ext or '')
+
+    if len(raw) > 4 * 1024 * 1024:
+        raise AssistenteServiceError(
+            'Imagem ainda grande demais após compressão. Peça um print menor.'
+        )
 
     prompt = (
         'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
