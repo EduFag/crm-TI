@@ -715,7 +715,7 @@ def ticket_edit(request, pk):
 @requer_modulo(MODULO_HELPDESK)
 @require_POST
 def ticket_transfer(request, pk):
-    """Transferência rápida de técnico responsável (somente ADMIN/superuser)."""
+    """Transferência rápida de técnico responsável (somente operadores)."""
     if not usuario_pode_transferir_chamado(request.user):
         return HttpResponseForbidden('Sem permissão para transferir chamados.')
 
@@ -724,7 +724,44 @@ def ticket_transfer(request, pk):
         pk=pk,
         is_active=True,
     )
-    tecnico_id = request.POST.get('assigned_to')
+    tecnico_id = (request.POST.get('assigned_to') or '').strip()
+
+    # Em Novos: permitir remover o responsável residual
+    if tecnico_id == '__remover__':
+        if ticket.status != Ticket.StatusChoices.NEW:
+            return HttpResponseForbidden('Só é possível remover o técnico em chamados Novos.')
+        if not ticket.assigned_to_id:
+            return render(request, 'helpdesk/_drawer.html', _contexto_drawer(request, ticket))
+
+        anterior = ticket.assigned_to
+        ticket.assigned_to = None
+        ticket.assistente_escalado = False
+        ticket.save(update_fields=['assigned_to', 'assistente_escalado', 'updated_at'])
+        Comment.objects.create(
+            ticket=ticket,
+            author=request.user,
+            text=(
+                f'Técnico removido ({_nome_usuario(anterior)}). '
+                f'Chamado sem responsável na coluna Novos.'
+            ),
+        )
+        log_transferencia(
+            ticket,
+            request.user,
+            _nome_usuario(anterior),
+            'Nenhum',
+        )
+        adicionar_nao_lido(ticket, request.user)
+        _agendar_assistente(ticket.pk)
+        ticket.refresh_from_db()
+        response = render(
+            request,
+            'helpdesk/_drawer.html',
+            _contexto_drawer(request, ticket),
+        )
+        response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
+        return response
+
     if not tecnico_id:
         return HttpResponseForbidden('Selecione um técnico.')
 

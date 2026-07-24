@@ -177,8 +177,11 @@
                   class="flex gap-2 items-end">
                 {% csrf_token %}
                 <div class="flex-1">
-                    <select name="assigned_to" required class="w-full text-sm p-2 border border-slate-300 rounded-lg bg-white">
+                    <select name="assigned_to" class="w-full text-sm p-2 border border-slate-300 rounded-lg bg-white">
                         <option value="">Selecione o técnico</option>
+                        {% if ticket.status == 'NEW' and ticket.assigned_to_id %}
+                        <option value="__remover__">Sem técnico (remover responsável)</option>
+                        {% endif %}
                         {% for tecnico in tecnicos %}
                         <option value="{{ tecnico.pk }}" {% if ticket.assigned_to_id == tecnico.pk %}selected{% endif %}>
                             {{ tecnico.get_full_name|default:tecnico.username }}
@@ -187,9 +190,12 @@
                     </select>
                 </div>
                 <button type="submit" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                    Transferir
+                    {% if ticket.status == 'NEW' and ticket.assigned_to_id %}Aplicar{% else %}Transferir{% endif %}
                 </button>
             </form>
+            {% if ticket.status == 'NEW' and ticket.assigned_to_id %}
+            <p class="text-[11px] text-slate-500 mt-2">Em Novos você pode remover o técnico para o Assistente voltar a atender.</p>
+            {% endif %}
         </div>
         {% endif %}
 
