@@ -1,10 +1,16 @@
 """
-Follow-up automático do Assistente quando solicitante/criador não responde.
+Follow-up automático do Assistente quando solicitante/criador NUNCA respondeu.
+
+Escopo: chamados em que a IA mandou mensagem pública e o solicitante/criador
+não enviou nenhuma mensagem depois (sem diálogo). Não se aplica a chamados
+que já tiveram troca de mensagens com a IA.
 
 - 5 min sem resposta → mensagem pública com @menção
 - 20 min sem resposta → recusa com motivo "Sem resposta"
+  (arquivamento continua só após 24h, pelo fluxo padrão)
 
-Disparado de forma leve no poll HTMX (com throttle), como o arquivamento.
+Também sincroniza chamados antigos (ex.: Novos com IA antes do deploy).
+Disparado no poll HTMX (throttle), como o arquivamento.
 """
 
 from __future__ import annotations
@@ -37,10 +43,81 @@ def limpar_espera_assistente(ticket, *, save: bool = True) -> None:
         ])
 
 
+def _ids_solicitante_criador(ticket) -> set[int]:
+    ids = set()
+    if ticket.requester_user_id:
+        ids.add(ticket.requester_user_id)
+    if ticket.created_by_id:
+        ids.add(ticket.created_by_id)
+    return ids
+
+
+def primeira_mensagem_assistente_publica(ticket):
+    """Primeira mensagem pública ativa do Assistente no chamado."""
+    from helpdesk.models import Comment
+
+    return (
+        Comment.objects.filter(
+            ticket=ticket,
+            is_active=True,
+            is_assistente=True,
+            is_interno=False,
+        )
+        .order_by('created_at')
+        .first()
+    )
+
+
+def solicitante_respondeu_apos_assistente(ticket, desde=None) -> bool:
+    """
+    True se solicitante/criador já mandou mensagem pública após a IA
+    (configura 'teve diálogo' — exceção do follow-up automático).
+    """
+    from helpdesk.models import Comment
+
+    ids = _ids_solicitante_criador(ticket)
+    if not ids:
+        return False
+
+    qs = Comment.objects.filter(
+        ticket=ticket,
+        is_active=True,
+        is_assistente=False,
+        is_interno=False,
+        author_id__in=ids,
+    )
+    if desde is not None:
+        qs = qs.filter(created_at__gt=desde)
+    else:
+        primeira = primeira_mensagem_assistente_publica(ticket)
+        if not primeira:
+            return False
+        qs = qs.filter(created_at__gt=primeira.created_at)
+    return qs.exists()
+
+
+def ticket_elegivel_followup_sem_resposta(ticket) -> bool:
+    """IA falou em público e solicitante/criador nunca respondeu depois."""
+    primeira = primeira_mensagem_assistente_publica(ticket)
+    if not primeira:
+        return False
+    if solicitante_respondeu_apos_assistente(ticket, desde=primeira.created_at):
+        return False
+    return True
+
+
 def marcar_espera_assistente(ticket) -> None:
-    """Inicia/reinicia a espera após mensagem pública normal do Assistente."""
-    agora = timezone.now()
-    ticket.assistente_aguardando_desde = agora
+    """
+    Marca início da espera na 1ª mensagem pública do Assistente.
+    Não reinicia em bolhas seguintes; não marca se já houve diálogo.
+    """
+    if ticket.assistente_aguardando_desde is not None:
+        return
+    if solicitante_respondeu_apos_assistente(ticket):
+        return
+    primeira = primeira_mensagem_assistente_publica(ticket)
+    inicio = primeira.created_at if primeira else timezone.now()
+    ticket.assistente_aguardando_desde = inicio
     ticket.assistente_followup_mencao_em = None
     ticket.save(update_fields=[
         'assistente_aguardando_desde',
@@ -165,10 +242,77 @@ def _recusar_sem_resposta(ticket) -> bool:
         return False
 
 
+def sincronizar_espera_tickets_sem_resposta() -> int:
+    """
+    Preenche assistente_aguardando_desde em Novos onde a IA falou e
+    o solicitante/criador nunca respondeu (inclui chamados anteriores ao deploy).
+    """
+    from helpdesk.assistente_services import assistente_pode_atuar
+    from helpdesk.models import Comment, Ticket
+
+    # Tickets com pelo menos uma mensagem pública do Assistente
+    com_ia = Comment.objects.filter(
+        is_active=True,
+        is_assistente=True,
+        is_interno=False,
+    ).values_list('ticket_id', flat=True).distinct()
+
+    qs = (
+        Ticket.objects.filter(
+            pk__in=com_ia,
+            is_active=True,
+            is_archived=False,
+            is_rejected=False,
+            assistente_escalado=False,
+            status=Ticket.StatusChoices.NEW,
+        )
+        .select_related('requester_user', 'created_by', 'assigned_to')
+        .order_by('id')[:80]
+    )
+
+    sincronizados = 0
+    for ticket in qs:
+        try:
+            if not assistente_pode_atuar(ticket):
+                if ticket.assistente_aguardando_desde is not None:
+                    limpar_espera_assistente(ticket)
+                continue
+
+            primeira = primeira_mensagem_assistente_publica(ticket)
+            if not primeira:
+                continue
+
+            if solicitante_respondeu_apos_assistente(ticket, desde=primeira.created_at):
+                # Teve diálogo — não entra no follow-up automático
+                if ticket.assistente_aguardando_desde is not None:
+                    limpar_espera_assistente(ticket)
+                continue
+
+            # Sem resposta: ancora o timer na 1ª mensagem da IA
+            if ticket.assistente_aguardando_desde != primeira.created_at:
+                ticket.assistente_aguardando_desde = primeira.created_at
+                # Mantém menção se já cobrou depois da 1ª msg; senão zera
+                if (
+                    ticket.assistente_followup_mencao_em
+                    and ticket.assistente_followup_mencao_em < primeira.created_at
+                ):
+                    ticket.assistente_followup_mencao_em = None
+                ticket.save(update_fields=[
+                    'assistente_aguardando_desde',
+                    'assistente_followup_mencao_em',
+                    'updated_at',
+                ])
+                sincronizados += 1
+        except Exception:
+            logger.exception('Falha ao sincronizar espera do ticket %s', ticket.pk)
+
+    return sincronizados
+
+
 def processar_followups_assistente(*, forcar: bool = False) -> dict:
     """
-    Varre chamados aguardando resposta e aplica menção (5min) / recusa (20min).
-    Throttle global de 30s para não sobrecarregar o poll.
+    1) Sincroniza Novos com IA sem resposta (legado + atuais)
+    2) Aplica menção (5min) / recusa (20min)
     """
     global _ultimo_run
 
@@ -181,6 +325,8 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
     from helpdesk.assistente_services import assistente_pode_atuar
     from helpdesk.models import Ticket
 
+    sincronizados = sincronizar_espera_tickets_sem_resposta()
+
     mencoes = 0
     recusas = 0
     qs = (
@@ -190,8 +336,8 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
             is_rejected=False,
             assistente_escalado=False,
             assistente_aguardando_desde__isnull=False,
+            status=Ticket.StatusChoices.NEW,
         )
-        .exclude(status=Ticket.StatusChoices.RESOLVED)
         .select_related('requester_user', 'created_by', 'assigned_to')
         .order_by('assistente_aguardando_desde')[:40]
     )
@@ -202,17 +348,22 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
                 limpar_espera_assistente(ticket)
                 continue
 
+            # Revalida: se já houve diálogo, sai
+            if not ticket_elegivel_followup_sem_resposta(ticket):
+                limpar_espera_assistente(ticket)
+                continue
+
             espera = agora - ticket.assistente_aguardando_desde
             if espera >= timedelta(seconds=SEGUNDOS_RECUSA):
                 desde = ticket.assistente_aguardando_desde
                 mencao_em = ticket.assistente_followup_mencao_em
-                # Reserva atômica para evitar dupla recusa entre workers
                 n = Ticket.objects.filter(
                     pk=ticket.pk,
                     assistente_aguardando_desde=desde,
                     is_rejected=False,
                     assistente_escalado=False,
-                ).exclude(status=Ticket.StatusChoices.RESOLVED).update(
+                    status=Ticket.StatusChoices.NEW,
+                ).update(
                     assistente_aguardando_desde=None,
                     assistente_followup_mencao_em=None,
                     updated_at=agora,
@@ -226,7 +377,8 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
                         pk=ticket.pk,
                         assistente_aguardando_desde__isnull=True,
                         is_rejected=False,
-                    ).exclude(status=Ticket.StatusChoices.RESOLVED).update(
+                        status=Ticket.StatusChoices.NEW,
+                    ).update(
                         assistente_aguardando_desde=desde,
                         assistente_followup_mencao_em=mencao_em,
                         updated_at=timezone.now(),
@@ -241,6 +393,7 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
                     pk=ticket.pk,
                     assistente_followup_mencao_em__isnull=True,
                     assistente_aguardando_desde=ticket.assistente_aguardando_desde,
+                    status=Ticket.StatusChoices.NEW,
                 ).update(
                     assistente_followup_mencao_em=agora,
                     updated_at=agora,
@@ -251,7 +404,6 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
                 if _enviar_cobranca_mencao(ticket):
                     mencoes += 1
                 else:
-                    # Libera para tentar de novo no próximo ciclo
                     Ticket.objects.filter(pk=ticket.pk).update(
                         assistente_followup_mencao_em=None,
                         updated_at=timezone.now(),
@@ -259,4 +411,9 @@ def processar_followups_assistente(*, forcar: bool = False) -> dict:
         except Exception:
             logger.exception('Erro no follow-up do Assistente ticket %s', ticket.pk)
 
-    return {'ok': True, 'mencoes': mencoes, 'recusas': recusas}
+    return {
+        'ok': True,
+        'sincronizados': sincronizados,
+        'mencoes': mencoes,
+        'recusas': recusas,
+    }

@@ -480,6 +480,7 @@ def recusar_chamado(ticket_id: int, motivo: str) -> dict:
             'Por favor, abra um novo chamado com título e descrição que correspondam '
             'ao problema real.'
         )
+
     comment = Comment.objects.create(
         ticket=ticket,
         author=None,
