@@ -806,8 +806,147 @@ def consultar_usuario(q: str, limit: int = 15) -> dict:
         CustomUser.objects.prefetch_related('equipes').order_by('username'),
         termo,
     ).distinct()[:limit]
-    itens = [serialize_user(u) for u in qs]
+    itens = []
+    for u in qs:
+        item = serialize_user(u)
+        item['eh_membro_ti'] = usuario_eh_operador_helpdesk(u)
+        itens.append(item)
     return {'ok': True, 'q': termo, 'count': len(itens), 'results': itens}
+
+
+def atualizar_solicitante(
+    ticket_id: int,
+    user_id: int | None = None,
+    nome_livre: str = '',
+) -> dict:
+    """
+    Corrige o solicitante do chamado.
+    - user_id: vincula usuário do sistema (tem acesso)
+    - nome_livre: nome sem conta (sem requester_user)
+    """
+    from core.models import CustomUser
+    from helpdesk.audit import log_edicao
+
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+    if not assistente_pode_atuar(ticket):
+        raise AssistenteServiceError('Assistente não pode alterar este chamado agora.')
+
+    antes_nome = ticket.requester_name
+    antes_user_id = ticket.requester_user_id
+
+    if user_id is not None and str(user_id).strip() != '':
+        try:
+            uid = int(user_id)
+        except (TypeError, ValueError):
+            raise AssistenteServiceError('user_id inválido.')
+        user = CustomUser.objects.filter(pk=uid, is_active=True).first()
+        if not user:
+            raise AssistenteServiceError('Usuário não encontrado ou inativo.', 404)
+        if usuario_eh_operador_helpdesk(user):
+            raise AssistenteServiceError(
+                'Não defina membro da TI como solicitante. Peça o nome de quem sofreu o problema.'
+            )
+        ticket.requester_user = user
+        ticket.requester_name = (user.get_full_name() or user.username)[:150]
+        modo = 'usuario_sistema'
+    else:
+        nome = (nome_livre or '').strip()
+        if not nome:
+            raise AssistenteServiceError(
+                'Informe user_id (usuário do sistema) ou nome_livre.'
+            )
+        ticket.requester_user = None
+        ticket.requester_name = nome[:150]
+        modo = 'nome_livre'
+
+    ticket.save(update_fields=['requester_name', 'requester_user', 'updated_at'])
+    Comment.objects.create(
+        ticket=ticket,
+        author=None,
+        text=(
+            f'Solicitante atualizado pelo Assistente de '
+            f'"{antes_nome}" para "{ticket.requester_name}"'
+            f'{" (usuário do sistema)" if ticket.requester_user_id else " (nome livre)"}.'
+        ),
+        is_assistente=True,
+    )
+    try:
+        log_edicao(
+            ticket,
+            None,
+            {
+                'requester_name': {'antes': antes_nome, 'depois': ticket.requester_name},
+                'requester_user_id': {'antes': antes_user_id, 'depois': ticket.requester_user_id},
+            },
+            f'Solicitante corrigido pelo Assistente para {ticket.requester_name}.',
+        )
+    except Exception:
+        pass
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'modo': modo,
+        'requester_name': ticket.requester_name,
+        'requester_user_id': ticket.requester_user_id,
+        'antes': {'requester_name': antes_nome, 'requester_user_id': antes_user_id},
+    }
+
+
+def atualizar_descricao_chamado(
+    ticket_id: int,
+    description: str,
+    title: str | None = None,
+) -> dict:
+    """Melhora título e/ou descrição do chamado (após confirmar o contexto)."""
+    from helpdesk.audit import log_edicao
+
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+    if not assistente_pode_atuar(ticket):
+        raise AssistenteServiceError('Assistente não pode alterar este chamado agora.')
+
+    desc = (description or '').strip()
+    if not desc:
+        raise AssistenteServiceError('Informe a nova descrição.')
+    if len(desc) > 8000:
+        raise AssistenteServiceError('Descrição muito longa (máx. 8000 caracteres).')
+
+    antes_desc = ticket.description
+    antes_title = ticket.title
+    campos = ['description', 'updated_at']
+    ticket.description = desc
+
+    titulo_novo = None
+    if title is not None and str(title).strip():
+        titulo_novo = str(title).strip()[:200]
+        ticket.title = titulo_novo
+        campos.append('title')
+
+    ticket.save(update_fields=campos)
+    Comment.objects.create(
+        ticket=ticket,
+        author=None,
+        text='Descrição do chamado atualizada pelo Assistente para ficar mais clara.',
+        is_assistente=True,
+    )
+    meta = {'description': {'antes': (antes_desc or '')[:200], 'depois': desc[:200]}}
+    if titulo_novo is not None:
+        meta['title'] = {'antes': antes_title, 'depois': titulo_novo}
+    try:
+        log_edicao(ticket, None, meta, 'Descrição/título atualizados pelo Assistente.')
+    except Exception:
+        pass
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'title': ticket.title,
+        'description': ticket.description,
+    }
 
 
 # --- Discador (JoyTec) ---

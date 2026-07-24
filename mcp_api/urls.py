@@ -20,6 +20,8 @@ urlpatterns = [
     path('categorias-especificas/', helpdesk.get_categorias_especificas, name='mcp_categorias_especificas'),
     path('assistente/consultar-chips/', helpdesk.get_consultar_chips, name='mcp_consultar_chips'),
     path('assistente/consultar-usuario/', helpdesk.get_consultar_usuario, name='mcp_consultar_usuario'),
+    path('tickets/<int:pk>/assistente/solicitante/', helpdesk.post_atualizar_solicitante, name='mcp_atualizar_solicitante'),
+    path('tickets/<int:pk>/assistente/descricao/', helpdesk.post_atualizar_descricao, name='mcp_atualizar_descricao'),
 
     # Discador (JoyTec)
     path('discador/licencas/', discador.get_licencas, name='mcp_discador_licencas'),

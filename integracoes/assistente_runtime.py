@@ -13,6 +13,8 @@ from helpdesk.assistente_services import (
     AssistenteServiceError,
     assistente_motivo_bloqueio,
     assistente_pode_atuar,
+    atualizar_descricao_chamado,
+    atualizar_solicitante,
     consultar_acesso_discador,
     consultar_chips,
     consultar_licencas_discador,
@@ -36,6 +38,7 @@ from helpdesk.assistente_services import (
     triar_chamado,
 )
 from helpdesk.models import Comment, Ticket
+from helpdesk.ticket_access import usuario_eh_operador_helpdesk
 from integracoes.llm import LlmError, chat_completion
 from integracoes.models import AssistenteChunk
 
@@ -244,13 +247,58 @@ TOOLS_SPEC = [
         'type': 'function',
         'function': {
             'name': 'consultar_usuario',
-            'description': 'Busca usuário no CRM (acessos) por username ou nome.',
+            'description': (
+                'Busca usuário CRM por username ou nome. '
+                'results[].eh_membro_ti=true → é da TI (não use como solicitante). '
+                'Use antes de atualizar_solicitante.'
+            ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'q': {'type': 'string'},
                 },
                 'required': ['q'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'atualizar_solicitante',
+            'description': (
+                'Corrige o solicitante do chamado após confirmação. '
+                'Se a pessoa tiver conta: passe user_id (de consultar_usuario). '
+                'Se não tiver: passe nome_livre. '
+                'Não use membro da TI (eh_membro_ti) como solicitante.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'user_id': {'type': 'integer', 'description': 'ID do usuário do sistema'},
+                    'nome_livre': {
+                        'type': 'string',
+                        'description': 'Nome sem conta no sistema',
+                    },
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'atualizar_descricao_chamado',
+            'description': (
+                'Reescreve a descrição (e opcionalmente o título) de forma clara e objetiva, '
+                'após entender o problema real (ex.: loja X sem internet; aberto por Y em nome da unidade).'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'description': {'type': 'string'},
+                    'title': {'type': 'string'},
+                },
+                'required': ['description'],
             },
         },
     },
@@ -451,6 +499,26 @@ def _montar_contexto(ticket: Ticket) -> str:
     chunks = _chunks_relevantes(ticket)
     chunks_txt = '\n'.join(f'- {ch.titulo}: {ch.conteudo}' for ch in chunks) or '(sem chunks ainda)'
     cat_esp = ticket.specific_category.name if ticket.specific_category_id else '(não triado)'
+    equipe_nome = ticket.equipe.name if ticket.equipe_id else '(não informada)'
+
+    if ticket.requester_user_id:
+        ru = ticket.requester_user
+        sol_txt = (
+            f'{ticket.requester_name} (@{ru.username}, user_id={ru.pk})'
+        )
+        if usuario_eh_operador_helpdesk(ru):
+            sol_txt += ' [ATENÇÃO: solicitante é membro da TI]'
+        else:
+            sol_txt += ' [usuário do sistema]'
+    else:
+        sol_txt = f'{ticket.requester_name} [nome livre, sem user vinculado]'
+
+    criador_txt = '-'
+    if ticket.created_by_id:
+        cb = ticket.created_by
+        criador_txt = cb.get_full_name() or cb.username
+        if usuario_eh_operador_helpdesk(cb):
+            criador_txt += ' [membro da TI]'
 
     return (
         f'Chamado #{ticket.pk}\n'
@@ -460,8 +528,9 @@ def _montar_contexto(ticket: Ticket) -> str:
         f'Prioridade: {ticket.priority or "(não definida)"}\n'
         f'Categoria: {ticket.category.name if ticket.category_id else "-"}\n'
         f'Categoria específica: {cat_esp}\n'
-        f'Solicitante: {ticket.requester_name}\n'
-        f'Criador: {(ticket.created_by.get_full_name() or ticket.created_by.username) if ticket.created_by_id else "-"}\n'
+        f'Equipe/Setor (unidade afetada — NÃO é o solicitante): {equipe_nome}\n'
+        f'Solicitante: {sol_txt}\n'
+        f'Aberto por (created_by): {criador_txt}\n'
         f'Atribuído a: {(ticket.assigned_to.username if ticket.assigned_to_id else "(ninguém)")}\n\n'
         f'Anexos:\n{_resumo_anexos(ticket)}\n\n'
         f'Histórico de comentários:\n' + ('\n'.join(linhas) or '(vazio)') + '\n\n'
@@ -482,6 +551,21 @@ def _system_prompt() -> str:
         '- Discador JoyTec: ferramenta usada internamente; a TI gerencia acessos/licenças '
         'pelas tools do discador. Só escale se precisar de ação humana (limite de contrato, etc.).\n'
         '- CRM e este helpdesk: também internos.\n\n'
+        'Solicitante × equipe × TI (CRÍTICO):\n'
+        '- Equipe/Setor = loja/unidade do problema (ex.: Loja CCH). NÃO confundir com quem '
+        'aparece como Solicitante.\n'
+        '- Nomes de membros da TI (ex.: Léo/Leonardo, técnicos) citados no texto NÃO são '
+        'solicitantes — costumam ser avisos internos. Nunca diga que a TI "não conseguiu abrir".\n'
+        '- Se a descrição indicar abertura EM NOME de outra loja/pessoa (ex.: "Cachoeirinha '
+        'está sem internet, estou abrindo pra ela") e o Solicitante for quem abriu o chamado '
+        '(não alguém daquela unidade): pergunte se o solicitante ficou errado. '
+        'Se confirmar que sim, pergunte o nome de quem deveria constar; '
+        'use consultar_usuario; se achar usuário com acesso (eh_membro_ti=false) → '
+        'atualizar_solicitante com user_id; se não achar → atualizar_solicitante com nome_livre; '
+        'depois atualizar_descricao_chamado deixando claro unidade afetada, quem abriu e o problema.\n'
+        '- Rede/internet fora em loja: priorize esclarecer solicitante/unidade e escalar_para_ti '
+        'quando for indisponibilidade real de link — não fique só perguntando se "já voltou" '
+        'como se fosse oscilação leve, a menos que o texto sugira isso.\n\n'
         'Formato das mensagens:\n'
         '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
         '- Envie 2–4 mensagens curtas via send_assistente_message (1–3 frases cada). '
@@ -557,6 +641,24 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
             return json.dumps(consultar_chips(args.get('q', '')), ensure_ascii=False)
         if name == 'consultar_usuario':
             return json.dumps(consultar_usuario(args.get('q', '')), ensure_ascii=False)
+        if name == 'atualizar_solicitante':
+            return json.dumps(
+                atualizar_solicitante(
+                    ticket_id,
+                    args.get('user_id'),
+                    args.get('nome_livre', ''),
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'atualizar_descricao_chamado':
+            return json.dumps(
+                atualizar_descricao_chamado(
+                    ticket_id,
+                    args.get('description', ''),
+                    args.get('title'),
+                ),
+                ensure_ascii=False,
+            )
         if name == 'consultar_licencas_discador':
             return json.dumps(
                 consultar_licencas_discador(args.get('slug') or 'joytec'),
@@ -762,7 +864,8 @@ def processar_assistente(ticket_id: int) -> None:
     """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
         ticket = Ticket.objects.select_related(
-            'category', 'specific_category', 'created_by', 'assigned_to', 'requester_user',
+            'category', 'specific_category', 'created_by', 'assigned_to',
+            'requester_user', 'equipe',
         ).get(pk=ticket_id)
     except Ticket.DoesNotExist:
         return

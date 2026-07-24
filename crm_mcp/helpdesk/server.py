@@ -185,9 +185,49 @@ def consultar_chips(q: str) -> str:
 
 @mcp.tool()
 def consultar_usuario(q: str) -> str:
-    """Busca usuário CRM por username ou nome."""
+    """Busca usuário CRM por username ou nome. eh_membro_ti=true = TI."""
     try:
         return get_client().get_text('assistente/consultar-usuario/', {'q': q})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def atualizar_solicitante(
+    ticket_id: int,
+    user_id: int = 0,
+    nome_livre: str = '',
+) -> str:
+    """Corrige solicitante: user_id (conta, >0) ou nome_livre (sem conta)."""
+    body = {}
+    if user_id:
+        body['user_id'] = user_id
+    if nome_livre:
+        body['nome_livre'] = nome_livre
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/assistente/solicitante/',
+            body,
+        )
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def atualizar_descricao_chamado(
+    ticket_id: int,
+    description: str,
+    title: str = '',
+) -> str:
+    """Reescreve descrição (e título opcional) do chamado."""
+    body = {'description': description}
+    if title:
+        body['title'] = title
+    try:
+        return get_client().post_text(
+            f'tickets/{ticket_id}/assistente/descricao/',
+            body,
+        )
     except CrmTiApiError as exc:
         return f'Erro: {exc}'
 

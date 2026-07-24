@@ -6,6 +6,8 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from helpdesk.assistente_services import (
     AssistenteServiceError,
+    atualizar_descricao_chamado,
+    atualizar_solicitante,
     consultar_chips,
     consultar_usuario,
     descrever_imagem_anexo,
@@ -213,3 +215,29 @@ def get_consultar_chips(request):
 def get_consultar_usuario(request):
     q = (request.GET.get('q') or '').strip()
     return _service_response(consultar_usuario, q)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_atualizar_solicitante(request, pk):
+    data = _json_body(request)
+    return _service_response(
+        atualizar_solicitante,
+        pk,
+        data.get('user_id'),
+        data.get('nome_livre', ''),
+    )
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_atualizar_descricao(request, pk):
+    data = _json_body(request)
+    return _service_response(
+        atualizar_descricao_chamado,
+        pk,
+        data.get('description', ''),
+        data.get('title'),
+    )
