@@ -209,8 +209,15 @@ def _notificar_comentario_assistente(ticket: Ticket, texto: str) -> None:
         pass
 
 
-def send_assistente_message(ticket_id: int, text: str, *, interno: bool = False) -> dict:
+def send_assistente_message(
+    ticket_id: int,
+    text: str,
+    *,
+    interno: bool = False,
+    followup_mencao: bool = False,
+) -> dict:
     interno = bool(interno)
+    followup_mencao = bool(followup_mencao)
     # Interna à TI: não aplicar limpeza agressiva (pode ser orientação técnica)
     if interno:
         texto = (text or '').strip()
@@ -249,7 +256,14 @@ def send_assistente_message(ticket_id: int, text: str, *, interno: bool = False)
     ticket.save(update_fields=['updated_at'])
     # Pública: notifica solicitante; interna: só badge para TI (sem push ao solicitante)
     if not interno:
-        _notificar_comentario_assistente(ticket, pedacos[0] if pedacos else texto)
+        # Cobrança @ (5min): o follow-up notifica com menções (evita log duplicado)
+        if not followup_mencao:
+            _notificar_comentario_assistente(ticket, pedacos[0] if pedacos else texto)
+            try:
+                from helpdesk.assistente_followup import marcar_espera_assistente
+                marcar_espera_assistente(ticket)
+            except Exception:
+                pass
     else:
         try:
             from helpdesk.audit import log_comentario
@@ -275,6 +289,7 @@ def send_assistente_message(ticket_id: int, text: str, *, interno: bool = False)
         'text': pedacos[0] if len(pedacos) == 1 else '\n\n'.join(pedacos),
         'bolhas': len(pedacos),
         'is_interno': interno,
+        'followup_mencao': followup_mencao,
     }
 
 
@@ -328,7 +343,14 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> dict:
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
     ticket.assistente_escalado = True
-    update_fields = ['assistente_escalado', 'updated_at']
+    ticket.assistente_aguardando_desde = None
+    ticket.assistente_followup_mencao_em = None
+    update_fields = [
+        'assistente_escalado',
+        'assistente_aguardando_desde',
+        'assistente_followup_mencao_em',
+        'updated_at',
+    ]
     if ticket.status == Ticket.StatusChoices.NEW:
         ticket.status = Ticket.StatusChoices.PENDING
         update_fields.append('status')
@@ -435,18 +457,29 @@ def recusar_chamado(ticket_id: int, motivo: str) -> dict:
     ticket.is_rejected = True
     ticket.rejection_reason = motivo_limpo
     ticket.assistente_escalado = True
+    ticket.assistente_aguardando_desde = None
+    ticket.assistente_followup_mencao_em = None
     if not ticket.resolved_at:
         ticket.resolved_at = timezone.now()
     ticket.save(update_fields=[
         'status', 'is_rejected', 'rejection_reason', 'assistente_escalado',
+        'assistente_aguardando_desde', 'assistente_followup_mencao_em',
         'resolved_at', 'updated_at',
     ])
 
-    texto = (
-        f'Chamado recusado.\nMotivo: {motivo_limpo}\n\n'
-        'Por favor, abra um novo chamado com título e descrição que correspondam '
-        'ao problema real.'
-    )
+    if motivo_limpo.lower() == 'sem resposta':
+        texto = (
+            'Chamado encerrado por falta de resposta.\n'
+            'Motivo: Sem resposta.\n\n'
+            'Se o problema continuar, abra um novo chamado e responda às perguntas '
+            'do Assistente para podermos ajudar.'
+        )
+    else:
+        texto = (
+            f'Chamado recusado.\nMotivo: {motivo_limpo}\n\n'
+            'Por favor, abra um novo chamado com título e descrição que correspondam '
+            'ao problema real.'
+        )
     comment = Comment.objects.create(
         ticket=ticket,
         author=None,

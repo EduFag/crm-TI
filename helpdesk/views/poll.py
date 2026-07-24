@@ -47,6 +47,12 @@ def poll_ticket_updates(request):
     """
     agora = timezone.now()
     Ticket.archive_old_tickets()
+    try:
+        from helpdesk.assistente_followup import processar_followups_assistente
+        processar_followups_assistente()
+    except Exception:
+        # Poll não pode quebrar por falha no follow-up
+        pass
     since_raw = request.session.get(_CHAVE_SESSAO_POLL)
 
     tem_mudanca = False

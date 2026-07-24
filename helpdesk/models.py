@@ -162,6 +162,18 @@ class Ticket(models.Model):
         default=False,
         help_text='Assistente IA encerrou o atendimento e pediu intervenção da TI.',
     )
+    assistente_aguardando_desde = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Início da espera por resposta do solicitante/criador após mensagem pública do Assistente.'
+        ),
+    )
+    assistente_followup_mencao_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Quando o Assistente cobrou resposta com @menção (follow-up de 5 min).',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 

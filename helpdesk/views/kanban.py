@@ -928,6 +928,17 @@ def ticket_add_comment(request, pk):
 
         ticket.save(update_fields=['updated_at'])
 
+        # Resposta do solicitante/criador cancela follow-up de espera do Assistente
+        from helpdesk.assistente_followup import (
+            limpar_espera_assistente,
+            usuario_e_solicitante_ou_criador,
+        )
+        if (
+            not is_interno
+            and usuario_e_solicitante_ou_criador(ticket, request.user)
+        ):
+            limpar_espera_assistente(ticket)
+
         preview = text[:120] if text else 'Nova imagem anexada.'
         if is_interno:
             adicionar_nao_lido_operadores(ticket, request.user)
