@@ -25,6 +25,12 @@ class AssistenteServiceError(Exception):
 
 
 def ticket_assumido_pela_ti(ticket: Ticket) -> bool:
+    """
+    TI assume o atendimento quando há técnico e o chamado NÃO está em Novos.
+    Voltar para Novos (mesmo com assigned_to residual) libera o Assistente.
+    """
+    if ticket.status == Ticket.StatusChoices.NEW:
+        return False
     return usuario_eh_operador_helpdesk(ticket.assigned_to)
 
 

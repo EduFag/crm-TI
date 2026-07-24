@@ -421,6 +421,16 @@ def ticket_update_status(request, pk):
                 request.user,
                 descricao_extra=f'(movimentado para {ticket.get_status_display()})',
             )
+
+        # Devolver para Novos: sem técnico responsável + Assistente pode retomar
+        voltou_para_novos = (
+            status_anterior != Ticket.StatusChoices.NEW
+            and new_status == Ticket.StatusChoices.NEW
+        )
+        if voltou_para_novos:
+            ticket.assigned_to = None
+            ticket.assistente_escalado = False
+
         ticket.save()
         if status_anterior != new_status:
             log_status_alterado(
@@ -453,6 +463,8 @@ def ticket_update_status(request, pk):
                 EVENTO_TRIAGE_CHANGED,
                 f'Triagem: {depois_nome}.',
             )
+        if voltou_para_novos:
+            _agendar_assistente(ticket.pk)
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'error': 'Status inválido'}, status=400)
 
@@ -571,6 +583,9 @@ def ticket_contest(request, pk):
     ticket.status = Ticket.StatusChoices.NEW
     ticket.is_rejected = False
     ticket.rejection_reason = ''
+    # Contestações voltam à fila: sem técnico + Assistente pode atuar de novo
+    ticket.assigned_to = None
+    ticket.assistente_escalado = False
     ticket.save()
     adicionar_nao_lido(ticket, request.user)
 
@@ -587,6 +602,7 @@ def ticket_contest(request, pk):
         EVENTO_STATUS_CHANGED,
         f'Contestado — voltou para {_rotulo_status(Ticket.StatusChoices.NEW)}.',
     )
+    _agendar_assistente(ticket.pk)
 
     response = JsonResponse({'success': True})
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
@@ -634,7 +650,16 @@ def ticket_edit(request, pk):
     antes = Ticket.objects.select_related('assigned_to', 'category', 'specific_category').get(pk=ticket.pk)
     form = TicketUpdateForm(request.POST, instance=ticket, user=request.user)
     if form.is_valid():
-        depois = form.save()
+        depois = form.save(commit=False)
+        voltou_para_novos = (
+            antes.status != Ticket.StatusChoices.NEW
+            and depois.status == Ticket.StatusChoices.NEW
+        )
+        if voltou_para_novos:
+            depois.assigned_to = None
+            depois.assistente_escalado = False
+        depois.save()
+        form.save_m2m()
         mensagens = gerar_comentarios_alteracao(antes, depois)
         for texto in mensagens:
             Comment.objects.create(ticket=depois, author=request.user, text=texto)
@@ -667,14 +692,15 @@ def ticket_edit(request, pk):
                 msg_triagem,
             )
 
-        ticket.save()
-        adicionar_nao_lido(ticket, request.user)
-        
-        ticket.refresh_from_db()
+        adicionar_nao_lido(depois, request.user)
+        if voltou_para_novos:
+            _agendar_assistente(depois.pk)
+
+        depois.refresh_from_db()
         response = render(
             request,
             'helpdesk/_drawer.html',
-            _contexto_drawer(request, ticket),
+            _contexto_drawer(request, depois),
         )
         response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
         return response
