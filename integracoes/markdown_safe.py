@@ -11,6 +11,8 @@ _RE_BOLD = re.compile(r'\*\*(.+?)\*\*')
 _RE_ITALIC = re.compile(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)')
 _RE_CODE = re.compile(r'`([^`]+)`')
 _RE_LINK = re.compile(r'\[([^\]]+)\]\((https?://[^)\s]+)\)')
+# Mesmo padrão do helpdesk (@username) — texto já escapado
+_RE_MENTION = re.compile(r'(?<!\w)@([A-Za-z0-9_.+-]+)')
 
 
 def _inline(texto: str) -> str:
@@ -22,6 +24,11 @@ def _inline(texto: str) -> str:
     )
     texto = _RE_BOLD.sub(r'<strong>\1</strong>', texto)
     texto = _RE_ITALIC.sub(r'<em>\1</em>', texto)
+    # Destaca @menção (Assistente e TI usam o mesmo visual do chat)
+    texto = _RE_MENTION.sub(
+        r'<span class="font-semibold text-sky-600 bg-sky-50 px-0.5 rounded">@\1</span>',
+        texto,
+    )
     return texto
 
 
