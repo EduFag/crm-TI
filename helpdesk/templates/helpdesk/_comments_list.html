@@ -1,4 +1,24 @@
-{% load helpdesk_permissions %}
+{% load helpdesk_permissions integracoes_extras %}
+<style>
+.assistente-md { font-size: 0.875rem; line-height: 1.55; color: #475569; }
+.assistente-md .memoria-md-p { margin: 0.4em 0; }
+.assistente-md .memoria-md-p:first-child { margin-top: 0; }
+.assistente-md .memoria-md-p:last-child { margin-bottom: 0; }
+.assistente-md .memoria-md-h { font-size: 0.95rem; font-weight: 700; margin: 0.5em 0 0.25em; line-height: 1.35; color: #5b21b6; }
+.assistente-md .memoria-md-h:first-child { margin-top: 0; }
+.assistente-md .memoria-md-list { margin: 0.4em 0; padding-left: 1.25rem; list-style-position: outside; }
+.assistente-md ol.memoria-md-list { list-style-type: decimal; }
+.assistente-md ul.memoria-md-list { list-style-type: disc; }
+.assistente-md .memoria-md-list li { margin: 0.25em 0; padding-left: 0.15rem; }
+.assistente-md strong { font-weight: 700; color: #4c1d95; }
+.assistente-md em { font-style: italic; }
+.assistente-md .memoria-md-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8em; background: #f5f3ff; color: #5b21b6;
+    padding: 0.1em 0.35em; border-radius: 0.25rem;
+}
+.assistente-md .memoria-md-link { color: #6d28d9; text-decoration: underline; text-underline-offset: 2px; }
+</style>
 {% for comment in comments %}
 {% if not comment.is_assistente and comment.author_id == request.user.id %}
 <div class="flex gap-3 flex-row-reverse">
@@ -59,7 +79,11 @@
             <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
         </div>
         {% if comment.text %}
+        {% if comment.is_assistente %}
+        <div class="assistente-md">{{ comment.text|markdown_leve }}</div>
+        {% else %}
         <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{{ comment.text|highlight_mentions }}</p>
+        {% endif %}
         {% endif %}
         {% if comment.attachment %}
         <div class="mt-2">

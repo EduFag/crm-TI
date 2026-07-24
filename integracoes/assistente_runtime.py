@@ -38,11 +38,18 @@ TOOLS_SPEC = [
         'type': 'function',
         'function': {
             'name': 'send_assistente_message',
-            'description': 'Envia uma mensagem ao solicitante no chamado (como Assistente).',
+            'description': (
+                'Envia uma mensagem CURTA ao solicitante (1–3 frases). '
+                'Chame de novo para a próxima fala — prefira 2–4 bolhas em vez de um texto longo. '
+                'Use Markdown leve (**negrito**, listas).'
+            ),
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'text': {'type': 'string', 'description': 'Texto da mensagem em português.'},
+                    'text': {
+                        'type': 'string',
+                        'description': 'Texto curto em português (Markdown leve ok).',
+                    },
                 },
                 'required': ['text'],
             },
@@ -279,11 +286,17 @@ def _system_prompt() -> str:
     return (
         'Você é o Assistente de TI da Money Promotora no helpdesk. '
         'Responda em português, claro e profissional, alinhado aos chunks de aprendizado.\n\n'
+        'Formato das mensagens:\n'
+        '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
+        '- Envie 2–4 mensagens curtas via send_assistente_message (1–3 frases cada). '
+        'Nunca um único bloco longo.\n\n'
         'Procedimentos:\n'
         '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
         '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
         '- Se houver anexos de imagem, use listar_anexos e ler_imagem_anexo ANTES de decidir.\n'
-        '- Triage: quando tiver prioridade/categoria claras, use listar_categorias_especificas + triar_chamado.\n'
+        '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
+        'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
+        'ANTES ou JUNTO das mensagens ao solicitante.\n'
         '- WhatsApp/chip: consulte consultar_chips pelo nome do consultor; se já tiver 2 em uso, questione.\n'
         '- Acesso: pergunte qual sistema; use consultar_usuario para caso individual.\n'
         '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
@@ -356,6 +369,86 @@ _MSG_FALLBACK_ERRO = (
 )
 
 
+def _rodada_tools(
+    ticket_id: int,
+    messages: list[dict[str, Any]],
+    *,
+    enviou_mensagem: bool,
+) -> bool:
+    """Uma rodada de tool-calling; devolve se enviou mensagem nesta rodada/acumulado."""
+    ticket = Ticket.objects.get(pk=ticket_id)
+    if not assistente_pode_atuar(ticket) and enviou_mensagem:
+        return enviou_mensagem
+    if ticket.assistente_escalado and enviou_mensagem:
+        return enviou_mensagem
+    if ticket.is_rejected and enviou_mensagem:
+        return enviou_mensagem
+
+    msg = chat_completion(messages, tools=TOOLS_SPEC, temperature=0.35)
+    tool_calls = msg.get('tool_calls') or []
+    messages.append(msg)
+
+    if not tool_calls:
+        content = (msg.get('content') or '').strip()
+        if content and not enviou_mensagem:
+            send_assistente_message(ticket_id, content)
+            enviou_mensagem = True
+        return enviou_mensagem
+
+    for call in tool_calls:
+        fn = call.get('function') or {}
+        name = fn.get('name') or ''
+        args = _parse_args(fn.get('arguments'))
+        result = _executar_tool(ticket_id, name, args)
+        try:
+            parsed = json.loads(result)
+            if name == 'send_assistente_message' and parsed.get('ok'):
+                enviou_mensagem = True
+            if name == 'recusar_chamado' and parsed.get('ok'):
+                enviou_mensagem = True
+            if name == 'escalar_para_ti' and parsed.get('ok'):
+                enviou_mensagem = True
+        except json.JSONDecodeError:
+            pass
+        messages.append({
+            'role': 'tool',
+            'tool_call_id': call.get('id') or name,
+            'content': result,
+        })
+    return enviou_mensagem
+
+
+def _garantir_triagem(ticket_id: int, messages: list[dict[str, Any]]) -> None:
+    """Se ainda sem prioridade, pede triagem à IA; senão aplica MEDIUM."""
+    ticket = Ticket.objects.get(pk=ticket_id)
+    if ticket.priority or not assistente_pode_atuar(ticket):
+        return
+
+    messages.append({
+        'role': 'user',
+        'content': (
+            'Prioridade ainda não definida. Obrigatório agora: '
+            'listar_categorias_especificas se precisar do id, depois triar_chamado. '
+            'Não envie mensagem longa — só a triagem.'
+        ),
+    })
+    try:
+        _rodada_tools(ticket_id, messages, enviou_mensagem=True)
+    except (LlmError, AssistenteServiceError, Exception):
+        logger.exception('Falha na rodada extra de triagem do ticket %s', ticket_id)
+
+    ticket.refresh_from_db()
+    if not ticket.priority and assistente_pode_atuar(ticket):
+        try:
+            triar_chamado(ticket_id, 'MEDIUM', None)
+            logger.info(
+                'Triagem fallback MEDIUM aplicada no ticket %s',
+                ticket_id,
+            )
+        except AssistenteServiceError:
+            logger.exception('Falha no fallback de triagem do ticket %s', ticket_id)
+
+
 def processar_assistente(ticket_id: int) -> None:
     """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
@@ -393,40 +486,23 @@ def processar_assistente(ticket_id: int) -> None:
             if ticket.is_rejected and enviou_mensagem:
                 break
 
-            msg = chat_completion(messages, tools=TOOLS_SPEC, temperature=0.35)
-            tool_calls = msg.get('tool_calls') or []
-            messages.append(msg)
-
-            if not tool_calls:
-                content = (msg.get('content') or '').strip()
-                if content and not enviou_mensagem:
-                    send_assistente_message(ticket_id, content)
-                    enviou_mensagem = True
+            qtd_msgs = len(messages)
+            enviou_mensagem = _rodada_tools(
+                ticket_id, messages, enviou_mensagem=enviou_mensagem,
+            )
+            # Resposta sem tools → fim
+            last = messages[-1] if messages else {}
+            if last.get('role') == 'assistant' and not (last.get('tool_calls') or []):
                 break
-
-            for call in tool_calls:
-                fn = call.get('function') or {}
-                name = fn.get('name') or ''
-                args = _parse_args(fn.get('arguments'))
-                result = _executar_tool(ticket_id, name, args)
-                try:
-                    parsed = json.loads(result)
-                    if name == 'send_assistente_message' and parsed.get('ok'):
-                        enviou_mensagem = True
-                    if name == 'recusar_chamado' and parsed.get('ok'):
-                        enviou_mensagem = True
-                    if name == 'escalar_para_ti' and parsed.get('ok'):
-                        enviou_mensagem = True
-                except json.JSONDecodeError:
-                    pass
-                messages.append({
-                    'role': 'tool',
-                    'tool_call_id': call.get('id') or name,
-                    'content': result,
-                })
+            # Nada novo anexado (proteção)
+            if len(messages) == qtd_msgs:
+                break
 
         if not enviou_mensagem and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id)):
             send_assistente_message(ticket_id, _MSG_FALLBACK)
+            enviou_mensagem = True
+
+        _garantir_triagem(ticket_id, messages)
     except (LlmError, AssistenteServiceError, Exception):
         logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
         # Best-effort: chamado não fica mudo se o LLM falhar
@@ -440,6 +516,10 @@ def processar_assistente(ticket_id: int) -> None:
                 'Falha ao enviar fallback do Assistente no ticket %s',
                 ticket_id,
             )
+        try:
+            _garantir_triagem(ticket_id, messages)
+        except Exception:
+            pass
 
 
 def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:

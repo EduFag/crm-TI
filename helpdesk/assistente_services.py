@@ -53,6 +53,74 @@ def assistente_pode_atuar(ticket: Ticket) -> bool:
     return assistente_motivo_bloqueio(ticket) is None
 
 
+_MAX_CHARS_BOLHA = 350
+
+
+def _partir_texto_assistente(texto: str, max_chars: int = _MAX_CHARS_BOLHA) -> list[str]:
+    """Parte texto longo em várias bolhas (parágrafos / pedaços ~max_chars)."""
+    texto = (texto or '').replace('\r\n', '\n').replace('\r', '\n').strip()
+    if not texto:
+        return []
+
+    # Parágrafos separados por linha em branco
+    paragrafos = [p.strip() for p in texto.split('\n\n') if p.strip()]
+    if len(paragrafos) <= 1 and len(texto) <= max_chars:
+        return [texto]
+
+    if len(paragrafos) <= 1:
+        # Um bloco longo: quebra por linhas ou por tamanho
+        linhas = [ln.strip() for ln in texto.split('\n') if ln.strip()]
+        paragrafos = linhas if len(linhas) > 1 else [texto]
+
+    partes: list[str] = []
+    atual = ''
+    for trecho in paragrafos:
+        if len(trecho) > max_chars:
+            if atual:
+                partes.append(atual)
+                atual = ''
+            # Pedacos forçados por tamanho
+            resto = trecho
+            while len(resto) > max_chars:
+                corte = resto.rfind(' ', 0, max_chars + 1)
+                if corte < max_chars // 2:
+                    corte = max_chars
+                partes.append(resto[:corte].strip())
+                resto = resto[corte:].strip()
+            if resto:
+                atual = resto
+            continue
+        candidato = f'{atual}\n\n{trecho}'.strip() if atual else trecho
+        if atual and len(candidato) > max_chars:
+            partes.append(atual)
+            atual = trecho
+        else:
+            atual = candidato
+    if atual:
+        partes.append(atual)
+    return partes or [texto]
+
+
+def _notificar_comentario_assistente(ticket: Ticket, texto: str) -> None:
+    """Audit + badge + push para comentário do Assistente (uma vez por lote)."""
+    preview = (texto or '')[:120]
+    try:
+        from helpdesk.audit import log_comentario
+        log_comentario(ticket, None, preview, metadata={'is_assistente': True})
+    except Exception:
+        pass
+    try:
+        from helpdesk.views.kanban import adicionar_nao_lido
+        adicionar_nao_lido(ticket, None)
+    except Exception:
+        pass
+    try:
+        from helpdesk.notifications import EVENTO_COMMENT, agendar_notificacao_chamado
+        agendar_notificacao_chamado(ticket, None, EVENTO_COMMENT, preview)
+    except Exception:
+        pass
+
+
 def send_assistente_message(ticket_id: int, text: str) -> dict:
     texto = (text or '').strip()
     if not texto:
@@ -60,19 +128,30 @@ def send_assistente_message(ticket_id: int, text: str) -> dict:
     ticket = Ticket.objects.filter(pk=ticket_id).first()
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
-    comment = Comment.objects.create(
-        ticket=ticket,
-        author=None,
-        text=texto,
-        is_assistente=True,
-    )
+
+    pedacos = _partir_texto_assistente(texto)
+    comment_ids: list[int] = []
+    for pedaco in pedacos:
+        comment = Comment.objects.create(
+            ticket=ticket,
+            author=None,
+            text=pedaco,
+            is_assistente=True,
+        )
+        comment_ids.append(comment.pk)
+
     ticket.updated_at = timezone.now()
     ticket.save(update_fields=['updated_at'])
+    # Uma notificação por lote (evita spam se partiu em várias bolhas)
+    _notificar_comentario_assistente(ticket, pedacos[0] if pedacos else texto)
+
     return {
         'ok': True,
-        'comment_id': comment.pk,
+        'comment_id': comment_ids[0] if comment_ids else None,
+        'comment_ids': comment_ids,
         'ticket_id': ticket.pk,
-        'text': comment.text,
+        'text': pedacos[0] if len(pedacos) == 1 else '\n\n'.join(pedacos),
+        'bolhas': len(pedacos),
     }
 
 
@@ -145,6 +224,7 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> dict:
         text=texto,
         is_assistente=True,
     )
+    _notificar_comentario_assistente(ticket, texto)
     return {
         'ok': True,
         'ticket_id': ticket.pk,
@@ -250,6 +330,7 @@ def recusar_chamado(ticket_id: int, motivo: str) -> dict:
         text=texto,
         is_assistente=True,
     )
+    _notificar_comentario_assistente(ticket, texto)
     try:
         from helpdesk.audit import log_chamado_recusado
         log_chamado_recusado(ticket, None, motivo_limpo)
