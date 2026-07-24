@@ -197,11 +197,20 @@ def formatar_resultado_ocr(texto: str, *, origem: str = 'imagem') -> str:
     if not texto:
         return (
             f'[OCR local] Nenhum texto legível encontrado neste {origem}. '
-            'Use título, descrição e categoria do chamado.'
+            'Use título, descrição e categoria do chamado. '
+            'Se o sistema não estiver claro, pergunte MoneyConsig vs Discador JoyTec.'
         )
     rotulo = {
         'imagem': 'Texto extraído do print (OCR local, sem IA de visão)',
         'pdf_texto': 'Texto extraído do PDF (camada de texto)',
         'pdf_ocr': 'Texto extraído do PDF (OCR local em páginas escaneadas)',
     }.get(origem, f'Texto extraído ({origem})')
-    return f'{rotulo}:\n{texto}'
+    dica = ''
+    low = texto.lower()
+    if any(x in low for x in ('joytec', 'ramal web', 'campanha', 'disponibilidade', 'em chamada')):
+        dica = (
+            '\n[Indício OCR: parece Discador JoyTec — não assuma MoneyConsig sem confirmação.]'
+        )
+    elif any(x in low for x in ('moneypromotora', 'moneyconsig', 'ranking inss')):
+        dica = '\n[Indício OCR: parece MoneyConsig.]'
+    return f'{rotulo}:\n{texto}{dica}'

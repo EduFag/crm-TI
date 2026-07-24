@@ -614,10 +614,13 @@ def descrever_imagem_anexo(ticket_id: int, attachment_ref: str) -> dict:
     if integracao_visao:
         prompt = (
             'Descreva em português, de forma objetiva e útil para suporte de TI, o que aparece nesta imagem. '
-            'Inclua textos visíveis (OCR), URLs, nomes de sistema (ex.: MoneyConsig, sistema.moneypromotora.com.br), '
-            'números de telefone, nomes de campanha, erros na tela, menus/abas e qualquer detalhe relevante. '
-            'Se reconhecer o sistema Money Promotora / MoneyConsig, diga explicitamente que é o sistema interno. '
-            'Se a imagem estiver ilegível, diga isso claramente.'
+            'Inclua textos visíveis (OCR), URLs, logins, nomes de campanha, ramais, erros e menus. '
+            'Identifique o sistema com clareza quando der: '
+            'MoneyConsig (sistema.moneypromotora.com.br, rankings, abas loja/presença) '
+            'OU Discador JoyTec (ramal web, campanhas, disponibilidade, JOYTEC no nome da campanha/login). '
+            'Se NÃO for possível afirmar qual sistema é, diga explicitamente: '
+            '"sistema não identificado com segurança no print". '
+            'Não invente MoneyConsig se a tela parecer discador/telefonia.'
         )
         try:
             descricao = chat_completion_vision(prompt, raw_jpeg, mime_jpeg or 'image/jpeg')
