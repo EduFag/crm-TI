@@ -1031,7 +1031,7 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
     for t in tickets:
         ids.append(t.pk)
         comps = []
-        for c in t.comments.filter(is_active=True).order_by('created_at')[:15]:
+        for c in t.comments.filter(is_active=True, is_interno=False).order_by('created_at')[:15]:
             if c.is_assistente:
                 autor = 'Assistente'
             elif c.author_id:
