@@ -35,12 +35,12 @@
             </span>
             <div class="flex items-center gap-1 shrink-0">
                 <span class="text-[10px] text-blue-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
-                {% if pode_menu_comentario %}
+                {% if pode_menu_comentario or pode_gerenciar_comentarios %}
                 <details class="comment-menu relative">
-                    <summary class="cursor-pointer p-1 rounded-md text-blue-500 hover:bg-blue-100 hover:text-blue-800 transition-colors"
+                    <summary class="cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
                              title="Opções da mensagem"
                              aria-label="Opções da mensagem">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
                         </svg>
                     </summary>
@@ -111,12 +111,12 @@
             </span>
             <div class="flex items-center gap-1 shrink-0">
                 <span class="text-[10px] text-slate-400 font-medium">{{ comment.created_at|date:"d/m H:i" }}</span>
-                {% if pode_menu_comentario %}
+                {% if pode_menu_comentario or pode_gerenciar_comentarios %}
                 <details class="comment-menu relative">
-                    <summary class="cursor-pointer p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                    <summary class="cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"
                              title="Opções da mensagem"
                              aria-label="Opções da mensagem">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
                         </svg>
                     </summary>

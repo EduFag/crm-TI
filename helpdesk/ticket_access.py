@@ -246,8 +246,13 @@ def usuario_eh_staff_ou_superuser(user) -> bool:
 
 
 def usuario_pode_gerenciar_comentarios(user) -> bool:
-    """Editar ou excluir comentários/mensagens no histórico do chamado."""
-    return usuario_eh_staff_ou_superuser(user)
+    """
+    Editar/excluir mensagens no histórico:
+    is_staff, is_superuser ou operador helpdesk (ADMIN / IT_USER).
+    """
+    if usuario_eh_staff_ou_superuser(user):
+        return True
+    return usuario_eh_operador_helpdesk(user)
 
 
 def usuario_pode_editar_chamado(user, ticket=None) -> bool:
