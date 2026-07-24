@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import mimetypes
 import os
+import re
 from typing import Any
 
 from django.db.models import Q
@@ -54,6 +55,66 @@ def assistente_pode_atuar(ticket: Ticket) -> bool:
 
 
 _MAX_CHARS_BOLHA = 350
+
+# Rótulos meta que a IA às vezes coloca no texto (não devem ir ao solicitante)
+_RE_ROTULO_MENSAGEM = re.compile(
+    r'(?im)(?:^|\n)\s*\*{0,2}\s*(?:\d+[ªºa]?\.?\s*)?mensagem(?:\s*\d+)?\s*:?\s*\*{0,2}\s*',
+)
+_RE_LINHA_PENSAMENTO = re.compile(
+    r'(?i)^\s*(?:'
+    r'ok[,.]?\s+.+|'
+    r'vou\s+\w+.*|'
+    r'sem\s+chips?\s+ainda.*|'
+    r'(?:pensamento|racioc[ií]nio|nota\s+interna|plano(?:\s+de\s+a[cç][aã]o)?)\s*:?\s*.*|'
+    r'analisando(?:\s+o)?\s+chamado.*|'
+    r'agora\s+vou\s+.*|'
+    r'primeiro\s+vou\s+.*|'
+    r'deixa\s+eu\s+.*|'
+    r'certo[,.]?\s+vou\s+.*'
+    r')\s*$'
+)
+
+
+def limpar_texto_para_solicitante(texto: str) -> str:
+    """
+    Remove raciocínio/meta da IA, deixando só a fala ao solicitante.
+    Ex.: remove 'Ok, vou...' e rótulos '**1ª mensagem:**'.
+    """
+    texto = (texto or '').replace('\r\n', '\n').replace('\r', '\n').strip()
+    if not texto:
+        return ''
+
+    # Se há "1ª mensagem:" / "**2ª mensagem:**", descarta o preâmbulo e junta os corpos
+    if _RE_ROTULO_MENSAGEM.search(texto):
+        partes = _RE_ROTULO_MENSAGEM.split(texto)
+        corpos = [p.strip() for p in partes[1:] if p and p.strip()]
+        if corpos:
+            texto = '\n\n'.join(corpos)
+        else:
+            # só rótulo sem corpo
+            texto = _RE_ROTULO_MENSAGEM.sub('', texto).strip()
+
+    # Remove linhas de pensamento no início (e linhas em branco extras)
+    linhas = texto.split('\n')
+    while linhas:
+        primeira = linhas[0].strip()
+        if not primeira:
+            linhas.pop(0)
+            continue
+        if _RE_LINHA_PENSAMENTO.match(primeira):
+            linhas.pop(0)
+            continue
+        break
+
+    # Remove linhas que são só rótulo residual no meio
+    limpas = []
+    for ln in linhas:
+        s = ln.strip()
+        if re.match(r'(?i)^\*{0,2}\s*(?:\d+[ªºa]?\.?\s*)?mensagem(?:\s*\d+)?\s*:?\s*\*{0,2}$', s):
+            continue
+        limpas.append(ln)
+
+    return '\n'.join(limpas).strip()
 
 
 def _partir_texto_assistente(texto: str, max_chars: int = _MAX_CHARS_BOLHA) -> list[str]:
@@ -122,9 +183,13 @@ def _notificar_comentario_assistente(ticket: Ticket, texto: str) -> None:
 
 
 def send_assistente_message(ticket_id: int, text: str) -> dict:
-    texto = (text or '').strip()
+    # Remove pensamento/meta da IA antes de gravar no chamado
+    texto = limpar_texto_para_solicitante(text)
     if not texto:
-        raise AssistenteServiceError('Texto do comentário é obrigatório.')
+        raise AssistenteServiceError(
+            'Texto do comentário é obrigatório '
+            '(após remover raciocínio interno não restou mensagem ao solicitante).'
+        )
     ticket = Ticket.objects.filter(pk=ticket_id).first()
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)

@@ -22,6 +22,7 @@ from helpdesk.assistente_services import (
     escalar_para_ti,
     liberar_acesso_discador,
     liberar_licenca_ramal,
+    limpar_texto_para_solicitante,
     listar_anexos_ticket,
     listar_campanhas_discador,
     listar_categorias_especificas,
@@ -47,7 +48,9 @@ TOOLS_SPEC = [
             'name': 'send_assistente_message',
             'description': (
                 'Envia uma mensagem CURTA ao solicitante (1–3 frases). '
-                'Chame de novo para a próxima fala — prefira 2–4 bolhas em vez de um texto longo. '
+                'Chame de novo para a próxima fala — prefira 2–4 bolhas. '
+                'O campo text deve conter APENAS a fala ao solicitante: '
+                'proibido raciocínio, "Ok, vou...", "1ª mensagem:", planos ou notas internas. '
                 'Use Markdown leve (**negrito**, listas).'
             ),
             'parameters': {
@@ -55,7 +58,9 @@ TOOLS_SPEC = [
                 'properties': {
                     'text': {
                         'type': 'string',
-                        'description': 'Texto curto em português (Markdown leve ok).',
+                        'description': (
+                            'Somente o texto final ao solicitante (sem pensamento da IA).'
+                        ),
                     },
                 },
                 'required': ['text'],
@@ -419,7 +424,10 @@ def _system_prompt() -> str:
         'Formato das mensagens:\n'
         '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
         '- Envie 2–4 mensagens curtas via send_assistente_message (1–3 frases cada). '
-        'Nunca um único bloco longo.\n\n'
+        'Nunca um único bloco longo.\n'
+        '- CRÍTICO: o campo text é só a fala ao solicitante. '
+        'Nunca inclua raciocínio, "Ok, sem chips...", "Vou passar...", '
+        '"1ª mensagem:", planos ou notas internas — isso não pode aparecer no chamado.\n\n'
         'Procedimentos:\n'
         '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
         '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
@@ -579,10 +587,14 @@ def _rodada_tools(
     messages.append(msg)
 
     if not tool_calls:
-        content = (msg.get('content') or '').strip()
+        # content sem tools costuma ser raciocínio — só posta se sobrar fala limpa
+        content = limpar_texto_para_solicitante(msg.get('content') or '')
         if content and not enviou_mensagem:
-            send_assistente_message(ticket_id, content)
-            enviou_mensagem = True
+            try:
+                send_assistente_message(ticket_id, content)
+                enviou_mensagem = True
+            except AssistenteServiceError:
+                pass
         return enviou_mensagem
 
     for call in tool_calls:
