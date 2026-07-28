@@ -35,5 +35,13 @@ class EmailAccount(models.Model):
             return f"{self.username}@{self.domain.name}"
         return "Configuração Incompleta"
 
+    @property
+    def chip(self):
+        return self.chips.first()
+
+    @property
+    def chip_vinculado(self):
+        return self.chips.first()
+
     def __str__(self):
         return self.address

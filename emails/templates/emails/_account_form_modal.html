@@ -48,11 +48,31 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Vínculo</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Vínculo com Colaborador</label>
                 <input type="text" name="employee_name" required placeholder="Nome completo do colaborador" value="{{ form.employee_name.value|default:'' }}"
                     class="w-full text-base p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm transition-all">
                 {% if form.employee_name.errors %}
                     <p class="text-xs text-red-500 mt-1">{{ form.employee_name.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Linha Telefônica (Chip)</label>
+                <div class="space-y-1.5">
+                    <input type="text" id="chip_search_input" onkeyup="filterChipSelect()" placeholder="Pesquisar número da linha ou operadora..."
+                        class="w-full text-sm p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-800 transition-all placeholder:text-slate-400">
+                    <select name="chip" id="id_chip"
+                        class="w-full text-base p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm font-medium text-slate-700 bg-white">
+                        <option value="" {% if not form.chip.value %}selected{% endif %}>-- Sem linha vinculada --</option>
+                        {% for choice in form.chip.field.queryset %}
+                            <option value="{{ choice.pk }}" {% if form.chip.value|stringformat:"s" == choice.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ choice.formatted_line_number }} — {{ choice.operator.name }}{% if choice.email_vinculado and choice.email_vinculado.pk != form.instance.pk %} (Já em: {{ choice.email_vinculado.address }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if form.chip.errors %}
+                    <p class="text-xs text-red-500 mt-1">{{ form.chip.errors|join:", " }}</p>
                 {% endif %}
             </div>
 
@@ -90,3 +110,25 @@
         </form>
     </div>
 </div>
+
+<script>
+    function filterChipSelect() {
+        const query = (document.getElementById('chip_search_input')?.value || '').toLowerCase().trim();
+        const select = document.getElementById('id_chip');
+        if (!select) return;
+        
+        for (let i = 0; i < select.options.length; i++) {
+            const option = select.options[i];
+            if (option.value === "") {
+                option.style.display = "";
+                continue;
+            }
+            const text = option.text.toLowerCase();
+            if (text.includes(query)) {
+                option.style.display = "";
+            } else {
+                option.style.display = "none";
+            }
+        }
+    }
+</script>

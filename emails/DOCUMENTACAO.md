@@ -12,6 +12,7 @@ Cadastrar domínios (`@empresa.com.br`), contas (usuário + domínio + funcioná
 |---------|--------|
 | `apps.py` | Configuração do app. |
 | `models.py` | `EmailDomain` e `EmailAccount` (propriedade `address`). |
+| `forms.py` | Formulário `EmailAccountForm` com seleção e busca de linha de chip vinculada. |
 | `views.py` | Dashboard, CRUD completo de contas e domínios (Create, Update, Delete), reset de senha, visualizar senha com trava de segurança, e toggle de status (Inativar/Ativar). |
 | `audit.py` | Registro de ações em `RegistroAcao` (core). |
 | `urls.py` | Rotas sob `/emails/`. |

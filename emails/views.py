@@ -7,6 +7,7 @@ from core.permissions import MODULO_EMAILS, ModuloObrigatorioMixin
 from core.audit import logs_do_modulo
 from core.htmx import HtmxModalMixin
 from emails.models import EmailAccount, EmailDomain
+from emails.forms import EmailAccountForm
 from emails.audit import (
     log_conta_bloqueada,
     log_conta_criada,
@@ -32,7 +33,7 @@ class DashboardView(_EmailsMixin, TemplateView):
         context['blocked_accounts'] = EmailAccount.objects.filter(status=EmailAccount.StatusChoices.BLOCKED).count()
         
         # Inventário e Filtros
-        context['accounts'] = EmailAccount.objects.select_related('domain').all().order_by('employee_name')
+        context['accounts'] = EmailAccount.objects.select_related('domain').prefetch_related('chips', 'chips__operator').all().order_by('employee_name')
         context['domains'] = EmailDomain.objects.all().order_by('name')
         context['audit_logs'] = logs_do_modulo(MODULO_EMAILS, limite=50)
         context['audit_titulo'] = 'Registro de auditoria de e-mails'
@@ -42,7 +43,7 @@ class DashboardView(_EmailsMixin, TemplateView):
 class EmailAccountCreateView(HtmxModalMixin, _EmailsMixin, CreateView):
     """Cadastro de novo e-mail via modal no dashboard."""
     model = EmailAccount
-    fields = ['username', 'domain', 'employee_name', 'password', 'status']
+    form_class = EmailAccountForm
     modal_template_name = 'emails/_account_form_modal.html'
     list_url_name = 'emails:dashboard'
     
@@ -66,7 +67,7 @@ from django.views.generic import UpdateView, DeleteView
 class EmailAccountUpdateView(HtmxModalMixin, _EmailsMixin, UpdateView):
     """Edição de e-mail."""
     model = EmailAccount
-    fields = ['username', 'domain', 'employee_name', 'password', 'status']
+    form_class = EmailAccountForm
     modal_template_name = 'emails/_account_form_modal.html'
     list_url_name = 'emails:dashboard'
     

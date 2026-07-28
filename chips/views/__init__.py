@@ -7,7 +7,6 @@ from .management import (
     ChipCreateView,
     ChipUpdateView,
     ChipGeneralTransferView,
-    ChipLinkEmailView,
     batch_delete_view,
 )
 from .assignments import ReturnChipView

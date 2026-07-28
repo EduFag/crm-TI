@@ -1,0 +1,115 @@
+<!-- Modal Overlay -->
+<div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Perfil do Operador</h2>
+                <p class="text-sm text-slate-500 mt-0.5 font-medium">Detalhes completos, alocação e contas vinculadas.</p>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600 hover:bg-slate-200/70 p-2 rounded-lg transition-colors" onclick="document.getElementById('modal-container').innerHTML = ''">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto custom-scrollbar">
+            <!-- Resumo do Operador -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl font-bold shrink-0">
+                    {{ operador.name|make_list|first|upper }}
+                </div>
+                <div>
+                    <h3 class="text-2xl font-bold text-slate-900">{{ operador.name }}</h3>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">ID #{{ operador.id }}</span>
+                        {% if operador.pa %}
+                            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                                <svg class="h-1.5 w-1.5 fill-emerald-500" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" /></svg>
+                                Alocado
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                                <svg class="h-1.5 w-1.5 fill-slate-400" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" /></svg>
+                                Sem PA
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Informações de Alocação -->
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        Alocação Atual
+                    </h4>
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+                        {% if operador.pa %}
+                            <div>
+                                <span class="text-xs text-slate-500 uppercase font-semibold">Setor</span>
+                                <p class="font-medium text-slate-900 mt-0.5">{{ operador.pa.ilha.setor.name }}</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500 uppercase font-semibold">Ilha</span>
+                                <p class="font-medium text-slate-900 mt-0.5">{{ operador.pa.ilha.name }}</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500 uppercase font-semibold">PA</span>
+                                <p class="font-bold text-slate-900 font-mono mt-0.5">{{ operador.pa.name }}</p>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <span class="text-slate-400 italic text-sm">Operador não está alocado a nenhuma PA.</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Contas WhatsApp -->
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
+                        Contas de WhatsApp ({{ operador.whatsapp_accounts.count }}/2)
+                    </h4>
+                    <div class="space-y-3">
+                        {% for account in operador.whatsapp_accounts.all %}
+                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-bold font-mono text-slate-900">{{ account.formatted_number }}</span>
+                                        {% if account.status == 'ACTIVE' %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Ativa</span>
+                                        {% elif account.status == 'RESTRICTED' %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Restringido</span>
+                                        {% elif account.status == 'SUSPENDED' %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800">Em Análise</span>
+                                        {% else %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Banido</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs text-slate-500 font-medium">{{ account.get_account_type_display }}</div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
+                                <span class="text-slate-400 italic text-sm">Nenhuma conta vinculada.</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end shrink-0 gap-3">
+            <button type="button" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 bg-slate-200/70 hover:bg-slate-200 rounded-lg transition-colors" onclick="document.getElementById('modal-container').innerHTML = ''">
+                Fechar
+            </button>
+            <button type="button" hx-get="{% url 'operadores:operador_edit' operador.id %}" hx-target="#modal-container" hx-swap="innerHTML" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors">
+                Editar Operador
+            </button>
+        </div>
+    </div>
+</div>

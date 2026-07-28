@@ -95,12 +95,18 @@ class Chip(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     @property
+    def operador_vinculado(self):
+        if hasattr(self, 'whatsapp_account') and self.whatsapp_account and self.whatsapp_account.operador:
+            return self.whatsapp_account.operador.name
+        return None
+
+    @property
     def formatted_line_number(self):
         digits = ''.join(c for c in self.line_number if c.isdigit())
         if len(digits) == 11:
-            return f"({digits[:2]}){digits[2:7]}-{digits[7:]}"
+            return f"({digits[:2]}) {digits[2:7]}-{digits[7:]}"
         elif len(digits) == 10:
-            return f"({digits[:2]}){digits[2:6]}-{digits[6:]}"
+            return f"({digits[:2]}) {digits[2:6]}-{digits[6:]}"
         return self.line_number
 
     def __str__(self):

@@ -27,7 +27,7 @@ def log_status_alterado(ticket, actor, status_anterior, status_novo):
         ),
         actor=actor,
         obj=ticket,
-        metadata={'antes': status_anterior, 'depois': status_novo},
+        metadata={'status': {'antes': status_anterior, 'depois': status_novo}},
     )
 
 
@@ -41,7 +41,7 @@ def log_atribuicao(ticket, actor, descricao_extra=''):
         descricao=texto,
         actor=actor,
         obj=ticket,
-        metadata={'assigned_to': str(ticket.assigned_to) if ticket.assigned_to else None},
+        metadata={'assigned_to': {'antes': None, 'depois': str(ticket.assigned_to) if ticket.assigned_to else None}},
     )
 
 
@@ -55,6 +55,7 @@ def log_transferencia(ticket, actor, tecnico_anterior, tecnico_novo):
         ),
         actor=actor,
         obj=ticket,
+        metadata={'assigned_to': {'antes': tecnico_anterior, 'depois': tecnico_novo}},
     )
 
 
