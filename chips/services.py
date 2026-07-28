@@ -95,7 +95,10 @@ def devolver_para_ti(chip, *, actor):
     )
     log_devolucao(chip, nome_anterior, actor)
 
-    chip.usage_status = Chip.UsageChoices.AVAILABLE
+    if chip.status in [Chip.StatusChoices.CANCELED, Chip.StatusChoices.LOST]:
+        chip.usage_status = Chip.UsageChoices.UNAVAILABLE
+    else:
+        chip.usage_status = Chip.UsageChoices.AVAILABLE
     chip.save()
     return _chip_grid(chip.pk)
 

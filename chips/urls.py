@@ -28,6 +28,7 @@ urlpatterns = [
     path('batches/<int:pk>/delete/', views.batch_delete_view, name='batch_delete'),
     path('management/create/', views.ChipCreateView.as_view(), name='chip_create'),
     path('management/<int:pk>/edit/', views.ChipUpdateView.as_view(), name='chip_edit'),
+    path('api/grid/<int:pk>/change-status/', views.ChipChangeStatusView.as_view(), name='chip_change_status'),
     path('return/<int:pk>/', views.ReturnChipView.as_view(), name='return_chip'),
     path('recharge/new/', views.RechargeCreateView.as_view(), name='recharge_create'),
     path('transfer/', views.ChipGeneralTransferView.as_view(), name='general_transfer'),

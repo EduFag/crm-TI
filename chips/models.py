@@ -39,7 +39,7 @@ class Chip(models.Model):
     """Cadastro Central de Chips (RF05, RF07)"""
     class StatusChoices(models.TextChoices):
         ACTIVE = 'ACTIVE', 'Ativo'
-        BLOCKED = 'BLOCKED', 'Bloqueado'
+        BANNED = 'BANNED', 'Banido'
         CANCELED = 'CANCELED', 'Cancelado'
         LOST = 'LOST', 'Perdido'
         OTHER = 'OTHER', 'Outro'
@@ -113,6 +113,9 @@ class Chip(models.Model):
         return f"{self.formatted_line_number} - {self.operator.name}"
 
     def clean(self):
+        if self.status == self.StatusChoices.BANNED:
+            self.usage_status = self.UsageChoices.UNAVAILABLE
+
         # Automate usage_status based on status if not IN_USE
         if self.usage_status != self.UsageChoices.IN_USE:
             if self.status == self.StatusChoices.ACTIVE:
@@ -125,12 +128,22 @@ class Chip(models.Model):
                 raise ValidationError({'batch': 'Informe o envelope quando o chip estiver disponível na TI.'})
 
     def save(self, *args, **kwargs):
+        if self.status == self.StatusChoices.BANNED:
+            self.usage_status = self.UsageChoices.UNAVAILABLE
+
         if self.usage_status != self.UsageChoices.IN_USE:
             if self.status == self.StatusChoices.ACTIVE:
                 self.usage_status = self.UsageChoices.AVAILABLE
             else:
                 self.usage_status = self.UsageChoices.UNAVAILABLE
         super().save(*args, **kwargs)
+
+        # Se for Banido, desvincular operador da conta WhatsApp
+        if self.status == self.StatusChoices.BANNED:
+            if hasattr(self, 'whatsapp_account') and self.whatsapp_account:
+                if self.whatsapp_account.operador:
+                    self.whatsapp_account.operador = None
+                    self.whatsapp_account.save(update_fields=['operador'])
 
 
 class ChipMovement(models.Model):

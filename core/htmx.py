@@ -55,8 +55,13 @@ class HtmxModalMixin:
         })
         return context
 
-    def htmx_redirect_response(self, url_name=None):
-        url = reverse(url_name or self.list_url_name)
+    def htmx_redirect_response(self, url_name=None, url=None):
+        if not url:
+            target = url_name or self.list_url_name
+            if target and (target.startswith('/') or '?' in target):
+                url = target
+            else:
+                url = reverse(target)
         response = HttpResponse(status=204)
         response['HX-Redirect'] = url
         return response

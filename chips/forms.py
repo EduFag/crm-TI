@@ -250,3 +250,11 @@ class ChipUpdateForm(forms.ModelForm):
             'observacao': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 3}),
             'email_vinculado': forms.Select(attrs={'class': SELECT_CLASS}),
         }
+
+class ChipChangeStatusForm(forms.ModelForm):
+    class Meta:
+        model = Chip
+        fields = ['status']
+        widgets = {
+            'status': forms.Select(attrs={'class': SELECT_CLASS}),
+        }

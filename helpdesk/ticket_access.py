@@ -294,8 +294,8 @@ def ticket_pode_mostrar_refresh_ia(ticket) -> bool:
 
 
 def usuario_pode_editar_chamado(user, ticket=None) -> bool:
-    """Somente is_staff ou is_superuser veem/usam Editar no chamado."""
-    if not usuario_eh_staff_ou_superuser(user):
+    """Somente is_staff, is_superuser ou operador helpdesk veem/usam Editar no chamado."""
+    if not (usuario_eh_staff_ou_superuser(user) or usuario_eh_operador_helpdesk(user)):
         return False
     if ticket is not None and not usuario_pode_acessar_chamado(user, ticket):
         return False
@@ -303,8 +303,8 @@ def usuario_pode_editar_chamado(user, ticket=None) -> bool:
 
 
 def usuario_pode_excluir_chamado(user, ticket=None) -> bool:
-    """Somente is_staff ou is_superuser veem/usam Excluir no chamado."""
-    if not usuario_eh_staff_ou_superuser(user):
+    """Somente is_staff, is_superuser ou operador helpdesk veem/usam Excluir no chamado."""
+    if not (usuario_eh_staff_ou_superuser(user) or usuario_eh_operador_helpdesk(user)):
         return False
     if ticket is not None and not usuario_pode_acessar_chamado(user, ticket):
         return False

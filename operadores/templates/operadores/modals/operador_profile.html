@@ -22,15 +22,12 @@
                 <div>
                     <h3 class="text-2xl font-bold text-slate-900">{{ operador.name }}</h3>
                     <div class="flex items-center gap-2 mt-1">
-                        <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">ID #{{ operador.id }}</span>
                         {% if operador.pa %}
-                            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
-                                <svg class="h-1.5 w-1.5 fill-emerald-500" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" /></svg>
-                                Alocado
+                            <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
+                                {{ operador.pa.ilha.setor.name }} - {{ operador.pa.ilha.name }} - {{ operador.pa.name }}
                             </span>
                         {% else %}
-                            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
-                                <svg class="h-1.5 w-1.5 fill-slate-400" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" /></svg>
+                            <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
                                 Sem PA
                             </span>
                         {% endif %}

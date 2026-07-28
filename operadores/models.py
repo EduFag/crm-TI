@@ -122,11 +122,15 @@ class WhatsAppAccount(models.Model):
             old_chip.save(update_fields=['usage_status'])
 
         if self.chip:
-            if self.operador:
-                self.chip.usage_status = self.chip.UsageChoices.IN_USE
+            if self.status == self.StatusChoices.BANNED and self.chip.status != self.chip.StatusChoices.BANNED:
+                self.chip.status = self.chip.StatusChoices.BANNED
+                self.chip.save(update_fields=['status', 'usage_status'])
             else:
-                if self.chip.status == self.chip.StatusChoices.ACTIVE:
-                    self.chip.usage_status = self.chip.UsageChoices.AVAILABLE
+                if self.operador:
+                    self.chip.usage_status = self.chip.UsageChoices.IN_USE
                 else:
-                    self.chip.usage_status = self.chip.UsageChoices.UNAVAILABLE
-            self.chip.save(update_fields=['usage_status'])
+                    if self.chip.status == self.chip.StatusChoices.ACTIVE:
+                        self.chip.usage_status = self.chip.UsageChoices.AVAILABLE
+                    else:
+                        self.chip.usage_status = self.chip.UsageChoices.UNAVAILABLE
+                self.chip.save(update_fields=['usage_status'])

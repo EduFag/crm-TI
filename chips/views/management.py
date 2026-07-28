@@ -3,7 +3,7 @@ from django.views.generic import CreateView, UpdateView, FormView
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
 from chips.htmx import ChipsModalMixin
 from chips.models import Chip, Operator, Batch
-from chips.forms import ChipUpdateForm
+from chips.forms import ChipUpdateForm, ChipChangeStatusForm, GeneralTransferForm
 from chips.audit import log_chip_atualizado, log_chip_criado, log_lote_criado, log_operadora_criada
 
 
@@ -129,14 +129,42 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
         antes = Chip.objects.get(pk=self.object.pk)
         self.object = form.save()
         if (
-            self.object.status == Chip.StatusChoices.BLOCKED
-            and antes.status != Chip.StatusChoices.BLOCKED
+            self.object.status == Chip.StatusChoices.BANNED
+            and antes.status != Chip.StatusChoices.BANNED
         ):
             from chips.services import registrar_bloqueio
             registrar_bloqueio(self.object, self.request.user)
         elif (
-            antes.status == Chip.StatusChoices.BLOCKED
-            and self.object.status != Chip.StatusChoices.BLOCKED
+            antes.status == Chip.StatusChoices.BANNED
+            and self.object.status != Chip.StatusChoices.BANNED
+        ):
+            self.object.last_blocked_at = None
+            self.object.save(update_fields=['last_blocked_at'])
+        log_chip_atualizado(self.object, self.request.user, antes)
+        return self.htmx_redirect_response()
+
+
+class ChipChangeStatusView(ChipsModalMixin, _ChipsMixin, UpdateView):
+    model = Chip
+    form_class = ChipChangeStatusForm
+    template_name = 'chips/_change_status_modal.html'
+    chips_tab = 'chips'
+
+    def get_template_names(self):
+        return [self.template_name]
+
+    def form_valid(self, form):
+        antes = Chip.objects.get(pk=self.object.pk)
+        self.object = form.save()
+        if (
+            self.object.status == Chip.StatusChoices.BANNED
+            and antes.status != Chip.StatusChoices.BANNED
+        ):
+            from chips.services import registrar_bloqueio
+            registrar_bloqueio(self.object, self.request.user)
+        elif (
+            antes.status == Chip.StatusChoices.BANNED
+            and self.object.status != Chip.StatusChoices.BANNED
         ):
             self.object.last_blocked_at = None
             self.object.save(update_fields=['last_blocked_at'])
@@ -145,8 +173,6 @@ class ChipUpdateView(ChipsModalMixin, _ChipsMixin, UpdateView):
 
 
 class ChipGeneralTransferView(ChipsModalMixin, _ChipsMixin, FormView):
-    from django.views.generic import FormView
-    from chips.forms import GeneralTransferForm
     form_class = GeneralTransferForm
     template_name = 'chips/_general_transfer_modal.html'
     chips_tab = 'chips'

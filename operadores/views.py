@@ -175,7 +175,7 @@ class OperadorCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
     def form_valid(self, form):
         self.object = form.save()
         messages.success(self.request, "Funcionário cadastrado com sucesso!")
-        return self.htmx_redirect_response()
+        return self.htmx_redirect_response(url=reverse('operadores:dashboard') + '?tab=funcionarios')
 
 class OperadorUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
     modulo_obrigatorio = MODULO_OPERADORES
@@ -188,7 +188,7 @@ class OperadorUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
     def form_valid(self, form):
         self.object = form.save()
         messages.success(self.request, "Funcionário atualizado com sucesso!")
-        return self.htmx_redirect_response()
+        return self.htmx_redirect_response(url=reverse('operadores:dashboard') + '?tab=funcionarios')
 
 class OperadorDeleteView(ModuloObrigatorioMixin, View):
     modulo_obrigatorio = MODULO_OPERADORES
@@ -198,7 +198,7 @@ class OperadorDeleteView(ModuloObrigatorioMixin, View):
         nome = operador.name
         operador.delete()
         messages.success(request, f"Funcionário '{nome}' removido com sucesso!")
-        return redirect('operadores:dashboard')
+        return redirect(reverse('operadores:dashboard') + '?tab=funcionarios')
 
 class WhatsAppAccountCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
     modulo_obrigatorio = MODULO_OPERADORES
@@ -224,7 +224,7 @@ class WhatsAppAccountCreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateVi
     def form_valid(self, form):
         self.object = form.save()
         messages.success(self.request, "Conta WhatsApp cadastrada e linha atualizada!")
-        return self.htmx_redirect_response()
+        return self.htmx_redirect_response(url=reverse('operadores:dashboard') + '?tab=funcionarios')
 
 class WhatsAppAccountUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
     modulo_obrigatorio = MODULO_OPERADORES
@@ -237,7 +237,7 @@ class WhatsAppAccountUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateVi
     def form_valid(self, form):
         self.object = form.save()
         messages.success(self.request, "Conta WhatsApp atualizada!")
-        return self.htmx_redirect_response()
+        return self.htmx_redirect_response(url=reverse('operadores:dashboard') + '?tab=funcionarios')
 
 class PACreateView(HtmxModalMixin, ModuloObrigatorioMixin, CreateView):
     modulo_obrigatorio = MODULO_OPERADORES

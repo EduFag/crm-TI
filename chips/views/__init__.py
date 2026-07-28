@@ -6,6 +6,7 @@ from .management import (
     BatchUpdateView,
     ChipCreateView,
     ChipUpdateView,
+    ChipChangeStatusView,
     ChipGeneralTransferView,
     batch_delete_view,
 )
