@@ -11,6 +11,7 @@ def modulos_menu(request):
         'menu_chips_ativo': path.startswith('/chips/'),
         'menu_emails_ativo': path.startswith('/emails/'),
         'menu_equipment_ativo': path.startswith('/equipment/'),
+        'menu_operadores_ativo': path.startswith('/operadores/'),
         'menu_discador_ativo': path.startswith('/discador/'),
         'menu_usuarios_ativo': path.startswith('/usuarios/'),
         'menu_equipes_ativo': path.startswith('/equipes/'),
@@ -20,7 +21,7 @@ def modulos_menu(request):
         'menu_suporte_expandido': path.startswith('/helpdesk/'),
         'menu_gestao_expandida': any(
             path.startswith(prefixo)
-            for prefixo in ('/chips/', '/emails/', '/equipment/', '/discador/')
+            for prefixo in ('/chips/', '/emails/', '/equipment/', '/discador/', '/operadores/')
         ),
         'menu_discadores_expandida': path.startswith('/discador/'),
         'menu_admin_expandida': any(

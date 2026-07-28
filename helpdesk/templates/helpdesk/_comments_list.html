@@ -128,7 +128,7 @@
     <div class="max-w-[85%] shadow-sm p-3 rounded-lg rounded-tl-none {% if comment.is_interno %}bg-amber-50 border border-amber-200{% elif comment.is_assistente %}bg-white border border-violet-100{% else %}bg-white border border-slate-100{% endif %}">
         <div class="flex items-center justify-between gap-2 mb-1">
             <span class="text-xs font-bold {% if comment.is_interno %}text-amber-900{% else %}text-slate-800{% endif %} truncate flex items-center gap-1.5">
-                {% if comment.is_assistente %}Assistente{% else %}{{ comment.author.get_full_name|default:comment.author.username|default:"Sistema" }}{% endif %}
+                {% if comment.is_assistente %}Assistente{% elif comment.author %}{{ comment.author.get_full_name|default:comment.author.username }}{% else %}Sistema{% endif %}
                 {% if comment.is_interno %}
                 <span class="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">Interno</span>
                 {% endif %}
