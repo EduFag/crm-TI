@@ -78,7 +78,7 @@ def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
 
 
 @transaction.atomic
-def devolver_para_ti(chip, *, actor):
+def devolver_para_ti(chip, *, actor, batch=None):
     """Devolve chip da rua para envelope na TI."""
     if chip.usage_status != Chip.UsageChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser devolvidos.')
@@ -97,8 +97,17 @@ def devolver_para_ti(chip, *, actor):
 
     if chip.status in [Chip.StatusChoices.CANCELED, Chip.StatusChoices.LOST]:
         chip.usage_status = Chip.UsageChoices.UNAVAILABLE
+        # Envelope opcional quando o chip fica indisponível
+        if batch is not None:
+            chip.batch = batch
     else:
+        # Chip ativo volta AVAILABLE e exige envelope físico na TI
+        if batch is None:
+            raise ValidationError('Selecione o envelope para devolver o chip à TI.')
+        chip.batch = batch
         chip.usage_status = Chip.UsageChoices.AVAILABLE
+
+    chip.full_clean()
     chip.save()
     return _chip_grid(chip.pk)
 
@@ -122,7 +131,7 @@ def criar_chip_operacional(
     activated_at=None,
     batch=None,
     observacao='',
-    email_vinculado=False,
+    email_vinculado=None,
     actor,
 ):
     """Cria chip e posiciona na TI ou entrega direto ao callcenter."""

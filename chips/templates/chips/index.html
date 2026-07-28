@@ -88,7 +88,7 @@
         <!-- Form de devolução oculto -->
         <form id="devolver-form" method="post" action="" class="hidden">
             {% csrf_token %}
-            <input type="hidden" name="envelope_id" id="devolver-envelope-id">
+            <input type="hidden" name="envelope" id="devolver-envelope">
             <input type="hidden" name="tab" value="chips">
         </form>
 
@@ -656,9 +656,35 @@
     ];
 
     function devolverChip(id, line) {
-        if (!confirm('Deseja realmente devolver a linha ' + line + ' para a TI?')) return;
+        if (!envelopes.length) {
+            alert('Cadastre um envelope na aba Envelopes antes de devolver o chip à TI.');
+            return;
+        }
+
+        var envelopeId = null;
+        if (envelopes.length === 1) {
+            if (!confirm('Deseja realmente devolver a linha ' + line + ' para a TI?\nEnvelope: ' + envelopes[0].label)) {
+                return;
+            }
+            envelopeId = envelopes[0].id;
+        } else {
+            var lista = envelopes.map(function (env, i) {
+                return (i + 1) + ') ' + env.label;
+            }).join('\n');
+            var escolha = prompt(
+                'Devolver a linha ' + line + ' para a TI.\nDigite o número do envelope:\n\n' + lista
+            );
+            if (escolha === null) return;
+            var idx = parseInt(escolha, 10) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= envelopes.length) {
+                alert('Envelope inválido. Informe um número da lista.');
+                return;
+            }
+            envelopeId = envelopes[idx].id;
+        }
 
         var form = document.getElementById('devolver-form');
+        document.getElementById('devolver-envelope').value = envelopeId;
         form.action = '/chips/return/' + id + '/';
         form.submit();
     }

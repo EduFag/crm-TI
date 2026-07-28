@@ -60,10 +60,13 @@ class ChipGridCreateView(_JsonChipsMixin, View):
         try:
             row = criar_chip_operacional(
                 line_number=cleaned['line_number'],
+                operator=cleaned['operator'],
                 employee_name=cleaned.get('employee_name') or '',
                 employee_user=cleaned.get('employee_user'),
                 activated_at=cleaned.get('activated_at'),
                 batch=cleaned.get('batch'),
+                observacao=cleaned.get('observacao') or '',
+                email_vinculado=cleaned.get('email_vinculado'),
                 actor=request.user,
             )
         except ValidationError as exc:
@@ -135,7 +138,11 @@ class ChipReturnView(_JsonChipsMixin, View):
             return JsonResponse({'errors': form.errors}, status=400)
 
         try:
-            row = devolver_para_ti(chip, actor=request.user)
+            row = devolver_para_ti(
+                chip,
+                actor=request.user,
+                batch=form.cleaned_data.get('envelope'),
+            )
         except ValidationError as exc:
             return JsonResponse({'error': str(exc)}, status=400)
 

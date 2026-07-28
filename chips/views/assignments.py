@@ -4,7 +4,8 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import View
 
 from core.permissions import MODULO_CHIPS, ModuloObrigatorioMixin
-from chips.models import Batch, Chip
+from chips.forms import ReturnToTiForm
+from chips.models import Chip
 from chips.services import devolver_para_ti
 
 
@@ -18,9 +19,18 @@ class ReturnChipView(_ChipsMixin, View):
     def post(self, request, pk):
         chip = get_object_or_404(Chip, pk=pk, usage_status=Chip.UsageChoices.IN_USE)
         tab = request.POST.get('tab', 'chips')
+        form = ReturnToTiForm(request.POST)
+
+        if not form.is_valid():
+            messages.error(request, 'Selecione um envelope válido para a devolução.')
+            return redirect(f'/chips/?tab={tab}')
 
         try:
-            devolver_para_ti(chip, actor=request.user)
+            devolver_para_ti(
+                chip,
+                actor=request.user,
+                batch=form.cleaned_data.get('envelope'),
+            )
             messages.success(request, f'Chip {chip.line_number} retornado para TI.')
         except ValidationError as exc:
             messages.error(request, str(exc))

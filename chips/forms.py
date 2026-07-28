@@ -125,6 +125,7 @@ class ReturnToTiForm(forms.Form):
         queryset=Batch.objects.all().order_by('id'),
         label='Envelope na TI',
         empty_label='Selecione o envelope',
+        required=False,
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
 
