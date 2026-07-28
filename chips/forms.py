@@ -246,7 +246,7 @@ class ChipUpdateForm(forms.ModelForm):
             'iccid': forms.TextInput(attrs={'class': INPUT_CLASS}),
             'plan_type': forms.Select(attrs={'class': SELECT_CLASS}),
             'batch': forms.Select(attrs={'class': SELECT_CLASS}),
-            'activated_at': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+            'activated_at': forms.DateInput(format='%Y-%m-%d', attrs={'class': INPUT_CLASS, 'type': 'date'}),
             'observacao': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 3}),
             'email_vinculado': forms.Select(attrs={'class': SELECT_CLASS}),
         }
