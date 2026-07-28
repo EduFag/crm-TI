@@ -223,3 +223,24 @@ def filtro_q_usuario(qs, q):
     if q.isdigit():
         filtro |= Q(pk=int(q))
     return qs.filter(filtro)
+
+
+def serialize_chunk(chunk, detalhe=False):
+    """Serializa chunk de aprendizado do Assistente (sem dados sensíveis)."""
+    data = {
+        'id': chunk.pk,
+        'titulo': chunk.titulo,
+        'categoria_hint': chunk.categoria_hint,
+        'origem': chunk.origem,
+        'ativo': chunk.ativo,
+        'tags': chunk.tags if isinstance(chunk.tags, list) else [],
+        'fonte_ticket_ids': chunk.fonte_ticket_ids if isinstance(chunk.fonte_ticket_ids, list) else [],
+        'criado_em': iso(chunk.criado_em),
+        'atualizado_em': iso(chunk.atualizado_em),
+    }
+    if detalhe:
+        data['conteudo'] = chunk.conteudo
+    else:
+        data['conteudo_preview'] = (chunk.conteudo or '')[:180]
+    return data
+

@@ -113,14 +113,32 @@ class AssistenteConfig(models.Model):
 class AssistenteChunk(models.Model):
     """Trecho de aprendizado gerado a partir de chamados finalizados."""
 
+    class Origem(models.TextChoices):
+        IA = 'ia', 'Gerado pela IA'
+        MANUAL = 'manual', 'Manual'
+        CHAT = 'chat', 'Chat de memória'
+
     titulo = models.CharField(max_length=200)
     conteudo = models.TextField()
     categoria_hint = models.CharField(max_length=120, blank=True, default='')
     fonte_ticket_ids = models.JSONField(default=list, blank=True)
+    # Existentes preservados como manual para não serem apagados na regeneração
+    origem = models.CharField(
+        max_length=16,
+        choices=Origem.choices,
+        default=Origem.MANUAL,
+        help_text='Como o chunk foi criado (ia/manual/chat).',
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text='Se falso, o chunk não entra no contexto do Assistente.',
+    )
+    tags = models.JSONField(default=list, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-criado_em']
+        ordering = ['-atualizado_em', '-criado_em']
         verbose_name = 'chunk de aprendizado'
         verbose_name_plural = 'chunks de aprendizado'
 

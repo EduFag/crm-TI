@@ -262,7 +262,7 @@ def ia_aprendizado(request):
     from integracoes.models import AssistenteChunk, AssistenteConfig
 
     config = AssistenteConfig.get_solo()
-    chunks = AssistenteChunk.objects.all()[:50]
+    chunks = AssistenteChunk.objects.filter(ativo=True)[:50]
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
     chat_historico = request.session.get(SESSION_KEY) or []
     return render(request, 'integracoes/ia_aprendizado.html', {
@@ -321,10 +321,12 @@ def ia_aprendizado_gerar(request):
             actor=request.user,
             metadata=resultado,
         )
+        preservados = resultado.get('preservados_curadoria', 0)
         messages.success(
             request,
-            f'Aprendizado gerado: {resultado["chunks"]} chunks '
-            f'({resultado["tickets_analisados"]} chamados analisados).',
+            f'Aprendizado gerado: {resultado["chunks"]} chunks IA '
+            f'({resultado["tickets_analisados"]} chamados). '
+            f'Preservados {preservados} chunks manuais/chat.',
         )
     except LlmError as exc:
         messages.error(request, f'Falha ao gerar aprendizado: {exc}')
@@ -348,7 +350,8 @@ def ia_chunk_update(request, pk):
     chunk.titulo = titulo[:200]
     chunk.conteudo = conteudo
     chunk.categoria_hint = categoria[:120]
-    chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint'])
+    chunk.ativo = True
+    chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint', 'ativo', 'atualizado_em'])
     registrar_acao(
         modulo=MODULO_CORE,
         acao=RegistroAcao.AcaoChoices.UPDATED,
@@ -376,6 +379,9 @@ def ia_chunk_create(request):
         conteudo=conteudo,
         categoria_hint=categoria[:120],
         fonte_ticket_ids=[],
+        origem=AssistenteChunk.Origem.MANUAL,
+        ativo=True,
+        tags=[],
     )
     registrar_acao(
         modulo=MODULO_CORE,

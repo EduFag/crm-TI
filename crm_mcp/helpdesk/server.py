@@ -323,6 +323,40 @@ def liberar_licenca_ramal(ramal_id: int = 0, ramal_numero: str = '', slug: str =
         return f'Erro: {exc}'
 
 
+@mcp.tool()
+def list_chunks(origem: str = '', limit: int = 30) -> str:
+    """Lista chunks de aprendizado ativos do Assistente. origem opcional: ia|manual|chat."""
+    try:
+        return get_client().get_text('aprendizado/chunks/', {
+            'origem': origem or None,
+            'limit': limit,
+        })
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def get_chunk(chunk_id: int) -> str:
+    """Retorna um chunk de aprendizado completo pelo ID."""
+    try:
+        return get_client().get_text(f'aprendizado/chunks/{chunk_id}/')
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def search_chunks(q: str, limit: int = 20, ativos: str = 'true') -> str:
+    """Busca chunks de aprendizado por relevância textual (mesmo score do Assistente)."""
+    try:
+        return get_client().get_text('aprendizado/chunks/search/', {
+            'q': q or None,
+            'limit': limit,
+            'ativos': ativos or 'true',
+        })
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
 def main():
     mcp.run(transport='stdio')
 

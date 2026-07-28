@@ -6,7 +6,7 @@ Servidores MCP (stdio) que chamam a API Django em `/api/mcp/` com Bearer token.
 
 | Servidor | Módulo Python | Tools |
 |----------|---------------|-------|
-| mcp-helpdesk | `crm_mcp.helpdesk.server` | tickets, assistente, chips/usuario helpers |
+| mcp-helpdesk | `crm_mcp.helpdesk.server` | tickets, assistente (triagem/anexos/solicitante), aprendizado (chunks), helpers chips/usuário e discador |
 | mcp-chips | `crm_mcp.chips.server` | list_chips, get_chip, lookup_chip_by_line, list_chip_movements |
 | mcp-discador | `crm_mcp.discador.server` | licenças, ramais, acessos, campanhas, criar/liberar |
 | mcp-equipment | `crm_mcp.equipment.server` | list_equipment, get_equipment, lookup_equipment_by_tag, list_equipment_logs |
@@ -14,14 +14,36 @@ Servidores MCP (stdio) que chamam a API Django em `/api/mcp/` com Bearer token.
 | mcp-users | `crm_mcp.users.server` | list_users, get_user, lookup_user_by_username, list_equipes, list_equipe_membros |
 | mcp-audit | `crm_mcp.audit.server` | list_acoes, get_acao, sistema_status |
 
-## Tools de escrita (Assistente / Discador)
+## Tools Helpdesk (leitura + Assistente)
 
 | Tool | Endpoint |
 |------|----------|
+| `list_tickets` | GET `tickets/` |
+| `get_ticket` | GET `tickets/<id>/` |
+| `list_ticket_comments` | GET `tickets/<id>/comments/` |
 | `send_assistente_message` | POST `tickets/<id>/assistente/comentarios/` |
 | `set_ticket_priority` | POST `tickets/<id>/priority/` |
 | `set_ticket_status` | POST `tickets/<id>/status/` |
 | `escalar_para_ti` | POST `tickets/<id>/assistente/escalar/` |
+| `listar_categorias_especificas` | GET `categorias-especificas/` |
+| `triar_chamado` | POST `tickets/<id>/assistente/triar/` |
+| `recusar_chamado` | POST `tickets/<id>/assistente/recusar/` |
+| `listar_anexos` | GET `tickets/<id>/anexos/` |
+| `ler_imagem_anexo` | POST `tickets/<id>/anexos/ler-imagem/` |
+| `ler_pdf_anexo` | POST `tickets/<id>/anexos/ler-pdf/` |
+| `ler_anexo_texto` | POST `tickets/<id>/anexos/ler-texto/` |
+| `consultar_chips` | GET `assistente/consultar-chips/` |
+| `consultar_usuario` | GET `assistente/consultar-usuario/` |
+| `atualizar_solicitante` | POST `tickets/<id>/assistente/solicitante/` |
+| `atualizar_descricao_chamado` | POST `tickets/<id>/assistente/descricao/` |
+| `list_chunks` | GET `aprendizado/chunks/` |
+| `get_chunk` | GET `aprendizado/chunks/<id>/` |
+| `search_chunks` | GET `aprendizado/chunks/search/` |
+
+## Tools Discador (também espelhadas no helpdesk)
+
+| Tool | Endpoint |
+|------|----------|
 | `consultar_licencas_discador` | GET `discador/licencas/` |
 | `listar_ramais_discador` | GET `discador/ramais/` |
 | `consultar_acesso_discador` | GET `discador/acessos/` |
@@ -78,4 +100,6 @@ Veja [`.cursor/mcp.json`](../.cursor/mcp.json). Ajuste o caminho do `python` se 
 ```bash
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/sistema/status/"
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/discador/licencas/"
+curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/aprendizado/chunks/"
+curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/aprendizado/chunks/search/?q=discador"
 ```

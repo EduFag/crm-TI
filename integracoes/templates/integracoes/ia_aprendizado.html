@@ -101,7 +101,8 @@
             <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
                 <h3 class="text-lg font-bold text-slate-900">Gerar chunks com a IA</h3>
                 <p class="text-sm text-slate-500">
-                    Analisa chamados resolvidos/arquivados. Depois corrija manualmente ou pelo chat.
+                    Analisa chamados resolvidos/arquivados (inclui notas internas da TI).
+                    Substitui apenas chunks gerados pela IA — manuais e do chat são preservados.
                 </p>
                 <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
                       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
@@ -151,6 +152,16 @@
                 <ul class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
                     {% for chunk in chunks %}
                     <li class="px-6 py-5" id="chunk-{{ chunk.pk }}">
+                        <div class="flex items-center gap-2 mb-3">
+                            {% if chunk.origem == 'ia' %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">IA</span>
+                            {% elif chunk.origem == 'chat' %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100">Chat</span>
+                            {% else %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Manual</span>
+                            {% endif %}
+                            <span class="text-[10px] text-slate-400">#{{ chunk.pk }}</span>
+                        </div>
                         <form method="post" action="{% url 'integracoes:ia_chunk_update' chunk.pk %}" class="space-y-3">
                             {% csrf_token %}
                             <div>

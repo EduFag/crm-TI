@@ -19,7 +19,7 @@ MEMORIA_TOOLS = [
         'type': 'function',
         'function': {
             'name': 'listar_memorias',
-            'description': 'Lista os chunks de aprendizado atuais (id, título, categoria).',
+            'description': 'Lista os chunks de aprendizado ativos (id, título, categoria, origem).',
             'parameters': {'type': 'object', 'properties': {}, 'required': []},
         },
     },
@@ -63,7 +63,10 @@ MEMORIA_TOOLS = [
         'type': 'function',
         'function': {
             'name': 'remover_memoria',
-            'description': 'Remove um chunk incorreto ou obsoleto pelo id.',
+            'description': (
+                'Desativa um chunk incorreto ou obsoleto pelo id (soft-delete). '
+                'Não apaga o registro; só remove do contexto do Assistente.'
+            ),
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -95,9 +98,11 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
                 'id': c.pk,
                 'titulo': c.titulo,
                 'categoria_hint': c.categoria_hint,
+                'origem': c.origem,
+                'ativo': c.ativo,
                 'conteudo_preview': c.conteudo[:180],
             }
-            for c in AssistenteChunk.objects.all()[:80]
+            for c in AssistenteChunk.objects.filter(ativo=True)[:80]
         ]
         return json.dumps({'ok': True, 'chunks': itens}, ensure_ascii=False), False
 
@@ -112,11 +117,15 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
             conteudo=conteudo,
             categoria_hint=categoria[:120],
             fonte_ticket_ids=[],
+            origem=AssistenteChunk.Origem.CHAT,
+            ativo=True,
+            tags=[],
         )
         return json.dumps({
             'ok': True,
             'chunk_id': chunk.pk,
             'titulo': chunk.titulo,
+            'origem': chunk.origem,
             'acao': 'criado',
         }, ensure_ascii=False), True
 
@@ -135,11 +144,14 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
             chunk.conteudo = str(args['conteudo']).strip()
         if 'categoria_hint' in args and args.get('categoria_hint') is not None:
             chunk.categoria_hint = str(args.get('categoria_hint') or '').strip()[:120]
+        # Reativa se estava desligado e a TI corrigiu
+        chunk.ativo = True
         chunk.save()
         return json.dumps({
             'ok': True,
             'chunk_id': chunk.pk,
             'titulo': chunk.titulo,
+            'origem': chunk.origem,
             'acao': 'atualizado',
         }, ensure_ascii=False), True
 
@@ -153,12 +165,13 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
         if not chunk:
             return json.dumps({'ok': False, 'error': 'chunk não encontrado'}), False
         titulo = chunk.titulo
-        chunk.delete()
+        chunk.ativo = False
+        chunk.save(update_fields=['ativo', 'atualizado_em'])
         return json.dumps({
             'ok': True,
             'chunk_id': chunk_id,
             'titulo': titulo,
-            'acao': 'removido',
+            'acao': 'desativado',
         }, ensure_ascii=False), True
 
     return json.dumps({'ok': False, 'error': f'tool desconhecida: {name}'}), False
@@ -166,14 +179,15 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
 
 def _system_prompt() -> str:
     resumo = []
-    for c in AssistenteChunk.objects.all()[:40]:
-        resumo.append(f'- #{c.pk} [{c.categoria_hint or "-"}] {c.titulo}')
+    for c in AssistenteChunk.objects.filter(ativo=True)[:40]:
+        resumo.append(f'- #{c.pk} [{c.origem}] [{c.categoria_hint or "-"}] {c.titulo}')
     lista = '\n'.join(resumo) or '(nenhuma memória ainda)'
     return (
         'Você é o tutor de aprendizado do Assistente de TI da empresa. '
         'A TI conversa com você para corrigir e enriquecer a memória (chunks) usada no Helpdesk. '
         'Quando o usuário pedir para lembrar, gravar na memória, corrigir um procedimento ou '
         'esquecer algo, use as tools gravar_memoria / atualizar_memoria / remover_memoria. '
+        'remover_memoria apenas desativa o chunk (não apaga). '
         'Antes de atualizar/remover, use listar_memorias se precisar do id. '
         'Responda sempre em português, de forma objetiva e legível. '
         'Use Markdown leve (negrito com **, listas numeradas) só quando ajudar a leitura. '

@@ -455,16 +455,100 @@ TOOLS_SPEC = [
 ]
 
 
+def _tokens_relevancia(*textos: str) -> set[str]:
+    """Extrai tokens úteis (len>=3) de um ou mais textos."""
+    tokens: set[str] = set()
+    for texto in textos:
+        if not texto:
+            continue
+        for raw in re.split(r'[^\w]+', str(texto).lower(), flags=re.UNICODE):
+            tok = raw.strip('_')
+            if len(tok) >= 3:
+                tokens.add(tok)
+    return tokens
+
+
+def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> int:
+    """Pontuação simples por match de categoria/tags/palavras-chave."""
+    score = 0
+    cat_hint = (chunk.categoria_hint or '').lower()
+    titulo = (chunk.titulo or '').lower()
+    conteudo = (chunk.conteudo or '').lower()
+    tags = chunk.tags if isinstance(chunk.tags, list) else []
+    tags_txt = ' '.join(str(t) for t in tags).lower()
+    hay = f'{titulo} {conteudo} {cat_hint} {tags_txt}'
+
+    if categoria:
+        cat_l = categoria.lower()
+        if cat_l in cat_hint:
+            score += 10
+        elif cat_l in titulo or cat_l in conteudo:
+            score += 4
+
+    for tok in tokens:
+        if tok not in hay:
+            continue
+        if tok in titulo or tok in cat_hint or tok in tags_txt:
+            score += 3
+        else:
+            score += 1
+    return score
+
+
 def _chunks_relevantes(ticket: Ticket, limite: int = 8) -> list[AssistenteChunk]:
+    """Seleciona chunks ativos ranqueados por relevância ao ticket."""
+    qs = list(AssistenteChunk.objects.filter(ativo=True)[:200])
+    if not qs:
+        return []
+
+    cat = ticket.category.name if ticket.category_id else ''
+    tokens = _tokens_relevancia(ticket.title or '', (ticket.description or '')[:800], cat)
+    if ticket.specific_category_id:
+        tokens |= _tokens_relevancia(ticket.specific_category.name)
+
+    ranqueados = sorted(
+        qs,
+        key=lambda ch: (
+            _score_chunk(ch, tokens, cat),
+            ch.atualizado_em.timestamp() if ch.atualizado_em else 0,
+        ),
+        reverse=True,
+    )
+    escolhidos = [ch for ch in ranqueados if _score_chunk(ch, tokens, cat) > 0][:limite]
+    if not escolhidos:
+        escolhidos = ranqueados[:limite]
+
+    logger.info(
+        'chunks_relevantes ticket=%s ids=%s scores=%s',
+        ticket.pk,
+        [ch.pk for ch in escolhidos],
+        [_score_chunk(ch, tokens, cat) for ch in escolhidos],
+    )
+    return escolhidos
+
+
+def buscar_chunks(q: str = '', limite: int = 20, so_ativos: bool = True) -> list[AssistenteChunk]:
+    """Busca chunks por texto (mesmo score do Assistente). Usado pela API MCP."""
     qs = AssistenteChunk.objects.all()
-    cat = ''
-    if ticket.category_id:
-        cat = ticket.category.name
-    if cat:
-        filtrados = list(qs.filter(Q(categoria_hint__icontains=cat) | Q(conteudo__icontains=cat))[:limite])
-        if filtrados:
-            return filtrados
-    return list(qs[:limite])
+    if so_ativos:
+        qs = qs.filter(ativo=True)
+    chunks = list(qs[:300])
+    if not chunks:
+        return []
+    texto = (q or '').strip()
+    if not texto:
+        return chunks[: max(1, min(limite, 50))]
+    tokens = _tokens_relevancia(texto)
+    ranqueados = sorted(
+        chunks,
+        key=lambda ch: (
+            _score_chunk(ch, tokens, texto),
+            ch.atualizado_em.timestamp() if ch.atualizado_em else 0,
+        ),
+        reverse=True,
+    )
+    com_score = [ch for ch in ranqueados if _score_chunk(ch, tokens, texto) > 0]
+    return (com_score or ranqueados)[: max(1, min(limite, 50))]
 
 
 def _resumo_anexos(ticket: Ticket) -> str:
@@ -1010,8 +1094,15 @@ def processar_assistente(ticket_id: int) -> None:
                 pass
 
 
+def _titulo_normalizado(titulo: str) -> str:
+    return re.sub(r'\s+', ' ', (titulo or '').strip().lower())
+
+
 def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
-    """Usa a IA para gerar chunks a partir de chamados finalizados/arquivados."""
+    """Usa a IA para gerar chunks a partir de chamados finalizados/arquivados.
+
+    Substitui apenas chunks com origem=ia; preserva manual e chat.
+    """
     from django.utils import timezone
 
     from integracoes.llm import chat_text
@@ -1031,14 +1122,15 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
     for t in tickets:
         ids.append(t.pk)
         comps = []
-        for c in t.comments.filter(is_active=True, is_interno=False).order_by('created_at')[:15]:
+        for c in t.comments.filter(is_active=True).order_by('created_at')[:20]:
             if c.is_assistente:
                 autor = 'Assistente'
             elif c.author_id:
                 autor = c.author.username
             else:
                 autor = 'Sistema'
-            comps.append(f'  - {autor}: {c.text[:400]}')
+            marca = ' [INTERNO TI]' if c.is_interno else ''
+            comps.append(f'  - {autor}{marca}: {c.text[:400]}')
         blocos.append(
             f'#{t.pk} [{t.category.name if t.category_id else "-"}] {t.title}\n'
             f'Desc: {t.description[:500]}\nComentários:\n' + '\n'.join(comps)
@@ -1046,9 +1138,13 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
 
     prompt = (
         'Com base nos chamados de helpdesk abaixo (já finalizados pela TI real), '
-        'gere um JSON array de objetos com chaves: titulo, conteudo, categoria_hint. '
+        'gere um JSON array de objetos com chaves: titulo, conteudo, categoria_hint, '
+        'fonte_ticket_ids (lista opcional de IDs numéricos dos chamados que motivaram o chunk), '
+        'tags (lista opcional de strings curtas). '
+        'Priorize padrões das notas [INTERNO TI] (como a TI resolveu). '
         'Cada item é um "chunk" de aprendizado (tom de resposta, padrões, o que perguntar, '
-        'quando escalar). Gere entre 5 e 12 chunks. Responda SOMENTE o JSON.\n\n'
+        'quando escalar). Gere entre 5 e 12 chunks. '
+        'conteudo com no máximo 1200 caracteres. Responda SOMENTE o JSON.\n\n'
         + '\n\n---\n\n'.join(blocos)
     )
     raw = chat_text([
@@ -1059,11 +1155,24 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
     match = re.search(r'\[.*\]', raw, re.DOTALL)
     if not match:
         raise LlmError('IA não retornou JSON de chunks.')
-    data = json.loads(match.group(0))
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError as exc:
+        raise LlmError('JSON de chunks inválido.') from exc
     if not isinstance(data, list) or not data:
         raise LlmError('JSON de chunks vazio.')
 
-    AssistenteChunk.objects.all().delete()
+    # Só remove chunks gerados pela IA; curadoria manual/chat permanece
+    removidos = AssistenteChunk.objects.filter(origem=AssistenteChunk.Origem.IA).delete()[0]
+    preservados = AssistenteChunk.objects.filter(
+        origem__in=[AssistenteChunk.Origem.MANUAL, AssistenteChunk.Origem.CHAT],
+        ativo=True,
+    ).count()
+    titulos_existentes = {
+        _titulo_normalizado(t)
+        for t in AssistenteChunk.objects.filter(ativo=True).values_list('titulo', flat=True)
+    }
+
     criados = 0
     for item in data:
         if not isinstance(item, dict):
@@ -1072,15 +1181,53 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
         conteudo = (item.get('conteudo') or '').strip()
         if not titulo or not conteudo:
             continue
+        if len(conteudo) > 1200:
+            conteudo = conteudo[:1200].rstrip()
+        norm = _titulo_normalizado(titulo)
+        if not norm or norm in titulos_existentes:
+            continue
+
+        fontes = item.get('fonte_ticket_ids')
+        if isinstance(fontes, list):
+            fontes_ok = []
+            for x in fontes:
+                try:
+                    n = int(x)
+                except (TypeError, ValueError):
+                    continue
+                if n in ids:
+                    fontes_ok.append(n)
+            fonte_ticket_ids = fontes_ok or list(ids)
+        else:
+            fonte_ticket_ids = list(ids)
+
+        tags_raw = item.get('tags')
+        tags = []
+        if isinstance(tags_raw, list):
+            for tag in tags_raw[:8]:
+                t = str(tag).strip()[:40]
+                if t:
+                    tags.append(t)
+
         AssistenteChunk.objects.create(
             titulo=titulo[:200],
             conteudo=conteudo,
             categoria_hint=(item.get('categoria_hint') or '')[:120],
-            fonte_ticket_ids=ids,
+            fonte_ticket_ids=fonte_ticket_ids,
+            origem=AssistenteChunk.Origem.IA,
+            ativo=True,
+            tags=tags,
         )
+        titulos_existentes.add(norm)
         criados += 1
 
     config = AssistenteConfig.get_solo()
     config.ultima_geracao_em = timezone.now()
     config.save(update_fields=['ultima_geracao_em', 'atualizado_em'])
-    return {'ok': True, 'chunks': criados, 'tickets_analisados': len(ids)}
+    return {
+        'ok': True,
+        'chunks': criados,
+        'tickets_analisados': len(ids),
+        'removidos_ia': removidos,
+        'preservados_curadoria': preservados,
+    }

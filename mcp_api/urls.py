@@ -1,6 +1,6 @@
 from django.urls import path
 
-from mcp_api.views import audit, chips, discador, emails, equipment, helpdesk, users
+from mcp_api.views import aprendizado, audit, chips, discador, emails, equipment, helpdesk, users
 
 urlpatterns = [
     # Helpdesk
@@ -22,6 +22,11 @@ urlpatterns = [
     path('assistente/consultar-usuario/', helpdesk.get_consultar_usuario, name='mcp_consultar_usuario'),
     path('tickets/<int:pk>/assistente/solicitante/', helpdesk.post_atualizar_solicitante, name='mcp_atualizar_solicitante'),
     path('tickets/<int:pk>/assistente/descricao/', helpdesk.post_atualizar_descricao, name='mcp_atualizar_descricao'),
+
+    # Aprendizado (chunks) — somente leitura
+    path('aprendizado/chunks/', aprendizado.list_chunks, name='mcp_list_chunks'),
+    path('aprendizado/chunks/search/', aprendizado.search_chunks, name='mcp_search_chunks'),
+    path('aprendizado/chunks/<int:pk>/', aprendizado.get_chunk, name='mcp_get_chunk'),
 
     # Discador (JoyTec)
     path('discador/licencas/', discador.get_licencas, name='mcp_discador_licencas'),
