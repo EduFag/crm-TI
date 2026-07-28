@@ -106,7 +106,7 @@ def devolver_para_ti(chip, *, actor):
 @transaction.atomic
 def registrar_bloqueio(chip, actor):
     """Marca chip como bloqueado e registra data."""
-    chip.status = Chip.StatusChoices.BLOCKED
+    chip.status = Chip.StatusChoices.BANNED
     chip.last_blocked_at = timezone.now()
     chip.save()
     return chip

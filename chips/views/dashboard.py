@@ -121,7 +121,7 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
             usage_status=Chip.UsageChoices.IN_USE,
         ).count()
         context['metric_blocked_canceled'] = Chip.objects.filter(
-            status__in=[Chip.StatusChoices.BLOCKED, Chip.StatusChoices.CANCELED]
+            status__in=[Chip.StatusChoices.BANNED, Chip.StatusChoices.CANCELED]
         ).count()
         context['metric_lost'] = Chip.objects.filter(
             status=Chip.StatusChoices.LOST
