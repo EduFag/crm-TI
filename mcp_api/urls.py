@@ -1,6 +1,16 @@
 from django.urls import path
 
-from mcp_api.views import aprendizado, audit, chips, discador, emails, equipment, helpdesk, users
+from mcp_api.views import (
+    aprendizado,
+    audit,
+    chips,
+    discador,
+    emails,
+    equipment,
+    helpdesk,
+    operadores,
+    users,
+)
 
 urlpatterns = [
     # Helpdesk
@@ -44,6 +54,14 @@ urlpatterns = [
     path('chips/by-line/<str:line_number>/', chips.lookup_chip_by_line, name='mcp_lookup_chip_by_line'),
     path('chips/<int:pk>/', chips.get_chip, name='mcp_get_chip'),
     path('chips/<int:pk>/movements/', chips.list_chip_movements, name='mcp_list_chip_movements'),
+    path('chips/<int:pk>/status/', chips.post_chip_status, name='mcp_chip_status'),
+    path('chips/<int:pk>/observacao/', chips.post_chip_observacao, name='mcp_chip_observacao'),
+
+    # Operadores / WhatsApp (somente leitura)
+    path('operadores/', operadores.list_operadores, name='mcp_list_operadores'),
+    path('operadores/<int:pk>/', operadores.get_operador, name='mcp_get_operador'),
+    path('whatsapp/', operadores.list_whatsapp, name='mcp_list_whatsapp'),
+    path('whatsapp/<int:pk>/', operadores.get_whatsapp, name='mcp_get_whatsapp'),
 
     # Equipment
     path('equipment/', equipment.list_equipment, name='mcp_list_equipment'),

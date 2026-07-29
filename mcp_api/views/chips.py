@@ -1,11 +1,14 @@
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_http_methods
 
 from chips.models import Chip, ChipMovement
+from helpdesk.assistente_services import atualizar_observacao_chip, atualizar_status_chip
 from mcp_api.auth import requer_token_mcp
 from mcp_api.serializers import parse_limit, serialize_chip, serialize_chip_movement
+from mcp_api.views.helpdesk import _json_body, _service_response
 
 
 @require_GET
@@ -72,3 +75,31 @@ def list_chip_movements(request, pk):
     limit = parse_limit(request)
     itens = [serialize_chip_movement(m) for m in qs[:limit]]
     return JsonResponse({'chip_id': chip.pk, 'count': len(itens), 'results': itens})
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_chip_status(request, pk):
+    """Altera status do chip (inventário CRM)."""
+    data = _json_body(request)
+    return _service_response(
+        atualizar_status_chip,
+        pk,
+        '',
+        data.get('status', ''),
+    )
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token_mcp
+def post_chip_observacao(request, pk):
+    """Atualiza observação do chip."""
+    data = _json_body(request)
+    return _service_response(
+        atualizar_observacao_chip,
+        pk,
+        '',
+        data.get('observacao', ''),
+    )

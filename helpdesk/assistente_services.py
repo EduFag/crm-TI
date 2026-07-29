@@ -878,6 +878,151 @@ def consultar_chips(q: str, limit: int = 20) -> dict:
     }
 
 
+def _resolver_chip(*, chip_id=None, line_number: str = ''):
+    """Resolve chip por id ou número da linha."""
+    from chips.models import Chip
+
+    if chip_id:
+        try:
+            return Chip.objects.select_related('operator', 'batch').get(pk=int(chip_id))
+        except (Chip.DoesNotExist, TypeError, ValueError):
+            raise AssistenteServiceError(f'Chip id={chip_id} não encontrado.', status_code=404)
+
+    digits = ''.join(c for c in (line_number or '') if c.isdigit())
+    termo = (line_number or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe chip_id ou line_number.')
+
+    chip = (
+        Chip.objects.select_related('operator', 'batch')
+        .filter(Q(line_number=termo) | Q(line_number=digits))
+        .first()
+    )
+    if not chip:
+        raise AssistenteServiceError(f'Chip linha "{termo}" não encontrado.', status_code=404)
+    return chip
+
+
+def atualizar_status_chip(chip_id=None, line_number: str = '', status: str = '') -> dict:
+    """Altera status do chip (ACTIVE|BANNED|CANCELED|LOST|OTHER) com auditoria."""
+    from chips.audit import log_chip_atualizado
+    from chips.models import Chip
+    from chips.services import registrar_bloqueio
+
+    status_limpo = (status or '').strip().upper()
+    validos = {c.value for c in Chip.StatusChoices}
+    if status_limpo not in validos:
+        raise AssistenteServiceError(
+            f'Status inválido: {status}. Use: {", ".join(sorted(validos))}.'
+        )
+
+    chip = _resolver_chip(chip_id=chip_id, line_number=line_number)
+    antes = Chip.objects.get(pk=chip.pk)
+    status_antes = chip.status
+
+    if status_limpo == Chip.StatusChoices.BANNED and status_antes != Chip.StatusChoices.BANNED:
+        registrar_bloqueio(chip, actor=None)
+    else:
+        chip.status = status_limpo
+        if status_antes == Chip.StatusChoices.BANNED and status_limpo != Chip.StatusChoices.BANNED:
+            chip.last_blocked_at = None
+        chip.save()
+
+    chip.refresh_from_db()
+    log_chip_atualizado(chip, None, antes)
+    return {
+        'ok': True,
+        'chip': {
+            'id': chip.pk,
+            'line_number': chip.line_number,
+            'status': chip.status,
+            'usage_status': chip.usage_status,
+            'observacao': chip.observacao,
+        },
+    }
+
+
+def atualizar_observacao_chip(chip_id=None, line_number: str = '', observacao: str = '') -> dict:
+    """Atualiza observação operacional do chip."""
+    from chips.audit import log_chip_atualizado
+    from chips.models import Chip
+    from core.audit import registrar_acao
+    from core.models import RegistroAcao
+    from core.permissions import MODULO_CHIPS
+
+    chip = _resolver_chip(chip_id=chip_id, line_number=line_number)
+    antes = Chip.objects.get(pk=chip.pk)
+    chip.observacao = observacao if observacao is not None else ''
+    chip.save()
+    log_chip_atualizado(chip, None, antes)
+    registrar_acao(
+        modulo=MODULO_CHIPS,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=f'Observação do chip {chip.line_number} atualizada via Assistente/MCP.',
+        actor=None,
+        obj=chip,
+        metadata={'observacao': (chip.observacao or '')[:500]},
+    )
+    return {
+        'ok': True,
+        'chip': {
+            'id': chip.pk,
+            'line_number': chip.line_number,
+            'status': chip.status,
+            'observacao': chip.observacao,
+        },
+    }
+
+
+def consultar_equipamento(q: str, limit: int = 20) -> dict:
+    """Busca patrimônio por tag, serial, modelo ou colaborador."""
+    from equipment.models import Equipment
+    from mcp_api.serializers import serialize_equipment
+
+    termo = (q or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe tag, serial, modelo ou nome do colaborador.')
+
+    limit = max(1, min(int(limit or 20), 50))
+    filtro = (
+        Q(tag__icontains=termo)
+        | Q(serial_number__icontains=termo)
+        | Q(brand_model__icontains=termo)
+        | Q(current_employee__icontains=termo)
+    )
+    if termo.isdigit():
+        filtro |= Q(pk=int(termo))
+    qs = Equipment.objects.filter(filtro).order_by('-updated_at')[:limit]
+    itens = [serialize_equipment(e) for e in qs]
+    return {'ok': True, 'q': termo, 'count': len(itens), 'results': itens}
+
+
+def consultar_email(q: str, limit: int = 20) -> dict:
+    """Busca e-mail corporativo por username, domínio ou colaborador."""
+    from emails.models import EmailAccount
+    from mcp_api.serializers import serialize_email_account
+
+    termo = (q or '').strip()
+    if not termo:
+        raise AssistenteServiceError('Informe username, domínio ou nome do colaborador.')
+
+    limit = max(1, min(int(limit or 20), 50))
+    filtro = (
+        Q(username__icontains=termo)
+        | Q(employee_name__icontains=termo)
+        | Q(domain__name__icontains=termo)
+    )
+    if termo.isdigit():
+        filtro |= Q(pk=int(termo))
+    qs = (
+        EmailAccount.objects.select_related('domain')
+        .filter(filtro)
+        .order_by('-updated_at')[:limit]
+    )
+    itens = [serialize_email_account(a) for a in qs]
+    return {'ok': True, 'q': termo, 'count': len(itens), 'results': itens}
+
+
 def consultar_usuario(q: str, limit: int = 15) -> dict:
     """Busca usuários CRM por username/nome/e-mail."""
     from core.models import CustomUser
@@ -1107,9 +1252,11 @@ def consultar_licencas_discador(slug: str = 'joytec') -> dict:
         'no_limite': kpis['no_limite'],
         'custo_mensal': str(kpis['custo_mensal']),
         'orientacao': (
-            'ramais_livres = status FREE (ainda consomem licença). '
+            'Inventário LOCAL do CRM (não é a JoyTec). '
+            'ramais_livres = FREE (ainda consomem licença). '
             'licencas_disponiveis_contrato = slots novos no contrato. '
-            'Para liberar slot do contrato, use liberar_licenca_ramal (NOT_CONFIGURED).'
+            'Assistente: só consultar e avisar a TI (mensagem interna) qual FREE usar '
+            'ou se precisa comprar mais. Criar/liberar acesso é manual (TI/MCP inventário).'
         ),
     }
 

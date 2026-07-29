@@ -7,14 +7,19 @@ Servidores MCP (stdio) que chamam a API Django em `/api/mcp/` com Bearer token.
 | Servidor | Módulo Python | Tools |
 |----------|---------------|-------|
 | mcp-helpdesk | `crm_mcp.helpdesk.server` | tickets, assistente (triagem/anexos/solicitante), aprendizado (chunks R/W), helpers chips/usuário |
-| mcp-chips | `crm_mcp.chips.server` | list_chips, get_chip, lookup_chip_by_line, list_chip_movements |
-| mcp-discador | `crm_mcp.discador.server` | licenças, ramais, acessos, campanhas, criar/liberar |
+| mcp-chips | `crm_mcp.chips.server` | list/get/lookup + movements + `atualizar_status_chip` / `atualizar_observacao_chip` |
+| mcp-discador | `crm_mcp.discador.server` | inventário local CRM (licenças, ramais, acessos, campanhas, criar/liberar) — **não** acessa o site JoyTec |
 | mcp-equipment | `crm_mcp.equipment.server` | list_equipment, get_equipment, lookup_equipment_by_tag, list_equipment_logs |
 | mcp-emails | `crm_mcp.emails.server` | list_domains, list_accounts, get_account |
+| mcp-operadores | `crm_mcp.operadores.server` | list/get operadores, list/get WhatsApp (somente leitura) |
 | mcp-users | `crm_mcp.users.server` | list_users, get_user, lookup_user_by_username, list_equipes, list_equipe_membros |
 | mcp-audit | `crm_mcp.audit.server` | list_acoes, get_acao, sistema_status |
 
-Discador **não** é mais espelhado no helpdesk MCP — use `mcp-discador`.
+**MoneyConsig:** sistema interno da Money; API oficial ainda não liberada — sem MCP neste repo.
+
+**Discador JoyTec:** site externo. O MCP/CRM só controla o inventário manual (ramais + responsáveis). Criar ramal novo = suporte humano da discadora.
+
+Discador **não** é espelhado no helpdesk MCP — use `mcp-discador`.
 
 ## Tools Helpdesk (leitura + Assistente + aprendizado)
 
@@ -44,7 +49,18 @@ Discador **não** é mais espelhado no helpdesk MCP — use `mcp-discador`.
 | `create_chunk` | POST `aprendizado/chunks/criar/` |
 | `update_chunk` | POST `aprendizado/chunks/<id>/atualizar/` |
 
-## Tools Discador (`mcp-discador`)
+## Tools Chips (`mcp-chips`)
+
+| Tool | Endpoint |
+|------|----------|
+| `list_chips` | GET `chips/` |
+| `get_chip` | GET `chips/<id>/` |
+| `lookup_chip_by_line` | GET `chips/by-line/<line>/` |
+| `list_chip_movements` | GET `chips/<id>/movements/` |
+| `atualizar_status_chip` | POST `chips/<id>/status/` |
+| `atualizar_observacao_chip` | POST `chips/<id>/observacao/` |
+
+## Tools Discador (`mcp-discador`) — inventário local
 
 | Tool | Endpoint |
 |------|----------|
@@ -55,6 +71,15 @@ Discador **não** é mais espelhado no helpdesk MCP — use `mcp-discador`.
 | `criar_acesso_discador` | POST `discador/acessos/criar/` |
 | `liberar_acesso_discador` | POST `discador/acessos/liberar/` |
 | `liberar_licenca_ramal` | POST `discador/ramais/liberar-licenca/` |
+
+## Tools Operadores (`mcp-operadores`)
+
+| Tool | Endpoint |
+|------|----------|
+| `list_operadores` | GET `operadores/` |
+| `get_operador` | GET `operadores/<id>/` |
+| `list_whatsapp` | GET `whatsapp/` |
+| `get_whatsapp` | GET `whatsapp/<id>/` |
 
 O pacote chama-se `crm_mcp` (não `mcp`) para não conflitar com o SDK oficial `mcp` no PyPI.
 
@@ -104,6 +129,7 @@ Veja [`.cursor/mcp.json`](../.cursor/mcp.json). Ajuste o caminho do `python` se 
 ```bash
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/sistema/status/"
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/discador/licencas/"
+curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/operadores/"
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/aprendizado/chunks/"
 curl -H "Authorization: Bearer SEU_TOKEN" "https://ti.moneypromotora.com.br/api/mcp/aprendizado/chunks/search/?q=discador"
 ```

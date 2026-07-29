@@ -20,8 +20,9 @@ REGRAS_SEED: list[dict[str, Any]] = [
             'Nunca diga que é sistema externo, JoyTec de terceiros, ou que o solicitante deve '
             'abrir chamado no suporte do fornecedor. Para alteração de aba/permissão/acesso → '
             'escalar_para_ti com motivo.\n'
-            '- Discador JoyTec: ferramenta usada internamente; a TI gerencia acessos/licenças '
-            'pelas tools do discador. Só escale se precisar de ação humana (limite de contrato, etc.).\n'
+            '- Discador JoyTec: site EXTERNO. No CRM só há inventário manual (ramais + titular). '
+            'A IA consulta se já tem acesso/ramal FREE e passa orientação à TI em mensagem interna. '
+            'Criar ramal novo = suporte da discadora (humano). MoneyConsig ainda sem API/MCP oficial.\n'
             '- CRM e este helpdesk: também internos.'
         ),
     },
@@ -112,11 +113,15 @@ REGRAS_SEED: list[dict[str, Any]] = [
             '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
             'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
             'ANTES ou JUNTO das mensagens ao solicitante.\n'
-            '- WhatsApp/chip: consulte consultar_chips pelo nome do consultor; se já tiver 2 em uso, questione.\n'
-            '- Discador/JoyTec: use consultar_licencas_discador e listar_ramais_discador (FREE); '
-            'consultar_acesso_discador para achar titular; criar_acesso_discador / '
-            'liberar_acesso_discador / liberar_licenca_ramal conforme o caso. '
-            'Se no_limite/estourado e precisar de slot novo, explique e escalar_para_ti.\n'
+            '- WhatsApp/chip: consulte consultar_chips; status/obs com atualizar_status_chip / '
+            'atualizar_observacao_chip; se já tiver 2 em uso, questione.\n'
+            '- Patrimônio/e-mail: consultar_equipamento e consultar_email quando relevante.\n'
+            '- Discador/JoyTec (inventário local): consultar_acesso_discador (já tem login/ramal?); '
+            'consultar_licencas_discador / listar_ramais_discador (FREE). '
+            'NÃO criar nem liberar acesso. Se já tiver: informe ao solicitante. '
+            'Se não: mensagem interna (interno=true) à TI com ramal FREE sugerido OU '
+            '"preciso comprar mais ramais" se no_limite/sem FREE; pode escalar_para_ti.\n'
+            '- MoneyConsig: sem integração/API — escalar_para_ti (TI interna).\n'
             '- Acesso CRM: pergunte qual sistema; use consultar_usuario para caso individual.\n'
             '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
             '- Hardware, AnyDesk, permissões de rede e mudanças no MoneyConsig (UI/abas/acessos): '
@@ -140,30 +145,52 @@ def chunk_eh_regra(chunk) -> bool:
 
 
 def garantir_chunks_regras() -> int:
-    """Cria chunks de regra ausentes (por título). Não sobrescreve curadoria existente.
+    """Garante chunks seed: cria ausentes e atualiza conteúdo dos títulos seed.
 
-    Retorna quantidade criada.
+    Títulos em REGRAS_SEED são ownership do código (sincroniza conteudo/tags).
+    Retorna quantidade criada + atualizada.
     """
     from integracoes.models import AssistenteChunk
 
-    criados = 0
+    alterados = 0
     titulos = {s['titulo'] for s in REGRAS_SEED}
-    existentes = set(
-        AssistenteChunk.objects.filter(titulo__in=titulos).values_list('titulo', flat=True)
-    )
+    por_titulo = {
+        c.titulo: c
+        for c in AssistenteChunk.objects.filter(titulo__in=titulos)
+    }
     for seed in REGRAS_SEED:
-        if seed['titulo'] in existentes:
+        titulo = seed['titulo'][:200]
+        tags = list(seed.get('tags') or ['regra'])
+        categoria = (seed.get('categoria_hint') or 'regras')[:120]
+        conteudo = seed['conteudo']
+        existente = por_titulo.get(titulo) or por_titulo.get(seed['titulo'])
+        if existente is None:
+            chunk = AssistenteChunk.objects.create(
+                titulo=titulo,
+                conteudo=conteudo,
+                categoria_hint=categoria,
+                fonte_ticket_ids=[],
+                origem=AssistenteChunk.Origem.MANUAL,
+                ativo=True,
+                tags=tags,
+            )
+            from integracoes.embeddings import atualizar_embedding_chunk
+            atualizar_embedding_chunk(chunk)
+            alterados += 1
             continue
-        chunk = AssistenteChunk.objects.create(
-            titulo=seed['titulo'][:200],
-            conteudo=seed['conteudo'],
-            categoria_hint=(seed.get('categoria_hint') or 'regras')[:120],
-            fonte_ticket_ids=[],
-            origem=AssistenteChunk.Origem.MANUAL,
-            ativo=True,
-            tags=list(seed.get('tags') or ['regra']),
+        mudou = (
+            existente.conteudo != conteudo
+            or list(existente.tags or []) != tags
+            or (existente.categoria_hint or '') != categoria
         )
+        if not mudou:
+            continue
+        existente.conteudo = conteudo
+        existente.tags = tags
+        existente.categoria_hint = categoria
+        existente.ativo = True
+        existente.save(update_fields=['conteudo', 'tags', 'categoria_hint', 'ativo', 'atualizado_em'])
         from integracoes.embeddings import atualizar_embedding_chunk
-        atualizar_embedding_chunk(chunk)
-        criados += 1
-    return criados
+        atualizar_embedding_chunk(existente)
+        alterados += 1
+    return alterados

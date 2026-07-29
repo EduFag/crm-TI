@@ -1,4 +1,4 @@
-"""MCP Chips — tools somente leitura."""
+"""MCP Chips — leitura + alteração de status/observação."""
 
 from mcp.server.fastmcp import FastMCP
 
@@ -51,6 +51,27 @@ def list_chip_movements(chip_id: int, limit: int = 20) -> str:
     """Lista movimentações (entrega/devolução/transferência) de um chip."""
     try:
         return get_client().get_text(f'chips/{chip_id}/movements/', {'limit': limit})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def atualizar_status_chip(chip_id: int, status: str) -> str:
+    """Altera status do chip: ACTIVE|BANNED|CANCELED|LOST|OTHER."""
+    try:
+        return get_client().post_text(f'chips/{chip_id}/status/', {'status': status})
+    except CrmTiApiError as exc:
+        return f'Erro: {exc}'
+
+
+@mcp.tool()
+def atualizar_observacao_chip(chip_id: int, observacao: str) -> str:
+    """Atualiza a observação operacional do chip."""
+    try:
+        return get_client().post_text(
+            f'chips/{chip_id}/observacao/',
+            {'observacao': observacao},
+        )
     except CrmTiApiError as exc:
         return f'Erro: {exc}'
 

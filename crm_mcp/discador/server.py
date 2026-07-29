@@ -1,4 +1,4 @@
-"""MCP Discador (JoyTec) — leitura + escrita."""
+"""MCP Discador (JoyTec) — inventário local do CRM (não acessa o site externo)."""
 
 from mcp.server.fastmcp import FastMCP
 
@@ -9,7 +9,7 @@ mcp = FastMCP('crm-ti-discador')
 
 @mcp.tool()
 def consultar_licencas_discador(slug: str = 'joytec') -> str:
-    """KPIs de licenças: contratadas, ramais livres, slots disponíveis no contrato."""
+    """KPIs do inventário local: contratadas, ramais livres, slots no contrato."""
     try:
         return get_client().get_text('discador/licencas/', {'slug': slug or 'joytec'})
     except CrmTiApiError as exc:
@@ -18,7 +18,7 @@ def consultar_licencas_discador(slug: str = 'joytec') -> str:
 
 @mcp.tool()
 def listar_ramais_discador(status: str = '', slug: str = 'joytec', limit: int = 40) -> str:
-    """Lista ramais. status: FREE|IN_USE|NOT_CONFIGURED (vazio = todos)."""
+    """Lista ramais do inventário CRM. status: FREE|IN_USE|NOT_CONFIGURED."""
     try:
         return get_client().get_text('discador/ramais/', {
             'status': status or None,
@@ -31,7 +31,7 @@ def listar_ramais_discador(status: str = '', slug: str = 'joytec', limit: int = 
 
 @mcp.tool()
 def consultar_acesso_discador(q: str, slug: str = 'joytec') -> str:
-    """Busca acessos por titular, login ou número do ramal."""
+    """Busca acessos no inventário local por titular, login ou ramal."""
     try:
         return get_client().get_text('discador/acessos/', {
             'q': q,
@@ -43,7 +43,7 @@ def consultar_acesso_discador(q: str, slug: str = 'joytec') -> str:
 
 @mcp.tool()
 def listar_campanhas_discador(slug: str = 'joytec') -> str:
-    """Lista campanhas ativas do discador."""
+    """Lista campanhas ativas do inventário local."""
     try:
         return get_client().get_text('discador/campanhas/', {'slug': slug or 'joytec'})
     except CrmTiApiError as exc:
@@ -61,7 +61,7 @@ def criar_acesso_discador(
     campanha_id: int = 0,
     slug: str = 'joytec',
 ) -> str:
-    """Cria acesso no discador. Sem ramal, usa um FREE. Informe campanha_nome ou campanha_id."""
+    """Registra acesso no inventário CRM (manual). Sem ramal, usa um FREE. Não fala com a JoyTec."""
     body = {
         'titular_nome': titular_nome,
         'login_discador': login_discador,
@@ -82,7 +82,7 @@ def criar_acesso_discador(
 
 @mcp.tool()
 def liberar_acesso_discador(acesso_id: int) -> str:
-    """Remove acesso; ramal fica FREE (ainda consome licença)."""
+    """Remove acesso no inventário CRM; ramal fica FREE (ainda consome licença)."""
     try:
         return get_client().post_text('discador/acessos/liberar/', {'acesso_id': acesso_id})
     except CrmTiApiError as exc:
@@ -95,7 +95,7 @@ def liberar_licenca_ramal(
     ramal_numero: str = '',
     slug: str = 'joytec',
 ) -> str:
-    """Marca ramal NOT_CONFIGURED (libera slot do contrato). Sem acesso vinculado."""
+    """Marca ramal NOT_CONFIGURED no inventário (libera slot do contrato)."""
     body = {'slug': slug or 'joytec', 'ramal_numero': ramal_numero or ''}
     if ramal_id:
         body['ramal_id'] = ramal_id
