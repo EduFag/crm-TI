@@ -45,6 +45,108 @@
     </div>
     {% endif %}
 
+    <div id="eval-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Eval · Últimas interações</h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    {{ eval_contagens.total }} rodadas ·
+                    {{ eval_contagens.pendentes }} sem nota ·
+                    {{ eval_contagens.uteis }} úteis ·
+                    {{ eval_contagens.ruins }} ruins
+                    {% if eval_contagens.pct_util != None %}
+                    · {{ eval_contagens.pct_util }}% útil entre avaliadas
+                    {% endif %}
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold">
+                <a href="?eval=pendente#eval-panel"
+                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'pendente' %}bg-amber-50 border-amber-200 text-amber-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Pendentes</a>
+                <a href="?eval=util#eval-panel"
+                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'util' %}bg-emerald-50 border-emerald-200 text-emerald-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Úteis</a>
+                <a href="?eval=ruim#eval-panel"
+                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'ruim' %}bg-red-50 border-red-200 text-red-700{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Ruins</a>
+                <a href="?eval=all#eval-panel"
+                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'all' %}bg-slate-900 border-slate-900 text-white{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Todas</a>
+            </div>
+        </div>
+        {% if chunks_ruins %}
+        <div class="px-6 py-3 border-b border-slate-100 bg-red-50/40">
+            <p class="text-xs font-semibold text-red-800 mb-1.5">Chunks mais citados em interações ruins</p>
+            <ul class="flex flex-wrap gap-2">
+                {% for item in chunks_ruins %}
+                <li>
+                    <a href="#chunk-{{ item.id }}"
+                       class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-red-100 bg-white text-red-700 hover:bg-red-50">
+                        #{{ item.id }} {{ item.titulo|truncatechars:40 }}
+                        <span class="text-red-400">×{{ item.n }}</span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
+            {% for it in interacoes %}
+            <li class="px-6 py-4" id="interacao-{{ it.pk }}">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0 space-y-1.5">
+                        <div class="flex flex-wrap items-center gap-2 text-sm">
+                            <a href="{% url 'helpdesk:ticket_drawer' it.ticket_id %}"
+                               class="font-semibold text-blue-700 hover:underline">
+                                Chamado #{{ it.ticket_id }}
+                            </a>
+                            <span class="text-xs text-slate-400">{{ it.criado_em|date:"d/m/Y H:i" }}</span>
+                            {% if it.hybrid %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">Híbrido</span>
+                            {% else %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Keyword</span>
+                            {% endif %}
+                            {% if it.nota == 1 %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Útil</span>
+                            {% elif it.nota == -1 %}
+                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">Ruim</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-slate-500">
+                            Chunks:
+                            {% for ch in it.chunks_resumo %}
+                            <a href="#chunk-{{ ch.id }}" class="text-slate-700 hover:underline">#{{ ch.id }} {{ ch.titulo|truncatechars:28 }}</a>{% if not forloop.last %},{% endif %}
+                            {% empty %}
+                            <span class="text-slate-400">(nenhum)</span>
+                            {% endfor %}
+                        </p>
+                        {% if it.comentario %}
+                        <p class="text-xs text-slate-600 italic">“{{ it.comentario }}”</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-col gap-2 shrink-0">
+                        <form method="post" action="{% url 'integracoes:ia_interacao_nota' it.pk %}" class="flex flex-wrap items-center gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="filtro_eval" value="{{ filtros.eval }}">
+                            <input type="text" name="comentario" maxlength="400" placeholder="Comentário (opcional)"
+                                   class="text-xs rounded-lg border border-slate-300 px-2 py-1.5 w-40 sm:w-48"
+                                   value="{{ it.comentario }}">
+                            <button type="submit" name="nota" value="1"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                Útil
+                            </button>
+                            <button type="submit" name="nota" value="-1"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                Ruim
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </li>
+            {% empty %}
+            <li class="px-6 py-8 text-center text-sm text-slate-500">
+                Nenhuma interação neste filtro. Quando o Assistente responder chamados, as rodadas aparecem aqui.
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         <!-- Coluna esquerda: config + chunks -->
         <div class="flex flex-col gap-6 min-w-0">

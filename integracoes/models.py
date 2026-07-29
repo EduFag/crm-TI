@@ -161,3 +161,42 @@ class AssistenteChunk(models.Model):
 
     def __str__(self) -> str:
         return self.titulo
+
+
+class AssistenteInteracao(models.Model):
+    """Rodada do Assistente com os chunks usados (para eval / feedback da TI)."""
+
+    class Nota(models.IntegerChoices):
+        UTIL = 1, 'Útil'
+        RUIM = -1, 'Ruim'
+
+    ticket_id = models.PositiveIntegerField(db_index=True)
+    chunk_ids = models.JSONField(default=list, blank=True)
+    hybrid = models.BooleanField(
+        default=False,
+        help_text='True se a query usou embedding semântico nesta rodada.',
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    nota = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        choices=Nota.choices,
+        help_text='null = sem avaliação; 1 = útil; -1 = ruim.',
+    )
+    nota_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='avaliacoes_assistente',
+    )
+    nota_em = models.DateTimeField(null=True, blank=True)
+    comentario = models.CharField(max_length=400, blank=True, default='')
+
+    class Meta:
+        ordering = ['-criado_em']
+        verbose_name = 'interação do assistente'
+        verbose_name_plural = 'interações do assistente'
+
+    def __str__(self) -> str:
+        return f'Interação ticket #{self.ticket_id} @ {self.criado_em}'

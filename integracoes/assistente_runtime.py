@@ -495,8 +495,11 @@ def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> in
     return score
 
 
-def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk]:
-    """Seleciona chunks ativos: regras sempre + demais por score híbrido (cosine+keyword)."""
+def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> tuple[list[AssistenteChunk], bool]:
+    """Seleciona chunks ativos: regras sempre + demais por score híbrido.
+
+    Retorna (chunks, usou_embedding_na_query).
+    """
     from integracoes.embeddings import cosine_similarity, score_hibrido
     from integracoes.llm import LlmError, obter_embedding, obter_integracao_embedding
     from integracoes.regras_seed import chunk_eh_regra, garantir_chunks_regras
@@ -506,7 +509,7 @@ def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk
 
     qs = list(AssistenteChunk.objects.filter(ativo=True)[:300])
     if not qs:
-        return []
+        return [], False
 
     regras = [ch for ch in qs if chunk_eh_regra(ch)]
     demais = [ch for ch in qs if not chunk_eh_regra(ch)]
@@ -568,14 +571,15 @@ def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk
         ids_ja.add(ch.pk)
         vagas -= 1
 
+    hybrid = bool(query_emb)
     logger.info(
         'chunks_relevantes ticket=%s regras=%s ids=%s hybrid=%s',
         ticket.pk,
         [ch.pk for ch in regras],
         [ch.pk for ch in escolhidos],
-        bool(query_emb),
+        hybrid,
     )
-    return escolhidos
+    return escolhidos, hybrid
 
 
 def buscar_chunks(q: str = '', limite: int = 20, so_ativos: bool = True) -> list[AssistenteChunk]:
@@ -644,7 +648,8 @@ def _resumo_anexos(ticket: Ticket) -> str:
     return '\n'.join(linhas)
 
 
-def _montar_contexto(ticket: Ticket) -> str:
+def _montar_contexto(ticket: Ticket) -> tuple[str, list[int], bool]:
+    """Monta o contexto do chamado. Retorna (texto, chunk_ids, hybrid)."""
     comentarios = (
         Comment.objects.filter(ticket=ticket, is_active=True)
         .select_related('author')
@@ -662,7 +667,7 @@ def _montar_contexto(ticket: Ticket) -> str:
         extra = ' [tem anexo]' if c.attachment else ''
         linhas.append(f'[{autor}]{marca}{extra} {c.text}')
 
-    chunks = _chunks_relevantes(ticket)
+    chunks, hybrid = _chunks_relevantes(ticket)
     from integracoes.regras_seed import chunk_eh_regra
 
     regras_txt = '\n'.join(
@@ -693,7 +698,7 @@ def _montar_contexto(ticket: Ticket) -> str:
         if usuario_eh_operador_helpdesk(cb):
             criador_txt += ' [membro da TI]'
 
-    return (
+    texto = (
         f'Chamado #{ticket.pk}\n'
         f'Título: {ticket.title}\n'
         f'Descrição: {ticket.description}\n'
@@ -710,6 +715,8 @@ def _montar_contexto(ticket: Ticket) -> str:
         f'Regras de negócio (obrigatórias):\n{regras_txt}\n\n'
         f'Aprendizado (estilo TI / chunks):\n{aprendizado_txt}'
     )
+    return texto, [ch.pk for ch in chunks], hybrid
+
 
 
 def _system_prompt() -> str:
@@ -1001,6 +1008,20 @@ def _textos_anexos_prelidos(ticket_id: int) -> str:
     return '\n'.join(linhas)
 
 
+def _registrar_interacao(ticket_id: int, chunk_ids: list[int], hybrid: bool) -> None:
+    """Persiste eval da rodada; nunca interrompe o atendimento."""
+    try:
+        from integracoes.models import AssistenteInteracao
+
+        AssistenteInteracao.objects.create(
+            ticket_id=ticket_id,
+            chunk_ids=list(chunk_ids or []),
+            hybrid=bool(hybrid),
+        )
+    except Exception:
+        logger.exception('Falha ao registrar AssistenteInteracao ticket=%s', ticket_id)
+
+
 def processar_assistente(ticket_id: int) -> None:
     """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
@@ -1020,93 +1041,102 @@ def processar_assistente(ticket_id: int) -> None:
         )
         return
 
-    contexto = _montar_contexto(ticket)
-    textos_anexos = _textos_anexos_prelidos(ticket_id)
-    if textos_anexos:
-        contexto += (
-            '\n\nTexto dos anexos (imagem/PDF já convertidos — visão ou OCR/extração local; '
-            'use estes dados; não diga que não conseguiu ver o anexo):\n' + textos_anexos
-        )
-        if 'falha ao ler' in textos_anexos.lower() or 'erro ao ler' in textos_anexos.lower():
-            contexto += (
-                '\n\nNota: alguma leitura de anexo falhou. NÃO peça ao solicitante para '
-                'descrever o arquivo se título/descrição/categoria já explicarem o pedido. '
-                'MoneyConsig é sistema INTERNO da Money Promotora; escale para a TI interna.'
-            )
-
-    orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
-    pedido = 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto
-    if orientacao_interna:
-        pedido += (
-            '\n\nHá orientação INTERNA recente da TI ([INTERNO TI]). '
-            'Priorize: se pedirem correção do que você falou, mande mensagem PÚBLICA '
-            'corrigindo o solicitante; se pedirem só nota à TI, use interno=true. '
-            'Não mencione o canal privado ao solicitante.'
-        )
-
-    messages: list[dict[str, Any]] = [
-        {'role': 'system', 'content': _system_prompt()},
-        {'role': 'user', 'content': pedido},
-    ]
-
-    enviou_mensagem = False
+    chunk_ids: list[int] = []
+    hybrid = False
+    contexto_ok = False
     try:
-        for _ in range(MAX_TOOL_ROUNDS):
-            ticket.refresh_from_db()
-            if not assistente_pode_atuar(ticket) and enviou_mensagem:
-                break
-            # Após escalar, ainda permite terminar se veio de orientação interna
-            if (
-                ticket.assistente_escalado
-                and enviou_mensagem
-                and not ticket_tem_orientacao_interna_pendente(ticket)
-            ):
-                break
-            if ticket.is_rejected and enviou_mensagem:
-                break
-
-            qtd_msgs = len(messages)
-            enviou_mensagem = _rodada_tools(
-                ticket_id, messages, enviou_mensagem=enviou_mensagem,
+        contexto, chunk_ids, hybrid = _montar_contexto(ticket)
+        contexto_ok = True
+        textos_anexos = _textos_anexos_prelidos(ticket_id)
+        if textos_anexos:
+            contexto += (
+                '\n\nTexto dos anexos (imagem/PDF já convertidos — visão ou OCR/extração local; '
+                'use estes dados; não diga que não conseguiu ver o anexo):\n' + textos_anexos
             )
-            # Resposta sem tools → fim
-            last = messages[-1] if messages else {}
-            if last.get('role') == 'assistant' and not (last.get('tool_calls') or []):
-                break
-            # Nada novo anexado (proteção)
-            if len(messages) == qtd_msgs:
-                break
+            if 'falha ao ler' in textos_anexos.lower() or 'erro ao ler' in textos_anexos.lower():
+                contexto += (
+                    '\n\nNota: alguma leitura de anexo falhou. NÃO peça ao solicitante para '
+                    'descrever o arquivo se título/descrição/categoria já explicarem o pedido. '
+                    'MoneyConsig é sistema INTERNO da Money Promotora; escale para a TI interna.'
+                )
 
-        if (
-            not enviou_mensagem
-            and not orientacao_interna
-            and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id))
-        ):
-            send_assistente_message(ticket_id, _MSG_FALLBACK)
-            enviou_mensagem = True
+        orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
+        pedido = 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto
+        if orientacao_interna:
+            pedido += (
+                '\n\nHá orientação INTERNA recente da TI ([INTERNO TI]). '
+                'Priorize: se pedirem correção do que você falou, mande mensagem PÚBLICA '
+                'corrigindo o solicitante; se pedirem só nota à TI, use interno=true. '
+                'Não mencione o canal privado ao solicitante.'
+            )
 
-        if not orientacao_interna:
-            _garantir_triagem(ticket_id, messages)
-    except (LlmError, AssistenteServiceError, Exception):
-        logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
-        # Best-effort: chamado não fica mudo se o LLM falhar (exceto trigger só-interno)
+        messages: list[dict[str, Any]] = [
+            {'role': 'system', 'content': _system_prompt()},
+            {'role': 'user', 'content': pedido},
+        ]
+
+        enviou_mensagem = False
         try:
+            for _ in range(MAX_TOOL_ROUNDS):
+                ticket.refresh_from_db()
+                if not assistente_pode_atuar(ticket) and enviou_mensagem:
+                    break
+                # Após escalar, ainda permite terminar se veio de orientação interna
+                if (
+                    ticket.assistente_escalado
+                    and enviou_mensagem
+                    and not ticket_tem_orientacao_interna_pendente(ticket)
+                ):
+                    break
+                if ticket.is_rejected and enviou_mensagem:
+                    break
+
+                qtd_msgs = len(messages)
+                enviou_mensagem = _rodada_tools(
+                    ticket_id, messages, enviou_mensagem=enviou_mensagem,
+                )
+                # Resposta sem tools → fim
+                last = messages[-1] if messages else {}
+                if last.get('role') == 'assistant' and not (last.get('tool_calls') or []):
+                    break
+                # Nada novo anexado (proteção)
+                if len(messages) == qtd_msgs:
+                    break
+
             if (
                 not enviou_mensagem
                 and not orientacao_interna
                 and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id))
             ):
-                send_assistente_message(ticket_id, _MSG_FALLBACK_ERRO)
-        except Exception:
-            logger.exception(
-                'Falha ao enviar fallback do Assistente no ticket %s',
-                ticket_id,
-            )
-        if not orientacao_interna:
-            try:
+                send_assistente_message(ticket_id, _MSG_FALLBACK)
+                enviou_mensagem = True
+
+            if not orientacao_interna:
                 _garantir_triagem(ticket_id, messages)
+        except (LlmError, AssistenteServiceError, Exception):
+            logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
+            # Best-effort: chamado não fica mudo se o LLM falhar (exceto trigger só-interno)
+            try:
+                if (
+                    not enviou_mensagem
+                    and not orientacao_interna
+                    and assistente_pode_atuar(Ticket.objects.get(pk=ticket_id))
+                ):
+                    send_assistente_message(ticket_id, _MSG_FALLBACK_ERRO)
             except Exception:
-                pass
+                logger.exception(
+                    'Falha ao enviar fallback do Assistente no ticket %s',
+                    ticket_id,
+                )
+            if not orientacao_interna:
+                try:
+                    _garantir_triagem(ticket_id, messages)
+                except Exception:
+                    pass
+    finally:
+        # Sempre registra eval desta rodada (mesmo se LLM falhou após montar contexto)
+        if contexto_ok:
+            _registrar_interacao(ticket_id, chunk_ids, hybrid)
 
 
 def _titulo_normalizado(titulo: str) -> str:

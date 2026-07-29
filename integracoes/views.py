@@ -258,11 +258,13 @@ def ia_delete(request, pk):
 @requer_modulo(MODULO_INTEGRACOES)
 def ia_aprendizado(request):
     """Página de aprendizado e flag do Assistente no Helpdesk."""
+    from collections import Counter
+
     from django.core.paginator import Paginator
     from django.db.models import Count, Q
 
     from integracoes.memoria_chat import SESSION_KEY
-    from integracoes.models import AssistenteChunk, AssistenteConfig
+    from integracoes.models import AssistenteChunk, AssistenteConfig, AssistenteInteracao
     from integracoes.regras_seed import garantir_chunks_regras
 
     garantir_chunks_regras()
@@ -272,6 +274,7 @@ def ia_aprendizado(request):
     origem = (request.GET.get('origem') or '').strip().lower()
     categoria = (request.GET.get('categoria') or '').strip()
     ativo_filtro = (request.GET.get('ativo') or '1').strip().lower()
+    eval_filtro = (request.GET.get('eval') or 'pendente').strip().lower()
 
     qs = AssistenteChunk.objects.all()
     if ativo_filtro in ('1', 'true', 'sim'):
@@ -302,6 +305,62 @@ def ia_aprendizado(request):
         for row in AssistenteChunk.objects.values('origem').annotate(n=Count('id'))
     }
 
+    # Eval: últimas interações + contadores
+    interacoes_qs = AssistenteInteracao.objects.all()
+    eval_contagens = {
+        'total': AssistenteInteracao.objects.count(),
+        'pendentes': AssistenteInteracao.objects.filter(nota__isnull=True).count(),
+        'uteis': AssistenteInteracao.objects.filter(nota=AssistenteInteracao.Nota.UTIL).count(),
+        'ruins': AssistenteInteracao.objects.filter(nota=AssistenteInteracao.Nota.RUIM).count(),
+    }
+    avaliadas = eval_contagens['uteis'] + eval_contagens['ruins']
+    eval_contagens['pct_util'] = (
+        round(100 * eval_contagens['uteis'] / avaliadas) if avaliadas else None
+    )
+
+    if eval_filtro == 'pendente':
+        interacoes_qs = interacoes_qs.filter(nota__isnull=True)
+    elif eval_filtro == 'util':
+        interacoes_qs = interacoes_qs.filter(nota=AssistenteInteracao.Nota.UTIL)
+    elif eval_filtro == 'ruim':
+        interacoes_qs = interacoes_qs.filter(nota=AssistenteInteracao.Nota.RUIM)
+    # eval=all → sem filtro
+
+    interacoes = list(interacoes_qs.order_by('-criado_em')[:30])
+    todos_chunk_ids = []
+    for it in interacoes:
+        todos_chunk_ids.extend(it.chunk_ids or [])
+    titulos_map = {
+        c.pk: c.titulo
+        for c in AssistenteChunk.objects.filter(pk__in=set(todos_chunk_ids)).only('id', 'titulo')
+    }
+    for it in interacoes:
+        it.chunks_resumo = [
+            {'id': cid, 'titulo': titulos_map.get(cid, f'#{cid}')}
+            for cid in (it.chunk_ids or [])[:8]
+        ]
+
+    # Chunks mais presentes em interações ruins (ajuda a curar memória)
+    ruins = AssistenteInteracao.objects.filter(
+        nota=AssistenteInteracao.Nota.RUIM,
+    ).order_by('-criado_em')[:120]
+    counter = Counter()
+    for it in ruins:
+        for cid in (it.chunk_ids or []):
+            try:
+                counter[int(cid)] += 1
+            except (TypeError, ValueError):
+                continue
+    top_ruins = counter.most_common(8)
+    titulos_ruins = {
+        c.pk: c.titulo
+        for c in AssistenteChunk.objects.filter(pk__in=[i for i, _ in top_ruins]).only('id', 'titulo')
+    }
+    chunks_ruins = [
+        {'id': cid, 'titulo': titulos_ruins.get(cid, f'#{cid}'), 'n': n}
+        for cid, n in top_ruins
+    ]
+
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
     chat_historico = request.session.get(SESSION_KEY) or []
     return render(request, 'integracoes/ia_aprendizado.html', {
@@ -313,11 +372,15 @@ def ia_aprendizado(request):
             'origem': origem,
             'categoria': categoria,
             'ativo': ativo_filtro,
+            'eval': eval_filtro,
         },
         'contagens': contagens,
         'por_origem': por_origem,
         'integracoes': integracoes,
         'chat_historico': chat_historico,
+        'interacoes': interacoes,
+        'eval_contagens': eval_contagens,
+        'chunks_ruins': chunks_ruins,
     })
 
 
@@ -513,6 +576,54 @@ def ia_embeddings_recalcular(request):
         f'(modelo {resultado.get("modelo") or "-"}).',
     )
     return redirect('integracoes:ia_aprendizado')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_interacao_nota(request, pk):
+    """Feedback da TI: útil (1) ou ruim (-1) em uma rodada do Assistente."""
+    from django.utils import timezone
+
+    from integracoes.models import AssistenteInteracao
+
+    interacao = get_object_or_404(AssistenteInteracao, pk=pk)
+    raw = (request.POST.get('nota') or '').strip()
+    try:
+        nota = int(raw)
+    except (TypeError, ValueError):
+        messages.error(request, 'Nota inválida.')
+        return redirect('integracoes:ia_aprendizado')
+    if nota not in (
+        AssistenteInteracao.Nota.UTIL,
+        AssistenteInteracao.Nota.RUIM,
+    ):
+        messages.error(request, 'Nota deve ser útil ou ruim.')
+        return redirect('integracoes:ia_aprendizado')
+
+    interacao.nota = nota
+    interacao.nota_por = request.user
+    interacao.nota_em = timezone.now()
+    interacao.comentario = (request.POST.get('comentario') or '').strip()[:400]
+    interacao.save(update_fields=['nota', 'nota_por', 'nota_em', 'comentario'])
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=(
+            f'Eval Assistente ticket #{interacao.ticket_id}: '
+            f'{"útil" if nota == 1 else "ruim"}.'
+        ),
+        actor=request.user,
+        metadata={'interacao_id': interacao.pk, 'nota': nota},
+    )
+    messages.success(
+        request,
+        f'Interação #{interacao.pk} marcada como {"útil" if nota == 1 else "ruim"}.',
+    )
+    eval_q = (request.POST.get('filtro_eval') or 'pendente').strip()
+    from django.urls import reverse
+    from urllib.parse import urlencode
+    url = reverse('integracoes:ia_aprendizado') + '?' + urlencode({'eval': eval_q})
+    return redirect(url + '#eval-panel')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
