@@ -363,6 +363,7 @@ def ia_aprendizado(request):
 
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
     chat_historico = request.session.get(SESSION_KEY) or []
+    from integracoes.llm import obter_integracao_embedding
     return render(request, 'integracoes/ia_aprendizado.html', {
         'config': config,
         'chunks': page_obj,
@@ -381,6 +382,7 @@ def ia_aprendizado(request):
         'interacoes': interacoes,
         'eval_contagens': eval_contagens,
         'chunks_ruins': chunks_ruins,
+        'embeddings_disponivel': bool(obter_integracao_embedding()),
     })
 
 

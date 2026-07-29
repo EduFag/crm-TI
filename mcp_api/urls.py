@@ -23,10 +23,12 @@ urlpatterns = [
     path('tickets/<int:pk>/assistente/solicitante/', helpdesk.post_atualizar_solicitante, name='mcp_atualizar_solicitante'),
     path('tickets/<int:pk>/assistente/descricao/', helpdesk.post_atualizar_descricao, name='mcp_atualizar_descricao'),
 
-    # Aprendizado (chunks) — somente leitura
+    # Aprendizado (chunks) — leitura + escrita
     path('aprendizado/chunks/', aprendizado.list_chunks, name='mcp_list_chunks'),
     path('aprendizado/chunks/search/', aprendizado.search_chunks, name='mcp_search_chunks'),
+    path('aprendizado/chunks/criar/', aprendizado.create_chunk, name='mcp_create_chunk'),
     path('aprendizado/chunks/<int:pk>/', aprendizado.get_chunk, name='mcp_get_chunk'),
+    path('aprendizado/chunks/<int:pk>/atualizar/', aprendizado.update_chunk, name='mcp_update_chunk'),
 
     # Discador (JoyTec)
     path('discador/licencas/', discador.get_licencas, name='mcp_discador_licencas'),

@@ -456,7 +456,9 @@ TOOLS_SPEC = [
 
 
 def _tokens_relevancia(*textos: str) -> set[str]:
-    """Extrai tokens úteis (len>=3) de um ou mais textos."""
+    """Extrai tokens úteis (len>=3) e amplia com sinônimos da empresa."""
+    from integracoes.sinonimos_retrieval import expandir_tokens_com_sinonimos
+
     tokens: set[str] = set()
     for texto in textos:
         if not texto:
@@ -465,11 +467,11 @@ def _tokens_relevancia(*textos: str) -> set[str]:
             tok = raw.strip('_')
             if len(tok) >= 3:
                 tokens.add(tok)
-    return tokens
+    return expandir_tokens_com_sinonimos(tokens)
 
 
 def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> int:
-    """Pontuação simples por match de categoria/tags/palavras-chave."""
+    """Pontuação por match de categoria/tags/palavras-chave (DeepSeek-only)."""
     score = 0
     cat_hint = (chunk.categoria_hint or '').lower()
     titulo = (chunk.titulo or '').lower()
@@ -480,17 +482,21 @@ def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> in
 
     if categoria:
         cat_l = categoria.lower()
-        if cat_l in cat_hint:
-            score += 10
+        cat_tokens = _tokens_relevancia(categoria)
+        if cat_l in cat_hint or cat_hint in cat_l:
+            score += 12
+        elif any(t in cat_hint for t in cat_tokens if len(t) >= 4):
+            score += 8
         elif cat_l in titulo or cat_l in conteudo:
-            score += 4
+            score += 5
 
+    # Tags explícitas pesam mais (curadoria manual)
     for tok in tokens:
-        if tok not in hay:
-            continue
-        if tok in titulo or tok in cat_hint or tok in tags_txt:
+        if tok in tags_txt:
+            score += 5
+        elif tok in titulo or tok in cat_hint:
             score += 3
-        else:
+        elif tok in conteudo:
             score += 1
     return score
 

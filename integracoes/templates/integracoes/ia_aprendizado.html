@@ -31,8 +31,14 @@
     <div>
         <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Aprendizado IA</h2>
         <p class="text-sm text-slate-500 mt-1">
-            Treine o Assistente com chamados finalizados, corrija chunks e grave na memória pelo chat.
+            Stack: DeepSeek (texto/tools). Prints via OCR local. Curadoria de chunks, regras e eval.
         </p>
+    </div>
+
+    <div class="px-4 py-3 rounded-lg text-sm bg-sky-50 text-sky-900 border border-sky-100">
+        <strong class="font-semibold">DeepSeek-only:</strong>
+        o Assistente usa busca por palavras-chave (sem embeddings).
+        Anexos de imagem/PDF são lidos por <strong>OCR/extração local</strong> e o texto vai ao DeepSeek.
     </div>
 
     {% if messages %}
@@ -175,10 +181,10 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração de visão (prints)</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Integração de visão (opcional)</label>
                     <select name="integracao_visao"
                             class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2.5">
-                        <option value="">Automático (ChatGPT/Gemini ativos)</option>
+                        <option value="">OCR local (padrão com DeepSeek)</option>
                         {% for integ in integracoes %}
                         <option value="{{ integ.pk }}" {% if config.integracao_visao_id == integ.pk %}selected{% endif %}>
                             {{ integ.name }} ({{ integ.get_provider_display }})
@@ -186,9 +192,8 @@
                         {% endfor %}
                     </select>
                     <p class="text-[11px] text-slate-500 mt-1.5">
-                        DeepSeek não lê imagem na API. Se não houver ChatGPT/Gemini aqui,
-                        o sistema usa OCR local (prints) e extração de texto (PDFs) e envia
-                        só o texto ao DeepSeek.
+                        Com DeepSeek, o caminho padrão é OCR local (prints) e extração de texto (PDFs).
+                        Só escolha outra integração aqui se no futuro houver provedor multimodal ativo.
                     </p>
                 </div>
                 <button type="submit"
@@ -214,19 +219,24 @@
                         Gerar aprendizado com a IA
                     </button>
                 </form>
+                {% if embeddings_disponivel %}
                 <form method="post" action="{% url 'integracoes:ia_embeddings_recalcular' %}" class="pt-2 border-t border-slate-100"
                       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Calculando…';">
                     {% csrf_token %}
                     <p class="text-sm text-slate-500 mb-2">
-                        Recalcula vetores semânticos (ChatGPT / text-embedding-3-small) dos chunks
-                        ativos sem embedding ou com modelo desatualizado. Sem ChatGPT ativo, o Assistente
-                        continua só com busca por palavras-chave.
+                        Recalcula vetores semânticos (provedor com embeddings ativo).
                     </p>
                     <button type="submit"
                             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700">
                         Recalcular embeddings
                     </button>
                 </form>
+                {% else %}
+                <p class="text-xs text-slate-500 pt-2 border-t border-slate-100">
+                    Embeddings desligados no stack DeepSeek-only. A relevância dos chunks usa
+                    palavras-chave, tags e categoria (curadoria na lista abaixo).
+                </p>
+                {% endif %}
             </div>
 
             <details class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 group">
