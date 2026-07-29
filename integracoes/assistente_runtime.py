@@ -496,7 +496,9 @@ def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> in
 
 
 def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk]:
-    """Seleciona chunks ativos: regras sempre + demais ranqueados por relevância."""
+    """Seleciona chunks ativos: regras sempre + demais por score híbrido (cosine+keyword)."""
+    from integracoes.embeddings import cosine_similarity, score_hibrido
+    from integracoes.llm import LlmError, obter_embedding, obter_integracao_embedding
     from integracoes.regras_seed import chunk_eh_regra, garantir_chunks_regras
 
     # Garante seeds se a migration ainda não rodou ou banco novo
@@ -510,22 +512,50 @@ def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk
     demais = [ch for ch in qs if not chunk_eh_regra(ch)]
 
     cat = ticket.category.name if ticket.category_id else ''
+    query_txt = ' '.join([
+        ticket.title or '',
+        (ticket.description or '')[:800],
+        cat,
+        ticket.specific_category.name if ticket.specific_category_id else '',
+    ]).strip()
     tokens = _tokens_relevancia(ticket.title or '', (ticket.description or '')[:800], cat)
     if ticket.specific_category_id:
         tokens |= _tokens_relevancia(ticket.specific_category.name)
 
-    def _chave(ch: AssistenteChunk) -> tuple:
+    query_emb: list[float] | None = None
+    if obter_integracao_embedding() and query_txt:
+        try:
+            query_emb, _ = obter_embedding(query_txt)
+        except LlmError as exc:
+            logger.info('embedding query ticket=%s indisponível: %s', ticket.pk, exc)
+
+    kw_scores = {_score_chunk(ch, tokens, cat) for ch in demais} or {0}
+    keyword_max = float(max(kw_scores)) if kw_scores else 1.0
+    if keyword_max <= 0:
+        keyword_max = 1.0
+
+    def _chave_hibrida(ch: AssistenteChunk) -> tuple:
+        kw = float(_score_chunk(ch, tokens, cat))
+        emb = ch.embedding if isinstance(ch.embedding, list) and ch.embedding else None
+        cos = cosine_similarity(query_emb, emb) if query_emb and emb else 0.0
+        h = score_hibrido(kw, keyword_max, cos, bool(emb and query_emb))
         return (
-            _score_chunk(ch, tokens, cat),
+            h,
             ch.atualizado_em.timestamp() if ch.atualizado_em else 0,
         )
 
-    ranqueados = sorted(demais, key=_chave, reverse=True)
-    com_score = [ch for ch in ranqueados if _score_chunk(ch, tokens, cat) > 0]
+    ranqueados = sorted(demais, key=_chave_hibrida, reverse=True)
+    # Mantém quem tem algum sinal (keyword ou semântico)
+    com_score = []
+    for ch in ranqueados:
+        kw = float(_score_chunk(ch, tokens, cat))
+        emb = ch.embedding if isinstance(ch.embedding, list) and ch.embedding else None
+        cos = cosine_similarity(query_emb, emb) if query_emb and emb else 0.0
+        if kw > 0 or cos > 0.25:
+            com_score.append(ch)
     if not com_score:
         com_score = ranqueados
 
-    # Regras primeiro; preenche o restante até o limite
     escolhidos: list[AssistenteChunk] = list(regras)
     ids_ja = {ch.pk for ch in escolhidos}
     vagas = max(0, limite - len(escolhidos))
@@ -539,16 +569,20 @@ def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk
         vagas -= 1
 
     logger.info(
-        'chunks_relevantes ticket=%s regras=%s ids=%s',
+        'chunks_relevantes ticket=%s regras=%s ids=%s hybrid=%s',
         ticket.pk,
         [ch.pk for ch in regras],
         [ch.pk for ch in escolhidos],
+        bool(query_emb),
     )
     return escolhidos
 
 
 def buscar_chunks(q: str = '', limite: int = 20, so_ativos: bool = True) -> list[AssistenteChunk]:
-    """Busca chunks por texto (mesmo score do Assistente). Usado pela API MCP."""
+    """Busca chunks por relevância híbrida (keyword + embedding). Usado pela API MCP."""
+    from integracoes.embeddings import cosine_similarity, score_hibrido
+    from integracoes.llm import LlmError, obter_embedding, obter_integracao_embedding
+
     qs = AssistenteChunk.objects.all()
     if so_ativos:
         qs = qs.filter(ativo=True)
@@ -558,16 +592,35 @@ def buscar_chunks(q: str = '', limite: int = 20, so_ativos: bool = True) -> list
     texto = (q or '').strip()
     if not texto:
         return chunks[: max(1, min(limite, 50))]
+
     tokens = _tokens_relevancia(texto)
-    ranqueados = sorted(
-        chunks,
-        key=lambda ch: (
-            _score_chunk(ch, tokens, texto),
-            ch.atualizado_em.timestamp() if ch.atualizado_em else 0,
-        ),
-        reverse=True,
-    )
-    com_score = [ch for ch in ranqueados if _score_chunk(ch, tokens, texto) > 0]
+    query_emb: list[float] | None = None
+    if obter_integracao_embedding():
+        try:
+            query_emb, _ = obter_embedding(texto)
+        except LlmError:
+            query_emb = None
+
+    kw_scores = {_score_chunk(ch, tokens, texto) for ch in chunks} or {0}
+    keyword_max = float(max(kw_scores)) if kw_scores else 1.0
+    if keyword_max <= 0:
+        keyword_max = 1.0
+
+    def _chave(ch: AssistenteChunk) -> tuple:
+        kw = float(_score_chunk(ch, tokens, texto))
+        emb = ch.embedding if isinstance(ch.embedding, list) and ch.embedding else None
+        cos = cosine_similarity(query_emb, emb) if query_emb and emb else 0.0
+        h = score_hibrido(kw, keyword_max, cos, bool(emb and query_emb))
+        return (h, ch.atualizado_em.timestamp() if ch.atualizado_em else 0)
+
+    ranqueados = sorted(chunks, key=_chave, reverse=True)
+    com_score = []
+    for ch in ranqueados:
+        kw = float(_score_chunk(ch, tokens, texto))
+        emb = ch.embedding if isinstance(ch.embedding, list) and ch.embedding else None
+        cos = cosine_similarity(query_emb, emb) if query_emb and emb else 0.0
+        if kw > 0 or cos > 0.25:
+            com_score.append(ch)
     return (com_score or ranqueados)[: max(1, min(limite, 50))]
 
 
@@ -1171,7 +1224,7 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
                 if t:
                     tags.append(t)
 
-        AssistenteChunk.objects.create(
+        chunk_novo = AssistenteChunk.objects.create(
             titulo=titulo[:200],
             conteudo=conteudo,
             categoria_hint=(item.get('categoria_hint') or '')[:120],
@@ -1180,6 +1233,8 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
             ativo=True,
             tags=tags,
         )
+        from integracoes.embeddings import atualizar_embedding_chunk
+        atualizar_embedding_chunk(chunk_novo)
         titulos_existentes.add(norm)
         criados += 1
 

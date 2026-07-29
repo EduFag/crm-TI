@@ -134,6 +134,23 @@ class AssistenteChunk(models.Model):
         help_text='Se falso, o chunk não entra no contexto do Assistente.',
     )
     tags = models.JSONField(default=list, blank=True)
+    # Vetor para retrieval híbrido (JSON — compatível SQLite/Postgres)
+    embedding = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Lista de floats do embedding; null se ainda não calculado.',
+    )
+    embedding_modelo = models.CharField(
+        max_length=80,
+        blank=True,
+        default='',
+        help_text='Modelo usado no último embedding (ex.: text-embedding-3-small).',
+    )
+    embedding_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Quando o embedding foi gerado.',
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 

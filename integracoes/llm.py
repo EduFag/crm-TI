@@ -342,3 +342,69 @@ def chat_completion_vision(
         mime=mime,
         timeout=timeout,
     )
+
+
+MODELO_EMBEDDING_PADRAO = 'text-embedding-3-small'
+
+
+def obter_integracao_embedding() -> IntegracaoIA | None:
+    """Integração com API de embeddings OpenAI-compatible (ChatGPT)."""
+    return (
+        IntegracaoIA.objects.filter(
+            is_active=True,
+            provider=IntegracaoIA.Provider.CHATGPT,
+        )
+        .order_by('-updated_at')
+        .first()
+    )
+
+
+def obter_embedding(texto: str, *, timeout: float = 30.0) -> tuple[list[float], str]:
+    """
+    Gera embedding via POST /embeddings (OpenAI-compatible).
+    Retorna (vetor, nome_do_modelo).
+    """
+    texto = (texto or '').strip()
+    if not texto:
+        raise LlmError('Texto vazio para embedding.')
+
+    integracao = obter_integracao_embedding()
+    if not integracao:
+        raise LlmError(
+            'Nenhuma integração ChatGPT ativa para embeddings. '
+            'Cadastre ChatGPT (text-embedding-3-small) ou use só keyword.'
+        )
+
+    api_key, base_url, _ = _resolver_endpoint_e_modelo(integracao)
+    # Embeddings usam modelo dedicado, não o de chat
+    modelo = MODELO_EMBEDDING_PADRAO
+    url = urljoin(base_url.rstrip('/') + '/', 'embeddings')
+    payload = {
+        'model': modelo,
+        'input': texto[:8000],
+    }
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, headers=headers, json=payload)
+    except httpx.HTTPError as exc:
+        logger.exception('Falha de rede no embedding')
+        raise LlmError(f'Falha de rede no embedding: {exc}') from exc
+
+    if resp.status_code >= 400:
+        corpo = (resp.text or '')[:400]
+        logger.error('Embedding HTTP %s: %s', resp.status_code, corpo)
+        raise LlmError(f'Embedding retornou HTTP {resp.status_code}')
+
+    data = resp.json()
+    try:
+        vetor = data['data'][0]['embedding']
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmError('Resposta de embedding inválida.') from exc
+    if not isinstance(vetor, list) or not vetor:
+        raise LlmError('Vetor de embedding vazio.')
+    return [float(x) for x in vetor], modelo
+

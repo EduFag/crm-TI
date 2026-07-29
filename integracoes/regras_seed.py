@@ -154,7 +154,7 @@ def garantir_chunks_regras() -> int:
     for seed in REGRAS_SEED:
         if seed['titulo'] in existentes:
             continue
-        AssistenteChunk.objects.create(
+        chunk = AssistenteChunk.objects.create(
             titulo=seed['titulo'][:200],
             conteudo=seed['conteudo'],
             categoria_hint=(seed.get('categoria_hint') or 'regras')[:120],
@@ -163,5 +163,7 @@ def garantir_chunks_regras() -> int:
             ativo=True,
             tags=list(seed.get('tags') or ['regra']),
         )
+        from integracoes.embeddings import atualizar_embedding_chunk
+        atualizar_embedding_chunk(chunk)
         criados += 1
     return criados

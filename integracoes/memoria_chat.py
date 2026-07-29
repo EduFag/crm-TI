@@ -121,6 +121,8 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
             ativo=True,
             tags=[],
         )
+        from integracoes.embeddings import atualizar_embedding_chunk
+        atualizar_embedding_chunk(chunk)
         return json.dumps({
             'ok': True,
             'chunk_id': chunk.pk,
@@ -147,6 +149,8 @@ def _executar_tool(name: str, args: dict) -> tuple[str, bool]:
         # Reativa se estava desligado e a TI corrigiu
         chunk.ativo = True
         chunk.save()
+        from integracoes.embeddings import atualizar_embedding_chunk
+        atualizar_embedding_chunk(chunk)
         return json.dumps({
             'ok': True,
             'chunk_id': chunk.pk,

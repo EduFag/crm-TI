@@ -420,6 +420,8 @@ def ia_chunk_update(request, pk):
     chunk.conteudo = conteudo
     chunk.categoria_hint = categoria[:120]
     chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint', 'atualizado_em'])
+    from integracoes.embeddings import atualizar_embedding_chunk
+    atualizar_embedding_chunk(chunk)
     registrar_acao(
         modulo=MODULO_CORE,
         acao=RegistroAcao.AcaoChoices.UPDATED,
@@ -451,6 +453,8 @@ def ia_chunk_create(request):
         ativo=True,
         tags=[],
     )
+    from integracoes.embeddings import atualizar_embedding_chunk
+    atualizar_embedding_chunk(chunk)
     registrar_acao(
         modulo=MODULO_CORE,
         acao=RegistroAcao.AcaoChoices.CREATED,
@@ -480,6 +484,35 @@ def ia_chunk_toggle_ativo(request, pk):
     )
     messages.success(request, f'Chunk "{chunk.titulo}" {estado}.')
     return _redirect_aprendizado(request, anchor=f'chunk-{pk}')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_embeddings_recalcular(request):
+    """Recalcula embeddings pendentes dos chunks ativos (ChatGPT)."""
+    from integracoes.embeddings import recalcular_embeddings
+
+    resultado = recalcular_embeddings(so_pendentes=True, limite=80)
+    if not resultado.get('ok'):
+        messages.error(request, resultado.get('error') or 'Falha ao recalcular embeddings.')
+        return redirect('integracoes:ia_aprendizado')
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=(
+            f'Recálculo de embeddings: {resultado["ok_count"]} ok, '
+            f'{resultado["fail_count"]} falhas.'
+        ),
+        actor=request.user,
+        metadata=resultado,
+    )
+    messages.success(
+        request,
+        f'Embeddings: {resultado["ok_count"]} atualizados, '
+        f'{resultado["fail_count"]} falhas '
+        f'(modelo {resultado.get("modelo") or "-"}).',
+    )
+    return redirect('integracoes:ia_aprendizado')
 
 
 @requer_modulo(MODULO_INTEGRACOES)

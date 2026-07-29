@@ -9,6 +9,7 @@ urlpatterns = [
     path('ia/aprendizado/', views.ia_aprendizado, name='ia_aprendizado'),
     path('ia/aprendizado/toggle/', views.ia_aprendizado_toggle, name='ia_aprendizado_toggle'),
     path('ia/aprendizado/gerar/', views.ia_aprendizado_gerar, name='ia_aprendizado_gerar'),
+    path('ia/aprendizado/embeddings/', views.ia_embeddings_recalcular, name='ia_embeddings_recalcular'),
     path('ia/aprendizado/chunks/novo/', views.ia_chunk_create, name='ia_chunk_create'),
     path('ia/aprendizado/chunks/<int:pk>/editar/', views.ia_chunk_update, name='ia_chunk_update'),
     path('ia/aprendizado/chunks/<int:pk>/toggle/', views.ia_chunk_toggle_ativo, name='ia_chunk_toggle'),

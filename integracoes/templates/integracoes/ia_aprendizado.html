@@ -112,6 +112,19 @@
                         Gerar aprendizado com a IA
                     </button>
                 </form>
+                <form method="post" action="{% url 'integracoes:ia_embeddings_recalcular' %}" class="pt-2 border-t border-slate-100"
+                      onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Calculando…';">
+                    {% csrf_token %}
+                    <p class="text-sm text-slate-500 mb-2">
+                        Recalcula vetores semânticos (ChatGPT / text-embedding-3-small) dos chunks
+                        ativos sem embedding ou com modelo desatualizado. Sem ChatGPT ativo, o Assistente
+                        continua só com busca por palavras-chave.
+                    </p>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700">
+                        Recalcular embeddings
+                    </button>
+                </form>
             </div>
 
             <details class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 group">
