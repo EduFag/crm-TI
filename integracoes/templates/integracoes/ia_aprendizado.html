@@ -25,20 +25,43 @@
     border-radius: 0.25rem;
     padding: 0.1em 0.35em;
 }
-.memoria-md .memoria-md-link { color: #6d28d9; text-decoration: underline; text-underline-offset: 2px; }
+.memoria-md .memoria-md-link { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+.aprendizado-tab-btn.active {
+    border-color: #0f172a;
+    color: #0f172a;
+}
 </style>
-<div class="flex flex-col w-full gap-6">
-    <div>
-        <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Aprendizado IA</h2>
-        <p class="text-sm text-slate-500 mt-1">
-            Stack: DeepSeek (texto/tools). Prints via OCR local. Curadoria de chunks, regras e eval.
-        </p>
-    </div>
 
-    <div class="px-4 py-3 rounded-lg text-sm bg-sky-50 text-sky-900 border border-sky-100">
-        <strong class="font-semibold">DeepSeek-only:</strong>
-        o Assistente usa busca por palavras-chave (sem embeddings).
-        Anexos de imagem/PDF são lidos por <strong>OCR/extração local</strong> e o texto vai ao DeepSeek.
+<div class="flex flex-col w-full gap-6">
+    {# Header #}
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+            <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Aprendizado IA</h2>
+            <p class="text-sm text-slate-500 mt-1">
+                Curadoria de chunks, regras e eval · DeepSeek + OCR local
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+            {% if config.ativo %}
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Assistente ativo
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                Assistente inativo
+            </span>
+            {% endif %}
+            <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
+                  onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                    Gerar aprendizado
+                </button>
+            </form>
+        </div>
     </div>
 
     {% if messages %}
@@ -51,114 +74,346 @@
     </div>
     {% endif %}
 
-    <div id="eval-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Eval · Últimas interações</h3>
-                <p class="text-xs text-slate-500 mt-0.5">
-                    {{ eval_contagens.total }} rodadas ·
-                    {{ eval_contagens.pendentes }} sem nota ·
-                    {{ eval_contagens.uteis }} úteis ·
-                    {{ eval_contagens.ruins }} ruins
-                    {% if eval_contagens.pct_util != None %}
-                    · {{ eval_contagens.pct_util }}% útil entre avaliadas
-                    {% endif %}
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                <a href="?eval=pendente#eval-panel"
-                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'pendente' %}bg-amber-50 border-amber-200 text-amber-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Pendentes</a>
-                <a href="?eval=util#eval-panel"
-                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'util' %}bg-emerald-50 border-emerald-200 text-emerald-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Úteis</a>
-                <a href="?eval=ruim#eval-panel"
-                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'ruim' %}bg-red-50 border-red-200 text-red-700{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Ruins</a>
-                <a href="?eval=all#eval-panel"
-                   class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'all' %}bg-slate-900 border-slate-900 text-white{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Todas</a>
-            </div>
+    {# KPI strip #}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 border-l-4 border-l-amber-400">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Eval pendentes</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">{{ eval_contagens.pendentes }}</p>
         </div>
-        {% if chunks_ruins %}
-        <div class="px-6 py-3 border-b border-slate-100 bg-red-50/40">
-            <p class="text-xs font-semibold text-red-800 mb-1.5">Chunks mais citados em interações ruins</p>
-            <ul class="flex flex-wrap gap-2">
-                {% for item in chunks_ruins %}
-                <li>
-                    <a href="#chunk-{{ item.id }}"
-                       class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-red-100 bg-white text-red-700 hover:bg-red-50">
-                        #{{ item.id }} {{ item.titulo|truncatechars:40 }}
-                        <span class="text-red-400">×{{ item.n }}</span>
-                    </a>
-                </li>
-                {% endfor %}
-            </ul>
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 border-l-4 border-l-emerald-500">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">% útil</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">
+                {% if eval_contagens.pct_util != None %}{{ eval_contagens.pct_util }}%{% else %}—{% endif %}
+            </p>
         </div>
-        {% endif %}
-        <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
-            {% for it in interacoes %}
-            <li class="px-6 py-4" id="interacao-{{ it.pk }}">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0 space-y-1.5">
-                        <div class="flex flex-wrap items-center gap-2 text-sm">
-                            <a href="{% url 'helpdesk:ticket_drawer' it.ticket_id %}"
-                               class="font-semibold text-blue-700 hover:underline">
-                                Chamado #{{ it.ticket_id }}
-                            </a>
-                            <span class="text-xs text-slate-400">{{ it.criado_em|date:"d/m/Y H:i" }}</span>
-                            {% if it.hybrid %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">Híbrido</span>
-                            {% else %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Keyword</span>
-                            {% endif %}
-                            {% if it.nota == 1 %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Útil</span>
-                            {% elif it.nota == -1 %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">Ruim</span>
-                            {% endif %}
-                        </div>
-                        <p class="text-xs text-slate-500">
-                            Chunks:
-                            {% for ch in it.chunks_resumo %}
-                            <a href="#chunk-{{ ch.id }}" class="text-slate-700 hover:underline">#{{ ch.id }} {{ ch.titulo|truncatechars:28 }}</a>{% if not forloop.last %},{% endif %}
-                            {% empty %}
-                            <span class="text-slate-400">(nenhum)</span>
-                            {% endfor %}
-                        </p>
-                        {% if it.comentario %}
-                        <p class="text-xs text-slate-600 italic">“{{ it.comentario }}”</p>
-                        {% endif %}
-                    </div>
-                    <div class="flex flex-col gap-2 shrink-0">
-                        <form method="post" action="{% url 'integracoes:ia_interacao_nota' it.pk %}" class="flex flex-wrap items-center gap-2">
-                            {% csrf_token %}
-                            <input type="hidden" name="filtro_eval" value="{{ filtros.eval }}">
-                            <input type="text" name="comentario" maxlength="400" placeholder="Comentário (opcional)"
-                                   class="text-xs rounded-lg border border-slate-300 px-2 py-1.5 w-40 sm:w-48"
-                                   value="{{ it.comentario }}">
-                            <button type="submit" name="nota" value="1"
-                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-                                Útil
-                            </button>
-                            <button type="submit" name="nota" value="-1"
-                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">
-                                Ruim
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </li>
-            {% empty %}
-            <li class="px-6 py-8 text-center text-sm text-slate-500">
-                Nenhuma interação neste filtro. Quando o Assistente responder chamados, as rodadas aparecem aqui.
-            </li>
-            {% endfor %}
-        </ul>
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 border-l-4 border-l-blue-500">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Chunks ativos</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">{{ contagens.ativos }}</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 border-l-4 border-l-slate-400">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Manual + Chat</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">
+                {{ por_origem_curadoria }}
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+                Manual {{ por_origem.manual|default:0 }} · Chat {{ por_origem.chat|default:0 }}
+            </p>
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-        <!-- Coluna esquerda: config + chunks -->
-        <div class="flex flex-col gap-6 min-w-0">
+    {# Abas #}
+    <div class="border-b border-slate-200 flex flex-wrap gap-1" role="tablist">
+        <a href="?tab=chunks&q={{ filtros.q|urlencode }}&origem={{ filtros.origem }}&categoria={{ filtros.categoria|urlencode }}&ativo={{ filtros.ativo }}"
+           role="tab"
+           class="aprendizado-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 {% if tab == 'chunks' %}border-slate-900 text-slate-900{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+            Chunks
+        </a>
+        <a href="?tab=eval&eval={{ filtros.eval }}"
+           role="tab"
+           class="aprendizado-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 {% if tab == 'eval' %}border-slate-900 text-slate-900{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+            Avaliação
+            {% if eval_contagens.pendentes %}
+            <span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">{{ eval_contagens.pendentes }}</span>
+            {% endif %}
+        </a>
+        <a href="?tab=config"
+           role="tab"
+           class="aprendizado-tab-btn px-4 pb-3 text-sm font-semibold transition-colors border-b-2 {% if tab == 'config' %}border-slate-900 text-slate-900{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+            Config
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] gap-6 items-start">
+        <div class="min-w-0 flex flex-col gap-4">
+
+            {% if tab == 'chunks' %}
+            {# Aba Chunks #}
+            <details class="bg-white border border-slate-200 rounded-xl shadow-sm group">
+                <summary class="cursor-pointer list-none px-5 py-3.5 flex items-center justify-between gap-3">
+                    <span class="text-sm font-bold text-slate-900">Novo chunk manual</span>
+                    <span class="text-xs font-semibold text-blue-600 group-open:hidden">Abrir</span>
+                    <span class="text-xs font-semibold text-slate-500 hidden group-open:inline">Fechar</span>
+                </summary>
+                <form method="post" action="{% url 'integracoes:ia_chunk_create' %}" class="px-5 pb-5 space-y-3 border-t border-slate-100 pt-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="filtro_tab" value="chunks">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Título</label>
+                        <input type="text" name="titulo" required maxlength="200"
+                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Categoria (opcional)</label>
+                        <input type="text" name="categoria_hint" maxlength="120" placeholder="Ex.: discador, acessos"
+                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Conteúdo</label>
+                        <textarea name="conteudo" required rows="3"
+                                  class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2"></textarea>
+                    </div>
+                    <button type="submit"
+                            class="inline-flex px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                        Adicionar chunk
+                    </button>
+                </form>
+            </details>
+
+            <div id="chunks-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-sm font-bold text-slate-800">Chunks</h3>
+                        <p class="text-xs text-slate-500">
+                            {{ contagens.ativos }} ativos · IA {{ por_origem.ia|default:0 }}
+                        </p>
+                    </div>
+                    <form method="get" action="{% url 'integracoes:ia_aprendizado' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        <input type="hidden" name="tab" value="chunks">
+                        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar…"
+                               class="text-sm rounded-lg border border-slate-300 px-3 py-2">
+                        <select name="origem" class="text-sm rounded-lg border border-slate-300 px-3 py-2">
+                            <option value="">Todas as origens</option>
+                            <option value="ia" {% if filtros.origem == 'ia' %}selected{% endif %}>IA</option>
+                            <option value="manual" {% if filtros.origem == 'manual' %}selected{% endif %}>Manual</option>
+                            <option value="chat" {% if filtros.origem == 'chat' %}selected{% endif %}>Chat</option>
+                        </select>
+                        <input type="text" name="categoria" value="{{ filtros.categoria }}" placeholder="Categoria…"
+                               class="text-sm rounded-lg border border-slate-300 px-3 py-2">
+                        <div class="flex gap-2">
+                            <select name="ativo" class="flex-1 text-sm rounded-lg border border-slate-300 px-3 py-2">
+                                <option value="1" {% if filtros.ativo == '1' %}selected{% endif %}>Só ativos</option>
+                                <option value="0" {% if filtros.ativo == '0' %}selected{% endif %}>Só inativos</option>
+                                <option value="all" {% if filtros.ativo == 'all' %}selected{% endif %}>Todos</option>
+                            </select>
+                            <button type="submit"
+                                    class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                                Filtrar
+                            </button>
+                        </div>
+                    </form>
+                    <p class="text-[11px] text-slate-400">
+                        Chunks com categoria <strong>regras</strong> entram sempre no contexto do Assistente.
+                    </p>
+                </div>
+                <ul class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+                    {% for chunk in chunks %}
+                    <li class="px-5 py-3 {% if not chunk.ativo %}opacity-60 bg-slate-50/80{% endif %}" id="chunk-{{ chunk.pk }}">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1 space-y-1">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    {% if chunk.origem == 'ia' %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">IA</span>
+                                    {% elif chunk.origem == 'chat' %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">Chat</span>
+                                    {% else %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Manual</span>
+                                    {% endif %}
+                                    {% if chunk.categoria_hint == 'regras' %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-100">Regra</span>
+                                    {% elif chunk.categoria_hint %}
+                                    <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200">{{ chunk.categoria_hint|truncatechars:20 }}</span>
+                                    {% endif %}
+                                    {% if not chunk.ativo %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Inativo</span>
+                                    {% endif %}
+                                    <span class="text-[10px] text-slate-400">#{{ chunk.pk }}</span>
+                                </div>
+                                <p class="text-sm font-semibold text-slate-900 truncate">{{ chunk.titulo }}</p>
+                                <p class="text-xs text-slate-500 line-clamp-2">{{ chunk.conteudo|truncatechars:140 }}</p>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <form method="post" action="{% url 'integracoes:ia_chunk_toggle' chunk.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
+                                    <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
+                                    <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
+                                    <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
+                                    <input type="hidden" name="filtro_page" value="{{ page_obj.number }}">
+                                    <input type="hidden" name="filtro_tab" value="chunks">
+                                    <button type="submit" class="text-xs font-semibold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded">
+                                        {% if chunk.ativo %}Desativar{% else %}Ativar{% endif %}
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'integracoes:ia_chunk_delete' chunk.pk %}"
+                                      onsubmit="return confirm('Remover este chunk permanentemente?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
+                                    <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
+                                    <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
+                                    <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
+                                    <input type="hidden" name="filtro_tab" value="chunks">
+                                    <button type="submit" class="text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1 rounded">
+                                        Excluir
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <details class="mt-2 group">
+                            <summary class="cursor-pointer list-none text-xs font-semibold text-blue-600 hover:text-blue-800">
+                                <span class="group-open:hidden">Editar</span>
+                                <span class="hidden group-open:inline">Fechar edição</span>
+                            </summary>
+                            <form method="post" action="{% url 'integracoes:ia_chunk_update' chunk.pk %}" class="mt-3 space-y-3 pt-3 border-t border-slate-100">
+                                {% csrf_token %}
+                                <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
+                                <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
+                                <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
+                                <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
+                                <input type="hidden" name="filtro_page" value="{{ page_obj.number }}">
+                                <input type="hidden" name="filtro_tab" value="chunks">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-1">Título</label>
+                                    <input type="text" name="titulo" value="{{ chunk.titulo }}" required maxlength="200"
+                                           class="w-full text-sm font-semibold rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-1">Categoria</label>
+                                    <input type="text" name="categoria_hint" value="{{ chunk.categoria_hint }}" maxlength="120"
+                                           class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-1">Conteúdo</label>
+                                    <textarea name="conteudo" required rows="4"
+                                              class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">{{ chunk.conteudo }}</textarea>
+                                </div>
+                                <button type="submit"
+                                        class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
+                                    Salvar correção
+                                </button>
+                            </form>
+                        </details>
+                    </li>
+                    {% empty %}
+                    <li class="px-5 py-10 text-center text-sm text-slate-500">
+                        Nenhum chunk com esses filtros. Gere com a IA, adicione manualmente ou grave pelo chat.
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if page_obj.paginator.num_pages > 1 %}
+                <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 text-sm">
+                    <span class="text-slate-500">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        ({{ page_obj.paginator.count }} chunks)
+                    </span>
+                    <div class="flex gap-2">
+                        {% if page_obj.has_previous %}
+                        <a class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
+                           href="?tab=chunks&q={{ filtros.q|urlencode }}&origem={{ filtros.origem }}&categoria={{ filtros.categoria|urlencode }}&ativo={{ filtros.ativo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                        <a class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
+                           href="?tab=chunks&q={{ filtros.q|urlencode }}&origem={{ filtros.origem }}&categoria={{ filtros.categoria|urlencode }}&ativo={{ filtros.ativo }}&page={{ page_obj.next_page_number }}">Próxima</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% elif tab == 'eval' %}
+            {# Aba Avaliação #}
+            <div id="eval-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Últimas interações</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ eval_contagens.total }} rodadas ·
+                            {{ eval_contagens.pendentes }} sem nota ·
+                            {{ eval_contagens.uteis }} úteis ·
+                            {{ eval_contagens.ruins }} ruins
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs font-semibold">
+                        <a href="?tab=eval&eval=pendente#eval-panel"
+                           class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'pendente' %}bg-amber-50 border-amber-200 text-amber-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Pendentes</a>
+                        <a href="?tab=eval&eval=util#eval-panel"
+                           class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'util' %}bg-emerald-50 border-emerald-200 text-emerald-800{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Úteis</a>
+                        <a href="?tab=eval&eval=ruim#eval-panel"
+                           class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'ruim' %}bg-red-50 border-red-200 text-red-700{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Ruins</a>
+                        <a href="?tab=eval&eval=all#eval-panel"
+                           class="px-2.5 py-1.5 rounded-lg border {% if filtros.eval == 'all' %}bg-slate-900 border-slate-900 text-white{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">Todas</a>
+                    </div>
+                </div>
+                {% if chunks_ruins %}
+                <div class="px-5 py-3 border-b border-slate-100 bg-red-50/40">
+                    <p class="text-xs font-semibold text-red-800 mb-1.5">Chunks mais citados em interações ruins</p>
+                    <ul class="flex flex-wrap gap-2">
+                        {% for item in chunks_ruins %}
+                        <li>
+                            <a href="?tab=chunks#chunk-{{ item.id }}"
+                               class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-red-100 bg-white text-red-700 hover:bg-red-50">
+                                #{{ item.id }} {{ item.titulo|truncatechars:40 }}
+                                <span class="text-red-400">×{{ item.n }}</span>
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
+                    {% for it in interacoes %}
+                    <li class="px-5 py-4" id="interacao-{{ it.pk }}">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0 space-y-1.5">
+                                <div class="flex flex-wrap items-center gap-2 text-sm">
+                                    <a href="{% url 'helpdesk:ticket_drawer' it.ticket_id %}"
+                                       class="font-semibold text-blue-700 hover:underline">
+                                        Chamado #{{ it.ticket_id }}
+                                    </a>
+                                    <span class="text-xs text-slate-400">{{ it.criado_em|date:"d/m/Y H:i" }}</span>
+                                    {% if it.hybrid %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">Híbrido</span>
+                                    {% else %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Keyword</span>
+                                    {% endif %}
+                                    {% if it.nota == 1 %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Útil</span>
+                                    {% elif it.nota == -1 %}
+                                    <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">Ruim</span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-xs text-slate-500">
+                                    Chunks:
+                                    {% for ch in it.chunks_resumo %}
+                                    <a href="?tab=chunks#chunk-{{ ch.id }}" class="text-slate-700 hover:underline">#{{ ch.id }} {{ ch.titulo|truncatechars:28 }}</a>{% if not forloop.last %},{% endif %}
+                                    {% empty %}
+                                    <span class="text-slate-400">(nenhum)</span>
+                                    {% endfor %}
+                                </p>
+                                {% if it.comentario %}
+                                <p class="text-xs text-slate-600 italic">“{{ it.comentario }}”</p>
+                                {% endif %}
+                            </div>
+                            <form method="post" action="{% url 'integracoes:ia_interacao_nota' it.pk %}" class="flex flex-wrap items-center gap-2 shrink-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="filtro_eval" value="{{ filtros.eval }}">
+                                <input type="text" name="comentario" maxlength="400" placeholder="Comentário (opcional)"
+                                       class="text-xs rounded-lg border border-slate-300 px-2 py-1.5 w-40 sm:w-48"
+                                       value="{{ it.comentario }}">
+                                <button type="submit" name="nota" value="1"
+                                        class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                    Útil
+                                </button>
+                                <button type="submit" name="nota" value="-1"
+                                        class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                    Ruim
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="px-5 py-8 text-center text-sm text-slate-500">
+                        Nenhuma interação neste filtro. Quando o Assistente responder chamados, as rodadas aparecem aqui.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            {% else %}
+            {# Aba Config #}
             <form method="post" action="{% url 'integracoes:ia_aprendizado_toggle' %}"
                   class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
                 {% csrf_token %}
+                <input type="hidden" name="filtro_tab" value="config">
                 <h3 class="text-lg font-bold text-slate-900">Assistente no Helpdesk</h3>
                 <p class="text-sm text-slate-500">
                     Quando ativo, o Assistente conversa com o solicitante até a TI assumir ou escalar.
@@ -192,8 +447,7 @@
                         {% endfor %}
                     </select>
                     <p class="text-[11px] text-slate-500 mt-1.5">
-                        Com DeepSeek, o caminho padrão é OCR local (prints) e extração de texto (PDFs).
-                        Só escolha outra integração aqui se no futuro houver provedor multimodal ativo.
+                        Stack DeepSeek-only: busca por palavras-chave; anexos via OCR/extração local.
                     </p>
                 </div>
                 <button type="submit"
@@ -205,213 +459,45 @@
                 {% endif %}
             </form>
 
-            <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
-                <h3 class="text-lg font-bold text-slate-900">Gerar chunks com a IA</h3>
+            <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-3">
+                <h3 class="text-base font-bold text-slate-900">Geração e embeddings</h3>
                 <p class="text-sm text-slate-500">
-                    Analisa chamados resolvidos/arquivados (inclui notas internas da TI).
-                    Substitui apenas chunks gerados pela IA — manuais e do chat são preservados.
+                    Gerar analisa chamados resolvidos e substitui só chunks da IA (manuais/chat preservados).
+                    Use o botão no topo da página ou abaixo.
                 </p>
                 <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
                       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
                     {% csrf_token %}
                     <button type="submit"
-                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
                         Gerar aprendizado com a IA
                     </button>
                 </form>
                 {% if embeddings_disponivel %}
-                <form method="post" action="{% url 'integracoes:ia_embeddings_recalcular' %}" class="pt-2 border-t border-slate-100"
+                <form method="post" action="{% url 'integracoes:ia_embeddings_recalcular' %}" class="pt-3 border-t border-slate-100"
                       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Calculando…';">
                     {% csrf_token %}
-                    <p class="text-sm text-slate-500 mb-2">
-                        Recalcula vetores semânticos (provedor com embeddings ativo).
-                    </p>
+                    <p class="text-sm text-slate-500 mb-2">Recalcula vetores semânticos (provedor com embeddings ativo).</p>
                     <button type="submit"
                             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700">
                         Recalcular embeddings
                     </button>
                 </form>
                 {% else %}
-                <p class="text-xs text-slate-500 pt-2 border-t border-slate-100">
-                    Embeddings desligados no stack DeepSeek-only. A relevância dos chunks usa
-                    palavras-chave, tags e categoria (curadoria na lista abaixo).
+                <p class="text-xs text-slate-500 pt-3 border-t border-slate-100">
+                    Embeddings desligados no stack DeepSeek-only. Relevância via palavras-chave, tags e categoria.
                 </p>
                 {% endif %}
             </div>
-
-            <details class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 group">
-                <summary class="cursor-pointer text-lg font-bold text-slate-900 list-none flex items-center justify-between">
-                    Novo chunk manual
-                    <span class="text-sm font-medium text-blue-600 group-open:hidden">Abrir</span>
-                    <span class="text-sm font-medium text-slate-500 hidden group-open:inline">Fechar</span>
-                </summary>
-                <form method="post" action="{% url 'integracoes:ia_chunk_create' %}" class="mt-4 space-y-3">
-                    {% csrf_token %}
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Título</label>
-                        <input type="text" name="titulo" required maxlength="200"
-                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Categoria (opcional)</label>
-                        <input type="text" name="categoria_hint" maxlength="120" placeholder="Ex.: discador, acessos"
-                               class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Conteúdo</label>
-                        <textarea name="conteudo" required rows="4"
-                                  class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2"></textarea>
-                    </div>
-                    <button type="submit"
-                            class="inline-flex px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
-                        Adicionar chunk
-                    </button>
-                </form>
-            </details>
-
-            <div id="chunks-panel" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Chunks</h3>
-                        <p class="text-xs text-slate-500">
-                            {{ contagens.ativos }} ativos · {{ contagens.inativos }} inativos ·
-                            IA {{ por_origem.ia|default:0 }} ·
-                            Manual {{ por_origem.manual|default:0 }} ·
-                            Chat {{ por_origem.chat|default:0 }}
-                        </p>
-                    </div>
-                    <form method="get" action="{% url 'integracoes:ia_aprendizado' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar título/conteúdo…"
-                               class="text-sm rounded-lg border border-slate-300 px-3 py-2">
-                        <select name="origem" class="text-sm rounded-lg border border-slate-300 px-3 py-2">
-                            <option value="">Todas as origens</option>
-                            <option value="ia" {% if filtros.origem == 'ia' %}selected{% endif %}>IA</option>
-                            <option value="manual" {% if filtros.origem == 'manual' %}selected{% endif %}>Manual</option>
-                            <option value="chat" {% if filtros.origem == 'chat' %}selected{% endif %}>Chat</option>
-                        </select>
-                        <input type="text" name="categoria" value="{{ filtros.categoria }}" placeholder="Categoria…"
-                               class="text-sm rounded-lg border border-slate-300 px-3 py-2">
-                        <div class="flex gap-2">
-                            <select name="ativo" class="flex-1 text-sm rounded-lg border border-slate-300 px-3 py-2">
-                                <option value="1" {% if filtros.ativo == '1' %}selected{% endif %}>Só ativos</option>
-                                <option value="0" {% if filtros.ativo == '0' %}selected{% endif %}>Só inativos</option>
-                                <option value="all" {% if filtros.ativo == 'all' %}selected{% endif %}>Todos</option>
-                            </select>
-                            <button type="submit"
-                                    class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
-                                Filtrar
-                            </button>
-                        </div>
-                    </form>
-                    <p class="text-[11px] text-slate-400">
-                        Chunks com categoria <strong>regras</strong> (tag regra) entram sempre no contexto do Assistente.
-                        Edite-os aqui sem precisar de deploy.
-                    </p>
-                </div>
-                <ul class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
-                    {% for chunk in chunks %}
-                    <li class="px-6 py-5 {% if not chunk.ativo %}opacity-60 bg-slate-50/80{% endif %}" id="chunk-{{ chunk.pk }}">
-                        <div class="flex flex-wrap items-center gap-2 mb-3">
-                            {% if chunk.origem == 'ia' %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">IA</span>
-                            {% elif chunk.origem == 'chat' %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100">Chat</span>
-                            {% else %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Manual</span>
-                            {% endif %}
-                            {% if chunk.categoria_hint == 'regras' %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-100">Regra</span>
-                            {% endif %}
-                            {% if not chunk.ativo %}
-                            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-slate-200 text-slate-600">Inativo</span>
-                            {% endif %}
-                            <span class="text-[10px] text-slate-400">#{{ chunk.pk }}</span>
-                        </div>
-                        <form method="post" action="{% url 'integracoes:ia_chunk_update' chunk.pk %}" class="space-y-3">
-                            {% csrf_token %}
-                            <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
-                            <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
-                            <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
-                            <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
-                            <input type="hidden" name="filtro_page" value="{{ page_obj.number }}">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 mb-1">Título</label>
-                                <input type="text" name="titulo" value="{{ chunk.titulo }}" required maxlength="200"
-                                       class="w-full text-sm font-semibold rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 mb-1">Categoria</label>
-                                <input type="text" name="categoria_hint" value="{{ chunk.categoria_hint }}" maxlength="120"
-                                       class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 mb-1">Conteúdo</label>
-                                <textarea name="conteudo" required rows="3"
-                                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500">{{ chunk.conteudo }}</textarea>
-                            </div>
-                            <button type="submit"
-                                    class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                                Salvar correção
-                            </button>
-                        </form>
-                        <div class="mt-2 flex flex-wrap items-center gap-3">
-                            <form method="post" action="{% url 'integracoes:ia_chunk_toggle' chunk.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
-                                <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
-                                <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
-                                <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
-                                <input type="hidden" name="filtro_page" value="{{ page_obj.number }}">
-                                <button type="submit" class="text-xs font-semibold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded">
-                                    {% if chunk.ativo %}Desativar{% else %}Ativar{% endif %}
-                                </button>
-                            </form>
-                            <form method="post" action="{% url 'integracoes:ia_chunk_delete' chunk.pk %}"
-                                  onsubmit="return confirm('Remover este chunk permanentemente?');">
-                                {% csrf_token %}
-                                <input type="hidden" name="filtro_q" value="{{ filtros.q }}">
-                                <input type="hidden" name="filtro_origem" value="{{ filtros.origem }}">
-                                <input type="hidden" name="filtro_categoria" value="{{ filtros.categoria }}">
-                                <input type="hidden" name="filtro_ativo" value="{{ filtros.ativo }}">
-                                <button type="submit" class="text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1 rounded">
-                                    Excluir
-                                </button>
-                            </form>
-                        </div>
-                    </li>
-                    {% empty %}
-                    <li class="px-6 py-10 text-center text-sm text-slate-500">
-                        Nenhum chunk com esses filtros. Gere com a IA, adicione manualmente ou grave pelo chat.
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% if page_obj.paginator.num_pages > 1 %}
-                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 text-sm">
-                    <span class="text-slate-500">
-                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-                        ({{ page_obj.paginator.count }} chunks)
-                    </span>
-                    <div class="flex gap-2">
-                        {% if page_obj.has_previous %}
-                        <a class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
-                           href="?q={{ filtros.q|urlencode }}&origem={{ filtros.origem }}&categoria={{ filtros.categoria|urlencode }}&ativo={{ filtros.ativo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
-                        {% endif %}
-                        {% if page_obj.has_next %}
-                        <a class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
-                           href="?q={{ filtros.q|urlencode }}&origem={{ filtros.origem }}&categoria={{ filtros.categoria|urlencode }}&ativo={{ filtros.ativo }}&page={{ page_obj.next_page_number }}">Próxima</a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+            {% endif %}
         </div>
 
-        <!-- Coluna direita: chat memória -->
-        <aside class="xl:sticky xl:top-4 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col h-[min(85vh,780px)] min-h-[420px]">
-            <div class="px-5 py-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between gap-2 shrink-0">
+        {# Chat memória #}
+        <aside class="xl:sticky xl:top-6 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col h-[min(85vh,780px)] min-h-[420px]">
+            <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
                 <div>
                     <h3 class="text-sm font-bold text-slate-900">Chat · Grave na memória</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Peça para lembrar, corrigir ou esquecer procedimentos.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Lembrar, corrigir ou esquecer procedimentos.</p>
                 </div>
                 <button type="button" id="memoria-chat-limpar"
                         class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-white">
@@ -439,9 +525,9 @@
                 {% csrf_token %}
                 <textarea id="memoria-chat-input" rows="3" required
                           placeholder="Ex.: Grave na memória que..."
-                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none"></textarea>
+                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
                 <button type="submit" id="memoria-chat-enviar"
-                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60">
+                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
                     Enviar
                 </button>
                 <p id="memoria-chat-status" class="text-xs text-slate-400 text-center hidden"></p>
@@ -532,6 +618,16 @@
             form.requestSubmit();
         }
     });
+
+    // Abre edição se a URL apontar para um chunk
+    if (window.location.hash && window.location.hash.indexOf('chunk-') === 1) {
+        const el = document.querySelector(window.location.hash);
+        if (el) {
+            const details = el.querySelector('details');
+            if (details) details.open = true;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
 })();
 </script>
 {% endblock %}

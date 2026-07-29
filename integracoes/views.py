@@ -275,6 +275,9 @@ def ia_aprendizado(request):
     categoria = (request.GET.get('categoria') or '').strip()
     ativo_filtro = (request.GET.get('ativo') or '1').strip().lower()
     eval_filtro = (request.GET.get('eval') or 'pendente').strip().lower()
+    tab = (request.GET.get('tab') or 'chunks').strip().lower()
+    if tab not in ('chunks', 'eval', 'config'):
+        tab = 'chunks'
 
     qs = AssistenteChunk.objects.all()
     if ativo_filtro in ('1', 'true', 'sim'):
@@ -304,6 +307,7 @@ def ia_aprendizado(request):
         row['origem']: row['n']
         for row in AssistenteChunk.objects.values('origem').annotate(n=Count('id'))
     }
+    por_origem_curadoria = int(por_origem.get('manual') or 0) + int(por_origem.get('chat') or 0)
 
     # Eval: últimas interações + contadores
     interacoes_qs = AssistenteInteracao.objects.all()
@@ -374,9 +378,12 @@ def ia_aprendizado(request):
             'categoria': categoria,
             'ativo': ativo_filtro,
             'eval': eval_filtro,
+            'tab': tab,
         },
+        'tab': tab,
         'contagens': contagens,
         'por_origem': por_origem,
+        'por_origem_curadoria': por_origem_curadoria,
         'integracoes': integracoes,
         'chat_historico': chat_historico,
         'interacoes': interacoes,
@@ -386,7 +393,7 @@ def ia_aprendizado(request):
     })
 
 
-def _redirect_aprendizado(request, anchor: str = ''):
+def _redirect_aprendizado(request, anchor: str = '', tab: str = ''):
     """Volta à lista preservando filtros GET (via next ou Referer query)."""
     from django.urls import reverse
     from urllib.parse import urlencode
@@ -396,10 +403,13 @@ def _redirect_aprendizado(request, anchor: str = ''):
         return redirect(next_url + (f'#{anchor}' if anchor else ''))
     base = reverse('integracoes:ia_aprendizado')
     params = {}
-    for key in ('q', 'origem', 'categoria', 'ativo', 'page'):
+    for key in ('q', 'origem', 'categoria', 'ativo', 'page', 'tab', 'eval'):
         val = (request.POST.get(f'filtro_{key}') or '').strip()
         if val:
             params[key] = val
+    tab_final = (tab or params.get('tab') or '').strip().lower()
+    if tab_final in ('chunks', 'eval', 'config'):
+        params['tab'] = tab_final
     qs = urlencode(params)
     url = f'{base}?{qs}' if qs else base
     if anchor:
@@ -434,7 +444,7 @@ def ia_aprendizado_toggle(request):
         metadata={'assistente_ativo': config.ativo},
     )
     messages.success(request, f'Assistente no Helpdesk {estado}.')
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request, tab='config')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -466,7 +476,7 @@ def ia_aprendizado_gerar(request):
         messages.error(request, f'Falha ao gerar aprendizado: {exc}')
     except Exception:
         messages.error(request, 'Erro inesperado ao gerar aprendizado.')
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request, tab='chunks')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -508,7 +518,7 @@ def ia_chunk_create(request):
     categoria = (request.POST.get('categoria_hint') or '').strip()
     if not titulo or not conteudo:
         messages.error(request, 'Título e conteúdo são obrigatórios.')
-        return redirect('integracoes:ia_aprendizado')
+        return _redirect_aprendizado(request, tab='chunks')
     chunk = AssistenteChunk.objects.create(
         titulo=titulo[:200],
         conteudo=conteudo,
@@ -528,7 +538,7 @@ def ia_chunk_create(request):
         metadata={'chunk_id': chunk.pk},
     )
     messages.success(request, f'Chunk "{chunk.titulo}" criado.')
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request, anchor=f'chunk-{chunk.pk}', tab='chunks')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -560,7 +570,7 @@ def ia_embeddings_recalcular(request):
     resultado = recalcular_embeddings(so_pendentes=True, limite=80)
     if not resultado.get('ok'):
         messages.error(request, resultado.get('error') or 'Falha ao recalcular embeddings.')
-        return redirect('integracoes:ia_aprendizado')
+        return _redirect_aprendizado(request, tab='config')
     registrar_acao(
         modulo=MODULO_CORE,
         acao=RegistroAcao.AcaoChoices.UPDATED,
@@ -577,7 +587,7 @@ def ia_embeddings_recalcular(request):
         f'{resultado["fail_count"]} falhas '
         f'(modelo {resultado.get("modelo") or "-"}).',
     )
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request, tab='config')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -594,13 +604,13 @@ def ia_interacao_nota(request, pk):
         nota = int(raw)
     except (TypeError, ValueError):
         messages.error(request, 'Nota inválida.')
-        return redirect('integracoes:ia_aprendizado')
+        return _redirect_aprendizado(request, tab='eval', anchor='eval-panel')
     if nota not in (
         AssistenteInteracao.Nota.UTIL,
         AssistenteInteracao.Nota.RUIM,
     ):
         messages.error(request, 'Nota deve ser útil ou ruim.')
-        return redirect('integracoes:ia_aprendizado')
+        return _redirect_aprendizado(request, tab='eval', anchor='eval-panel')
 
     interacao.nota = nota
     interacao.nota_por = request.user
@@ -624,7 +634,10 @@ def ia_interacao_nota(request, pk):
     eval_q = (request.POST.get('filtro_eval') or 'pendente').strip()
     from django.urls import reverse
     from urllib.parse import urlencode
-    url = reverse('integracoes:ia_aprendizado') + '?' + urlencode({'eval': eval_q})
+    url = reverse('integracoes:ia_aprendizado') + '?' + urlencode({
+        'tab': 'eval',
+        'eval': eval_q,
+    })
     return redirect(url + '#eval-panel')
 
 
