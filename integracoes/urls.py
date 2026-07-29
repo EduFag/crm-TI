@@ -11,6 +11,7 @@ urlpatterns = [
     path('ia/aprendizado/gerar/', views.ia_aprendizado_gerar, name='ia_aprendizado_gerar'),
     path('ia/aprendizado/chunks/novo/', views.ia_chunk_create, name='ia_chunk_create'),
     path('ia/aprendizado/chunks/<int:pk>/editar/', views.ia_chunk_update, name='ia_chunk_update'),
+    path('ia/aprendizado/chunks/<int:pk>/toggle/', views.ia_chunk_toggle_ativo, name='ia_chunk_toggle'),
     path('ia/aprendizado/chunks/<int:pk>/excluir/', views.ia_chunk_delete, name='ia_chunk_delete'),
     path('ia/aprendizado/chat/', views.ia_aprendizado_chat, name='ia_aprendizado_chat'),
     path('ia/aprendizado/chat/limpar/', views.ia_aprendizado_chat_limpar, name='ia_aprendizado_chat_limpar'),

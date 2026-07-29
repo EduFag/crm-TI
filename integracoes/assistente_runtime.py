@@ -495,34 +495,54 @@ def _score_chunk(chunk: AssistenteChunk, tokens: set[str], categoria: str) -> in
     return score
 
 
-def _chunks_relevantes(ticket: Ticket, limite: int = 8) -> list[AssistenteChunk]:
-    """Seleciona chunks ativos ranqueados por relevância ao ticket."""
-    qs = list(AssistenteChunk.objects.filter(ativo=True)[:200])
+def _chunks_relevantes(ticket: Ticket, limite: int = 12) -> list[AssistenteChunk]:
+    """Seleciona chunks ativos: regras sempre + demais ranqueados por relevância."""
+    from integracoes.regras_seed import chunk_eh_regra, garantir_chunks_regras
+
+    # Garante seeds se a migration ainda não rodou ou banco novo
+    garantir_chunks_regras()
+
+    qs = list(AssistenteChunk.objects.filter(ativo=True)[:300])
     if not qs:
         return []
+
+    regras = [ch for ch in qs if chunk_eh_regra(ch)]
+    demais = [ch for ch in qs if not chunk_eh_regra(ch)]
 
     cat = ticket.category.name if ticket.category_id else ''
     tokens = _tokens_relevancia(ticket.title or '', (ticket.description or '')[:800], cat)
     if ticket.specific_category_id:
         tokens |= _tokens_relevancia(ticket.specific_category.name)
 
-    ranqueados = sorted(
-        qs,
-        key=lambda ch: (
+    def _chave(ch: AssistenteChunk) -> tuple:
+        return (
             _score_chunk(ch, tokens, cat),
             ch.atualizado_em.timestamp() if ch.atualizado_em else 0,
-        ),
-        reverse=True,
-    )
-    escolhidos = [ch for ch in ranqueados if _score_chunk(ch, tokens, cat) > 0][:limite]
-    if not escolhidos:
-        escolhidos = ranqueados[:limite]
+        )
+
+    ranqueados = sorted(demais, key=_chave, reverse=True)
+    com_score = [ch for ch in ranqueados if _score_chunk(ch, tokens, cat) > 0]
+    if not com_score:
+        com_score = ranqueados
+
+    # Regras primeiro; preenche o restante até o limite
+    escolhidos: list[AssistenteChunk] = list(regras)
+    ids_ja = {ch.pk for ch in escolhidos}
+    vagas = max(0, limite - len(escolhidos))
+    for ch in com_score:
+        if vagas <= 0:
+            break
+        if ch.pk in ids_ja:
+            continue
+        escolhidos.append(ch)
+        ids_ja.add(ch.pk)
+        vagas -= 1
 
     logger.info(
-        'chunks_relevantes ticket=%s ids=%s scores=%s',
+        'chunks_relevantes ticket=%s regras=%s ids=%s',
         ticket.pk,
+        [ch.pk for ch in regras],
         [ch.pk for ch in escolhidos],
-        [_score_chunk(ch, tokens, cat) for ch in escolhidos],
     )
     return escolhidos
 
@@ -590,7 +610,14 @@ def _montar_contexto(ticket: Ticket) -> str:
         linhas.append(f'[{autor}]{marca}{extra} {c.text}')
 
     chunks = _chunks_relevantes(ticket)
-    chunks_txt = '\n'.join(f'- {ch.titulo}: {ch.conteudo}' for ch in chunks) or '(sem chunks ainda)'
+    from integracoes.regras_seed import chunk_eh_regra
+
+    regras_txt = '\n'.join(
+        f'- {ch.titulo}: {ch.conteudo}' for ch in chunks if chunk_eh_regra(ch)
+    ) or '(sem regras seed)'
+    aprendizado_txt = '\n'.join(
+        f'- {ch.titulo}: {ch.conteudo}' for ch in chunks if not chunk_eh_regra(ch)
+    ) or '(sem chunks de aprendizado)'
     cat_esp = ticket.specific_category.name if ticket.specific_category_id else '(não triado)'
     equipe_nome = ticket.equipe.name if ticket.equipe_id else '(não informada)'
 
@@ -627,90 +654,25 @@ def _montar_contexto(ticket: Ticket) -> str:
         f'Atribuído a: {(ticket.assigned_to.username if ticket.assigned_to_id else "(ninguém)")}\n\n'
         f'Anexos:\n{_resumo_anexos(ticket)}\n\n'
         f'Histórico de comentários:\n' + ('\n'.join(linhas) or '(vazio)') + '\n\n'
-        f'Aprendizado (estilo TI / chunks):\n{chunks_txt}'
+        f'Regras de negócio (obrigatórias):\n{regras_txt}\n\n'
+        f'Aprendizado (estilo TI / chunks):\n{aprendizado_txt}'
     )
 
 
 def _system_prompt() -> str:
+    """Persona curta: regras de negócio ficam nos chunks com tag regra."""
     return (
         'Você é o Assistente de TI da Money Promotora no helpdesk. '
-        'Responda em português, claro e profissional, alinhado aos chunks de aprendizado.\n\n'
-        'Sistemas da empresa (NÃO são terceiros):\n'
-        '- MoneyConsig / sistema.moneypromotora.com.br: sistema INTERNO da Money Promotora. '
-        'A equipe de TI desta empresa é responsável (abas, presença, rankings, acessos, UI). '
-        'Nunca diga que é sistema externo, JoyTec de terceiros, ou que o solicitante deve '
-        'abrir chamado no suporte do fornecedor. Para alteração de aba/permissão/acesso → '
-        'escalar_para_ti com motivo.\n'
-        '- Discador JoyTec: ferramenta usada internamente; a TI gerencia acessos/licenças '
-        'pelas tools do discador. Só escale se precisar de ação humana (limite de contrato, etc.).\n'
-        '- CRM e este helpdesk: também internos.\n\n'
-        'Identificar o sistema (CRÍTICO — não invente):\n'
-        '- NUNCA assuma MoneyConsig (nem Discador) se título, descrição, categoria e '
-        'texto do print/OCR NÃO nomearem o sistema de forma explícita.\n'
-        '- Categoria genérica (ex.: Outros) NÃO basta para concluir que é MoneyConsig.\n'
-        '- Se o print/OCR mostrar JoyTec, ramal web, campanha, disponibilidade, '
-        'discador, login tipo CAMILA_8371 / *_JOYTEC_* → trate como Discador JoyTec.\n'
-        '- Se mostrar sistema.moneypromotora.com.br, Ranking INSS, abas MoneyConsig → MoneyConsig.\n'
-        '- Problemas ambíguos (tabulação, tela travada, "não abre", erro de sistema) '
-        'sem evidência clara: PERGUNTE ao solicitante/criador se o problema é no '
-        'MoneyConsig ou no Discador JoyTec ANTES de orientar passos ou escalar. '
-        'Não diga "entendi que é MoneyConsig" sem prova no chamado.\n\n'
-        'Solicitante × equipe × TI (CRÍTICO):\n'
-        '- Equipe/Setor = loja/unidade do problema (ex.: Loja CCH). NÃO confundir com quem '
-        'aparece como Solicitante.\n'
-        '- Nomes de membros da TI (ex.: Léo/Leonardo, técnicos) citados no texto NÃO são '
-        'solicitantes — costumam ser avisos internos. Nunca diga que a TI "não conseguiu abrir".\n'
-        '- Se a descrição indicar abertura EM NOME de outra loja/pessoa (ex.: "Cachoeirinha '
-        'está sem internet, estou abrindo pra ela") e o Solicitante for quem abriu o chamado '
-        '(não alguém daquela unidade): pergunte se o solicitante ficou errado. '
-        'Se confirmar que sim, pergunte o nome de quem deveria constar; '
-        'use consultar_usuario; se achar usuário com acesso (eh_membro_ti=false) → '
-        'atualizar_solicitante com user_id; se não achar → atualizar_solicitante com nome_livre; '
-        'depois atualizar_descricao_chamado deixando claro unidade afetada, quem abriu e o problema.\n'
-        '- Rede/internet fora em loja: priorize esclarecer solicitante/unidade e escalar_para_ti '
-        'quando for indisponibilidade real de link — não fique só perguntando se "já voltou" '
-        'como se fosse oscilação leve, a menos que o texto sugira isso.\n\n'
-        'Canal interno [INTERNO TI]:\n'
-        '- Mensagens marcadas [INTERNO TI] NÃO são vistas pelo solicitante/criador comum. '
-        'Só TI, staff, superuser e você.\n'
-        '- Se a TI corrigir algo seu em [INTERNO TI], envie mensagem PÚBLICA (interno=false) '
-        'corrigindo/esclarecendo ao solicitante (ex.: "desculpe, o correto é…"). '
-        'Não diga que a TI te orientou em privado.\n'
-        '- Após triar ou escalar_para_ti, você PODE enviar uma nota com interno=true '
-        'à TI (ex.: "Precisa fazer X, Y, Z") sem o solicitante ver.\n'
-        '- Entre TI: se o pedido interno for só alinhamento (sem falar com o solicitante), '
-        'responda só com interno=true.\n\n'
-        'Formato das mensagens:\n'
-        '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
-        '- Ao solicitante: 2–4 mensagens curtas via send_assistente_message (1–3 frases). '
-        'Nunca um único bloco longo.\n'
-        '- CRÍTICO: o campo text não deve ter raciocínio, "Ok, sem chips...", "Vou passar...", '
-        '"1ª mensagem:" — isso não pode aparecer no chamado.\n\n'
-        'Procedimentos:\n'
-        '- Siga os chunks (discador, acessos, WhatsApp, etc.).\n'
-        '- Se o procedimento pedir print/números e não houver anexo, peça via mensagem.\n'
-        '- Se houver anexos de imagem/PDF, o contexto pode já trazer o texto (visão, OCR local '
-        'ou extração de PDF). Use esses dados para identificar o sistema; '
-        'NÃO diga que não conseguiu ver o print.\n'
-        '- Se a leitura falhar, NÃO peça para descrever o anexo quando título, '
-        'descrição ou categoria já deixarem o pedido claro — aja com esse texto. '
-        'Se o sistema ainda estiver ambíguo, pergunte MoneyConsig vs Discador JoyTec.\n'
-        '- TRIAGEM OBRIGATÓRIA: se Prioridade estiver "(não definida)", nesta interação '
-        'chame listar_categorias_especificas (se precisar do id) e triar_chamado '
-        'ANTES ou JUNTO das mensagens ao solicitante.\n'
-        '- WhatsApp/chip: consulte consultar_chips pelo nome do consultor; se já tiver 2 em uso, questione.\n'
-        '- Discador/JoyTec: use consultar_licencas_discador e listar_ramais_discador (FREE); '
-        'consultar_acesso_discador para achar titular; criar_acesso_discador / '
-        'liberar_acesso_discador / liberar_licenca_ramal conforme o caso. '
-        'Se no_limite/estourado e precisar de slot novo, explique e escalar_para_ti.\n'
-        '- Acesso CRM: pergunte qual sistema; use consultar_usuario para caso individual.\n'
-        '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
-        '- Hardware, AnyDesk, permissões de rede e mudanças no MoneyConsig (UI/abas/acessos): '
-        'explique que a TI interna trata e use escalar_para_ti. '
-        'Não oriente a procurar suporte externo para MoneyConsig.\n'
-        '- Só use RESOLVED se o problema foi resolvido sem TI (recusa usa recusar_chamado).\n'
+        'Responda em português, claro e profissional.\n\n'
+        'Siga SEMPRE as "Regras de negócio (obrigatórias)" e o "Aprendizado" do contexto, '
+        'além das tools disponíveis. '
+        'Não invente procedimentos fora desses chunks e do histórico do chamado.\n\n'
+        'Lembretes fixos:\n'
         '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
-        '- Não invente procedimentos fora dos chunks e do histórico.'
+        '- Use Markdown leve; ao solicitante prefira 2–4 bolhas curtas.\n'
+        '- O campo text das mensagens não deve conter raciocínio interno nem rótulos '
+        '("1ª mensagem:", "Vou verificar…").\n'
+        '- Se Prioridade estiver "(não definida)", tria com triar_chamado nesta interação.'
     )
 
 

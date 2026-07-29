@@ -258,19 +258,88 @@ def ia_delete(request, pk):
 @requer_modulo(MODULO_INTEGRACOES)
 def ia_aprendizado(request):
     """Página de aprendizado e flag do Assistente no Helpdesk."""
+    from django.core.paginator import Paginator
+    from django.db.models import Count, Q
+
     from integracoes.memoria_chat import SESSION_KEY
     from integracoes.models import AssistenteChunk, AssistenteConfig
+    from integracoes.regras_seed import garantir_chunks_regras
+
+    garantir_chunks_regras()
 
     config = AssistenteConfig.get_solo()
-    chunks = AssistenteChunk.objects.filter(ativo=True)[:50]
+    q = (request.GET.get('q') or '').strip()
+    origem = (request.GET.get('origem') or '').strip().lower()
+    categoria = (request.GET.get('categoria') or '').strip()
+    ativo_filtro = (request.GET.get('ativo') or '1').strip().lower()
+
+    qs = AssistenteChunk.objects.all()
+    if ativo_filtro in ('1', 'true', 'sim'):
+        qs = qs.filter(ativo=True)
+    elif ativo_filtro in ('0', 'false', 'nao', 'não'):
+        qs = qs.filter(ativo=False)
+    # ativo=all → sem filtro
+
+    if origem in {c.value for c in AssistenteChunk.Origem}:
+        qs = qs.filter(origem=origem)
+    if categoria:
+        qs = qs.filter(categoria_hint__icontains=categoria)
+    if q:
+        qs = qs.filter(
+            Q(titulo__icontains=q) | Q(conteudo__icontains=q) | Q(categoria_hint__icontains=q)
+        )
+
+    paginator = Paginator(qs.order_by('-atualizado_em', '-criado_em'), 20)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+
+    contagens = {
+        'total': AssistenteChunk.objects.count(),
+        'ativos': AssistenteChunk.objects.filter(ativo=True).count(),
+        'inativos': AssistenteChunk.objects.filter(ativo=False).count(),
+    }
+    por_origem = {
+        row['origem']: row['n']
+        for row in AssistenteChunk.objects.values('origem').annotate(n=Count('id'))
+    }
+
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
     chat_historico = request.session.get(SESSION_KEY) or []
     return render(request, 'integracoes/ia_aprendizado.html', {
         'config': config,
-        'chunks': chunks,
+        'chunks': page_obj,
+        'page_obj': page_obj,
+        'filtros': {
+            'q': q,
+            'origem': origem,
+            'categoria': categoria,
+            'ativo': ativo_filtro,
+        },
+        'contagens': contagens,
+        'por_origem': por_origem,
         'integracoes': integracoes,
         'chat_historico': chat_historico,
     })
+
+
+def _redirect_aprendizado(request, anchor: str = ''):
+    """Volta à lista preservando filtros GET (via next ou Referer query)."""
+    from django.urls import reverse
+    from urllib.parse import urlencode
+
+    next_url = (request.POST.get('next') or '').strip()
+    if next_url.startswith('/'):
+        return redirect(next_url + (f'#{anchor}' if anchor else ''))
+    base = reverse('integracoes:ia_aprendizado')
+    params = {}
+    for key in ('q', 'origem', 'categoria', 'ativo', 'page'):
+        val = (request.POST.get(f'filtro_{key}') or '').strip()
+        if val:
+            params[key] = val
+    qs = urlencode(params)
+    url = f'{base}?{qs}' if qs else base
+    if anchor:
+        url = f'{url}#{anchor}'
+    return redirect(url)
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -346,12 +415,11 @@ def ia_chunk_update(request, pk):
     categoria = (request.POST.get('categoria_hint') or '').strip()
     if not titulo or not conteudo:
         messages.error(request, 'Título e conteúdo são obrigatórios.')
-        return redirect('integracoes:ia_aprendizado')
+        return _redirect_aprendizado(request, anchor=f'chunk-{pk}')
     chunk.titulo = titulo[:200]
     chunk.conteudo = conteudo
     chunk.categoria_hint = categoria[:120]
-    chunk.ativo = True
-    chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint', 'ativo', 'atualizado_em'])
+    chunk.save(update_fields=['titulo', 'conteudo', 'categoria_hint', 'atualizado_em'])
     registrar_acao(
         modulo=MODULO_CORE,
         acao=RegistroAcao.AcaoChoices.UPDATED,
@@ -360,7 +428,7 @@ def ia_chunk_update(request, pk):
         metadata={'chunk_id': chunk.pk},
     )
     messages.success(request, f'Chunk "{chunk.titulo}" atualizado.')
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request, anchor=f'chunk-{pk}')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -396,6 +464,26 @@ def ia_chunk_create(request):
 
 @requer_modulo(MODULO_INTEGRACOES)
 @require_POST
+def ia_chunk_toggle_ativo(request, pk):
+    from integracoes.models import AssistenteChunk
+
+    chunk = get_object_or_404(AssistenteChunk, pk=pk)
+    chunk.ativo = not chunk.ativo
+    chunk.save(update_fields=['ativo', 'atualizado_em'])
+    estado = 'ativado' if chunk.ativo else 'desativado'
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.UPDATED,
+        descricao=f'Chunk "{chunk.titulo}" {estado}.',
+        actor=request.user,
+        metadata={'chunk_id': chunk.pk, 'ativo': chunk.ativo},
+    )
+    messages.success(request, f'Chunk "{chunk.titulo}" {estado}.')
+    return _redirect_aprendizado(request, anchor=f'chunk-{pk}')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
 def ia_chunk_delete(request, pk):
     from integracoes.models import AssistenteChunk
 
@@ -410,7 +498,7 @@ def ia_chunk_delete(request, pk):
         metadata={'chunk_id': pk},
     )
     messages.success(request, f'Chunk "{titulo}" removido.')
-    return redirect('integracoes:ia_aprendizado')
+    return _redirect_aprendizado(request)
 
 
 @requer_modulo(MODULO_INTEGRACOES)
