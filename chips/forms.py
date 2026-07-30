@@ -253,9 +253,22 @@ class ChipUpdateForm(forms.ModelForm):
         }
 
 class ChipChangeStatusForm(forms.ModelForm):
+    batch = forms.ModelChoiceField(
+        queryset=Batch.objects.all().order_by('id'),
+        required=False,
+        label='Envelope na TI (opcional)',
+        empty_label='Selecione o envelope',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+    )
+
     class Meta:
         model = Chip
-        fields = ['status']
+        fields = ['status', 'batch', 'observacao']
+        labels = {
+            'status': 'Status do Chip',
+            'observacao': 'Observação (opcional)',
+        }
         widgets = {
             'status': forms.Select(attrs={'class': SELECT_CLASS}),
+            'observacao': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 2, 'placeholder': 'Motivo ou observação...'}),
         }

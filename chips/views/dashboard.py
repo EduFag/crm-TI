@@ -113,6 +113,9 @@ class ChipsView(ModuloObrigatorioMixin, TemplateView):
 
     def _contexto_dashboard(self, context):
         from django.core.paginator import Paginator
+        from chips.services import recalcular_status_chips
+        recalcular_status_chips()
+
         context['total_chips'] = Chip.objects.filter(is_active=True).count()
         context['metric_available'] = Chip.objects.filter(
             usage_status=Chip.UsageChoices.AVAILABLE,

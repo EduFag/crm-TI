@@ -28,6 +28,17 @@
                     class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
                     Nova Recarga
                 </button>
+                <form method="post" action="{% url 'chips:recalcular_status' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit"
+                        title="Recalcular status de vencimento dos chips (> 90 dias sem recarga)"
+                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Recalcular Status
+                    </button>
+                </form>
             </div>
             <!-- Botões da aba Operadoras -->
             <div data-tab-actions="operators" class="flex gap-2 hidden">

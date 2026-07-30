@@ -32,6 +32,7 @@ urlpatterns = [
     path('return/<int:pk>/', views.ReturnChipView.as_view(), name='return_chip'),
     path('recharge/new/', views.RechargeCreateView.as_view(), name='recharge_create'),
     path('transfer/', views.ChipGeneralTransferView.as_view(), name='general_transfer'),
+    path('recalcular-status/', views.RecalcularStatusView.as_view(), name='recalcular_status'),
 
     # Rotas legadas → redirecionam para aba correspondente
     path('operators/', RedirectView.as_view(url='/chips/?tab=operators', permanent=False), name='operator_list'),

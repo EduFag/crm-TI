@@ -237,3 +237,27 @@ def _parse_data_grid(valor):
         return date.fromisoformat(texto)
     except ValueError as exc:
         raise ValidationError('Data de ativação inválida. Use AAAA-MM-DD.') from exc
+
+
+@transaction.atomic
+def recalcular_status_chips():
+    """
+    Verifica chips ativos no sistema.
+    Se a recarga excedeu 90 dias (ciclo status == 'overdue'),
+    altera o status do chip para CANCELED (Cancelado).
+    """
+    from chips.queries import _calcular_ciclo
+    chips = chips_com_anotacoes_operacionais(
+        Chip.objects.filter(is_active=True).exclude(
+            status__in=[Chip.StatusChoices.CANCELED, Chip.StatusChoices.BANNED]
+        )
+    )
+    cancelados_count = 0
+    for chip in chips:
+        _, _, cycle_status = _calcular_ciclo(chip)
+        if cycle_status == 'overdue':
+            chip.status = Chip.StatusChoices.CANCELED
+            chip.save()
+            cancelados_count += 1
+    return cancelados_count
+

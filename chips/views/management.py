@@ -216,3 +216,28 @@ def batch_delete_view(request, pk):
     batch.delete()
     messages.success(request, f'Envelope "{nome_str}" excluído com sucesso.')
     return redirect('/chips/?tab=envelopes')
+
+
+from django.views import View
+
+class RecalcularStatusView(_ChipsMixin, View):
+    """View para recalcular manualmente o status de vencimento dos chips."""
+
+    def post(self, request, *args, **kwargs):
+        from chips.services import recalcular_status_chips
+        cancelados = recalcular_status_chips()
+        if cancelados > 0:
+            messages.success(
+                request,
+                f'Status recalculado com sucesso! {cancelados} chip(s) com mais de 90 dias sem recarga foi/foram alterados para Cancelado.'
+            )
+        else:
+            messages.info(
+                request,
+                'Status recalculado com sucesso! Nenhum chip com recarga vencida foi encontrado.'
+            )
+        return redirect('/chips/?tab=chips')
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
+

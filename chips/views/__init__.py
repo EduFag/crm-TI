@@ -9,6 +9,7 @@ from .management import (
     ChipChangeStatusView,
     ChipGeneralTransferView,
     batch_delete_view,
+    RecalcularStatusView,
 )
 from .assignments import ReturnChipView
 from .recharges import RechargeCreateView

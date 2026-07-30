@@ -71,6 +71,8 @@ def _calcular_ciclo(chip):
         cycle_start = _para_data(chip.last_recharge_at)
     elif chip.activated_at:
         cycle_start = chip.activated_at
+    elif hasattr(chip, 'created_at') and chip.created_at:
+        cycle_start = _para_data(chip.created_at)
 
     if not cycle_start:
         return None, None, 'ok'
