@@ -63,6 +63,7 @@ class ChipGridCreateView(_JsonChipsMixin, View):
                 operator=cleaned['operator'],
                 employee_name=cleaned.get('employee_name') or '',
                 employee_user=cleaned.get('employee_user'),
+                employee_operador=cleaned.get('employee_operador'),
                 activated_at=cleaned.get('activated_at'),
                 batch=cleaned.get('batch'),
                 observacao=cleaned.get('observacao') or '',
@@ -113,6 +114,7 @@ class ChipTransferView(_JsonChipsMixin, View):
                     chip,
                     employee_name=form.cleaned_data['employee_name'],
                     employee_user=form.cleaned_data.get('employee_user'),
+                    employee_operador=form.cleaned_data.get('employee_operador'),
                     actor=request.user,
                 )
             else:
@@ -120,7 +122,9 @@ class ChipTransferView(_JsonChipsMixin, View):
                     chip,
                     novo_nome=form.cleaned_data['employee_name'],
                     novo_user=form.cleaned_data.get('employee_user'),
+                    novo_operador=form.cleaned_data.get('employee_operador'),
                     actor=request.user,
+                    preserve_movement=form.cleaned_data.get('preserve_movement', False),
                 )
         except ValidationError as exc:
             return JsonResponse({'error': str(exc)}, status=400)

@@ -163,6 +163,14 @@ class ChipMovement(models.Model):
         related_name='chip_movements',
         help_text='Usuário do sistema vinculado ao titular.',
     )
+    employee_operador = models.ForeignKey(
+        'operadores.Operador',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='chip_movements',
+        help_text='Operador do módulo de callcenter vinculado ao titular.',
+    )
     action = models.CharField(max_length=20, choices=ActionChoices.choices)
     timestamp = models.DateTimeField(auto_now_add=True)
     registered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='chip_movements_registered')

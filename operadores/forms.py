@@ -43,6 +43,15 @@ class PAForm(forms.ModelForm):
             'ilha': 'Ilha',
         }
 
+INPUT_CLASS = (
+    'w-full text-sm p-2.5 border border-slate-300 rounded-lg '
+    'focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50'
+)
+SELECT_CLASS = (
+    'w-full text-sm p-2.5 border border-slate-300 rounded-lg '
+    'focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50'
+)
+
 class IlhaForm(forms.ModelForm):
     class Meta:
         model = Ilha
@@ -50,6 +59,10 @@ class IlhaForm(forms.ModelForm):
         labels = {
             'name': 'Nome da Ilha',
             'setor': 'Setor / Equipe',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'setor': forms.Select(attrs={'class': SELECT_CLASS}),
         }
 
 class OperadorForm(forms.ModelForm):
@@ -81,10 +94,30 @@ class WhatsAppAccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = Chip.objects.filter(is_active=True, usage_status=Chip.UsageChoices.AVAILABLE)
-        if self.instance and self.instance.pk and self.instance.chip:
-            queryset = queryset | Chip.objects.filter(pk=self.instance.chip.pk)
-        self.fields['chip'].queryset = queryset.order_by('line_number')
+        operador_id = self.initial.get('operador') or (self.data.get('operador') if self.is_bound else None)
+        if self.instance and self.instance.pk and self.instance.operador_id:
+            operador_id = self.instance.operador_id
+
+        from django.db.models import Q, OuterRef, Subquery
+        from chips.models import ChipMovement
+
+        ultima_mov = ChipMovement.objects.filter(
+            chip=OuterRef('pk'),
+            action__in=[ChipMovement.ActionChoices.DELIVERY, ChipMovement.ActionChoices.TRANSFER]
+        ).order_by('-timestamp')
+
+        qs = Chip.objects.filter(is_active=True).annotate(
+            current_operador_id=Subquery(ultima_mov.values('employee_operador_id')[:1])
+        )
+
+        q_filter = Q(usage_status=Chip.UsageChoices.AVAILABLE)
+        if operador_id:
+            q_filter |= Q(current_operador_id=operador_id)
+
+        if self.instance and self.instance.pk and self.instance.chip_id:
+            q_filter |= Q(pk=self.instance.chip_id)
+
+        self.fields['chip'].queryset = qs.filter(q_filter).distinct().order_by('line_number')
         self.fields['chip'].required = True
 
     def clean(self):

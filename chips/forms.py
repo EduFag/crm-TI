@@ -3,6 +3,7 @@ from django import forms
 from core.models import CustomUser
 from chips.models import Batch, Chip, Operator
 from emails.models import EmailAccount, EmailDomain
+from operadores.models import Operador
 
 
 INPUT_CLASS = (
@@ -24,11 +25,13 @@ class TipoTitularFormMixin(forms.Form):
 
     TIPO_TEXTO = 'texto'
     TIPO_USUARIO = 'usuario'
+    TIPO_OPERADOR = 'operador'
 
     tipo_titular = forms.ChoiceField(
         choices=[
             (TIPO_TEXTO, 'Nome livre'),
             (TIPO_USUARIO, 'Usuário do sistema'),
+            (TIPO_OPERADOR, 'Operador'),
         ],
         initial=TIPO_TEXTO,
         widget=forms.RadioSelect,
@@ -52,25 +55,39 @@ class TipoTitularFormMixin(forms.Form):
         empty_label='Selecione um usuário',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
+    employee_operador = forms.ModelChoiceField(
+        queryset=Operador.objects.all().order_by('name'),
+        required=False,
+        label='Operador titular',
+        empty_label='Selecione um operador',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+    )
 
     def clean_titular(self):
-        """Retorna (employee_name, employee_user) validados."""
+        """Retorna (employee_name, employee_user, employee_operador) validados."""
         cleaned = self.cleaned_data
         tipo = cleaned.get('tipo_titular', self.TIPO_TEXTO)
         employee_name = (cleaned.get('employee_name') or '').strip()
         employee_user = cleaned.get('employee_user')
+        employee_operador = cleaned.get('employee_operador')
 
         if tipo == self.TIPO_USUARIO:
             if not employee_user:
                 self.add_error('employee_user', 'Selecione um usuário do sistema.')
-                return None, None
+                return None, None, None
             nome = employee_user.get_full_name() or employee_user.username
-            return nome, employee_user
+            return nome, employee_user, None
+
+        if tipo == self.TIPO_OPERADOR:
+            if not employee_operador:
+                self.add_error('employee_operador', 'Selecione um operador.')
+                return None, None, None
+            return employee_operador.name, None, employee_operador
 
         if not employee_name:
             self.add_error('employee_name', 'Informe o nome do titular.')
-            return None, None
-        return employee_name, None
+            return None, None, None
+        return employee_name, None, None
 
 
 class AssignmentForm(TipoTitularFormMixin):
@@ -80,22 +97,30 @@ class AssignmentForm(TipoTitularFormMixin):
         cleaned = super().clean()
         if self.errors:
             return cleaned
-        nome, usuario = self.clean_titular()
+        nome, usuario, operador = self.clean_titular()
         if nome:
             cleaned['employee_name'] = nome
             cleaned['employee_user'] = usuario
+            cleaned['employee_operador'] = operador
         return cleaned
 
 
 class TransferForm(TipoTitularFormMixin):
+    preserve_movement = forms.BooleanField(
+        required=False,
+        label='Não alterar última movimentação',
+        help_text='Atualiza o titular atual sem alterar a data da última movimentação.',
+    )
+
     def clean(self):
         cleaned = super().clean()
         if self.errors:
             return cleaned
-        nome, usuario = self.clean_titular()
+        nome, usuario, operador = self.clean_titular()
         if nome:
             cleaned['employee_name'] = nome
             cleaned['employee_user'] = usuario
+            cleaned['employee_operador'] = operador
         return cleaned
 
 
@@ -109,14 +134,21 @@ class GeneralTransferForm(TipoTitularFormMixin):
         widget=forms.Select(attrs={'class': SELECT_CLASS})
     )
 
+    preserve_movement = forms.BooleanField(
+        required=False,
+        label='Não alterar última movimentação',
+        help_text='Atualiza o titular atual sem alterar a data da última movimentação.',
+    )
+
     def clean(self):
         cleaned = super().clean()
         if self.errors:
             return cleaned
-        nome, usuario = self.clean_titular()
+        nome, usuario, operador = self.clean_titular()
         if nome:
             cleaned['employee_name'] = nome
             cleaned['employee_user'] = usuario
+            cleaned['employee_operador'] = operador
         return cleaned
 
 
@@ -151,6 +183,7 @@ class ChipGridCreateForm(forms.Form):
         choices=[
             (TipoTitularFormMixin.TIPO_TEXTO, 'Nome livre'),
             (TipoTitularFormMixin.TIPO_USUARIO, 'Usuário do sistema'),
+            (TipoTitularFormMixin.TIPO_OPERADOR, 'Operador'),
         ],
         initial=TipoTitularFormMixin.TIPO_TEXTO,
         required=False,
@@ -173,6 +206,13 @@ class ChipGridCreateForm(forms.Form):
         required=False,
         label='Usuário titular',
         empty_label='Selecione um usuário',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+    )
+    employee_operador = forms.ModelChoiceField(
+        queryset=Operador.objects.all().order_by('name'),
+        required=False,
+        label='Operador titular',
+        empty_label='Selecione um operador',
         widget=forms.Select(attrs={'class': SELECT_CLASS}),
     )
     activated_at = forms.DateField(
@@ -211,10 +251,15 @@ class ChipGridCreateForm(forms.Form):
         # Se houver nome/usuario preenchido, consideramos "Em Uso", senão é para a TI.
         nome = cleaned.get('employee_name')
         usuario = cleaned.get('employee_user')
+        operador = cleaned.get('employee_operador')
 
         # Se for tipo usuario, preenche o nome com base no usuario
         if tipo_titular == TipoTitularFormMixin.TIPO_USUARIO and usuario:
             cleaned['employee_name'] = usuario.get_full_name() or usuario.username
+            nome = cleaned['employee_name']
+            
+        if tipo_titular == TipoTitularFormMixin.TIPO_OPERADOR and operador:
+            cleaned['employee_name'] = operador.name
             nome = cleaned['employee_name']
 
         # Se houver nome/usuario preenchido, não precisa de envelope.
@@ -228,6 +273,8 @@ class ChipGridCreateForm(forms.Form):
                 del self.errors['employee_name']
             if 'employee_user' in self.errors:
                 del self.errors['employee_user']
+            if 'employee_operador' in self.errors:
+                del self.errors['employee_operador']
 
         return cleaned
 

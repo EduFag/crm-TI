@@ -188,6 +188,7 @@ class ChipGeneralTransferView(ChipsModalMixin, _ChipsMixin, FormView):
         chip = form.cleaned_data['chip']
         nome = form.cleaned_data['employee_name']
         usuario = form.cleaned_data.get('employee_user')
+        operador = form.cleaned_data.get('employee_operador')
 
         from chips.services import entregar_chip
         from django.core.exceptions import ValidationError
@@ -196,6 +197,7 @@ class ChipGeneralTransferView(ChipsModalMixin, _ChipsMixin, FormView):
                 chip,
                 employee_name=nome,
                 employee_user=usuario,
+                employee_operador=operador,
                 actor=self.request.user,
             )
         except ValidationError as exc:

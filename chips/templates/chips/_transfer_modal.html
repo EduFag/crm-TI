@@ -25,6 +25,21 @@
                 <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Usuário do sistema</label>
                 {{ form.employee_user }}
             </div>
+            
+            <div id="campo-titular-operador" class="hidden">
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Operador</label>
+                {{ form.employee_operador }}
+            </div>
+            
+            <div class="mt-4 flex items-center gap-2">
+                {{ form.preserve_movement }}
+                <label for="{{ form.preserve_movement.id_for_label }}" class="text-sm font-semibold text-slate-700 cursor-pointer">
+                    {{ form.preserve_movement.label }}
+                </label>
+            </div>
+            {% if form.preserve_movement.help_text %}
+            <p class="text-xs text-slate-500">{{ form.preserve_movement.help_text }}</p>
+            {% endif %}
             <div class="flex gap-2 pt-2">
                 <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''"
                         class="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">
@@ -41,14 +56,17 @@
 <script>
 (function() {
     var chipId = {{ chip.id }};
-    var tipoUsuario = document.querySelector('input[name="tipo_titular"][value="usuario"]');
     var campoTexto = document.getElementById('campo-titular-texto');
     var campoUsuario = document.getElementById('campo-titular-usuario');
+    var campoOperador = document.getElementById('campo-titular-operador');
 
     function toggleTitular() {
-        var usarUsuario = tipoUsuario && tipoUsuario.checked;
-        if (campoTexto) campoTexto.classList.toggle('hidden', usarUsuario);
-        if (campoUsuario) campoUsuario.classList.toggle('hidden', !usarUsuario);
+        var tipo = document.querySelector('input[name="tipo_titular"]:checked');
+        if (!tipo) return;
+        var valor = tipo.value;
+        if (campoTexto) campoTexto.classList.toggle('hidden', valor !== 'texto');
+        if (campoUsuario) campoUsuario.classList.toggle('hidden', valor !== 'usuario');
+        if (campoOperador) campoOperador.classList.toggle('hidden', valor !== 'operador');
     }
     document.querySelectorAll('input[name="tipo_titular"]').forEach(function(r) {
         r.addEventListener('change', toggleTitular);

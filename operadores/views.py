@@ -265,6 +265,19 @@ class PAUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
         messages.success(self.request, "PA atualizada com sucesso!")
         return self.htmx_redirect_response()
 
+class IlhaUpdateView(HtmxModalMixin, ModuloObrigatorioMixin, UpdateView):
+    modulo_obrigatorio = MODULO_OPERADORES
+    model = Ilha
+    form_class = IlhaForm
+    modal_title = 'Editar Ilha'
+    modal_submit_label = 'Salvar Alterações'
+    list_url_name = 'operadores:dashboard'
+
+    def form_valid(self, form):
+        self.object = form.save()
+        messages.success(self.request, f"Ilha '{self.object.name}' atualizada com sucesso!")
+        return self.htmx_redirect_response()
+
 class PADeleteView(ModuloObrigatorioMixin, View):
     modulo_obrigatorio = MODULO_OPERADORES
 

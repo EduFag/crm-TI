@@ -32,6 +32,7 @@ def entregar_chip(
     *,
     employee_name,
     employee_user=None,
+    employee_operador=None,
     actor,
     activated_at=None,
 ):
@@ -50,6 +51,7 @@ def entregar_chip(
         chip=chip,
         employee_name=employee_name,
         employee_user=employee_user,
+        employee_operador=employee_operador,
         action=ChipMovement.ActionChoices.DELIVERY,
         registered_by=actor,
     )
@@ -58,21 +60,31 @@ def entregar_chip(
 
 
 @transaction.atomic
-def transferir_chip(chip, *, novo_nome, novo_user=None, actor):
+def transferir_chip(chip, *, novo_nome, novo_user=None, novo_operador=None, actor, preserve_movement=False):
     """Transfere posse sem alterar activated_at nem ciclo de recarga."""
     if chip.usage_status != Chip.UsageChoices.IN_USE:
         raise ValidationError('Somente chips em uso podem ser transferidos.')
 
     anterior = _titular_atual(chip)
     nome_anterior = anterior.employee_name if anterior else 'Desconhecido'
-
-    ChipMovement.objects.create(
-        chip=chip,
-        employee_name=novo_nome,
-        employee_user=novo_user,
-        action=ChipMovement.ActionChoices.TRANSFER,
-        registered_by=actor,
-    )
+    
+    if preserve_movement and anterior:
+        anterior.employee_name = novo_nome
+        anterior.employee_user = novo_user
+        anterior.employee_operador = novo_operador
+        # Opcional: atualizar quem registrou a mudança?
+        # anterior.registered_by = actor
+        anterior.save(update_fields=['employee_name', 'employee_user', 'employee_operador'])
+    else:
+        ChipMovement.objects.create(
+            chip=chip,
+            employee_name=novo_nome,
+            employee_user=novo_user,
+            employee_operador=novo_operador,
+            action=ChipMovement.ActionChoices.TRANSFER,
+            registered_by=actor,
+        )
+        
     log_transferencia(chip, nome_anterior, novo_nome, actor)
     return _chip_grid(chip.pk)
 
@@ -128,6 +140,7 @@ def criar_chip_operacional(
     operator,
     employee_name='',
     employee_user=None,
+    employee_operador=None,
     activated_at=None,
     batch=None,
     observacao='',
@@ -154,6 +167,7 @@ def criar_chip_operacional(
             chip=chip,
             employee_name=employee_name,
             employee_user=employee_user,
+            employee_operador=employee_operador,
             action=ChipMovement.ActionChoices.DELIVERY,
             registered_by=actor,
         )
