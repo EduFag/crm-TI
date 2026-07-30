@@ -58,5 +58,12 @@ urlpatterns = [
         name='comment_delete',
     ),
     path('api/clipboard-image/', views.fetch_clipboard_image, name='fetch_clipboard_image'),
+    
+    # Central Informativa
+    path('informative/', views.informative_center, name='informative_center'),
+    path('informative/list/', views.informative_list, name='informative_list'),
+    path('informative/create/', views.informative_create, name='informative_create'),
+    path('informative/<int:message_id>/acknowledge/', views.informative_acknowledge, name='informative_acknowledge'),
+
     path('api/mention-users/', views.mention_users_search, name='mention_users_search'),
 ]

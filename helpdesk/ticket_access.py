@@ -327,3 +327,34 @@ def usuario_pode_ver_quem_abriu_chamado(user, ticket) -> bool:
     if ticket.requester_user_id is None and ticket.created_by_id is None:
         return True
     return False
+
+
+def filtrar_mensagens_informativas(user):
+    """
+    Filtro de mensagens da Central Informativa.
+    - Operadores TI veem tudo.
+    - Se o usuário não é TI, vê mensagens da TI + mensagens da própria equipe + próprias.
+    """
+    from helpdesk.models import InformativeMessage
+    
+    qs = InformativeMessage.objects.all()
+    
+    if usuario_eh_operador_helpdesk(user):
+        return qs
+        
+    role = _role(user)
+    
+    # Todos veem mensagens criadas por operadores TI (ADMIN, IT_USER, superuser)
+    q_ti = Q(created_by__role__in=[CustomUser.RoleChoices.ADMIN, CustomUser.RoleChoices.IT_USER]) | Q(created_by__is_superuser=True)
+    
+    # Se o usuário não é TI, aplica visibilidade restrita para mensagens não-TI
+    if role in (CustomUser.RoleChoices.TEAM_LEADER, CustomUser.RoleChoices.SUPERVISOR):
+        equipes_user = user.equipes.all()
+        q_equipe = Q(created_by__equipes__in=equipes_user)
+        q_propria = Q(created_by=user)
+        filtro_usuario = q_equipe | q_propria
+    else:
+        filtro_usuario = Q(created_by=user)
+        
+    ids = qs.filter(q_ti | filtro_usuario).values_list('pk', flat=True).distinct()
+    return qs.filter(pk__in=ids)

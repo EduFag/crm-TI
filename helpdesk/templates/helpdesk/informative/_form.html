@@ -1,0 +1,20 @@
+<div class="p-4 bg-white border-t border-slate-200">
+    <form hx-post="{% url 'helpdesk:informative_create' %}"
+          hx-target="#informative-chat-messages"
+          class="flex items-end gap-2"
+          onsubmit="setTimeout(() => { this.reset(); this.querySelector('textarea').style.height='auto'; }, 50)">
+        <textarea name="text" 
+                  rows="1"
+                  class="flex-1 resize-none bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder:text-slate-400"
+                  placeholder="Digite um recado informativo..."
+                  required
+                  oninput="this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
+        <button type="submit" 
+                class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition-colors shadow-sm mb-0.5 flex-shrink-0"
+                title="Enviar">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            </svg>
+        </button>
+    </form>
+</div>

@@ -505,3 +505,31 @@ class TicketMention(models.Model):
 
     def __str__(self):
         return f'@{self.user.username} em chamado #{self.ticket_id}'
+
+
+class InformativeMessage(models.Model):
+    """
+    Mensagens informativas trocadas no chat 'Central Informativa'.
+    """
+    text = models.TextField(help_text='Conteúdo da mensagem.')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='informative_messages',
+        help_text='Usuário que enviou a mensagem.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='acknowledged_info_msgs',
+        blank=True,
+        help_text='Usuários que deram OK na mensagem.',
+    )
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'mensagem informativa'
+        verbose_name_plural = 'mensagens informativas'
+
+    def __str__(self):
+        return f'Info by {self.created_by.username} at {self.created_at}'
