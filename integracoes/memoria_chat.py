@@ -32,7 +32,9 @@ MEMORIA_TOOLS = [
             'name': 'gravar_memoria',
             'description': (
                 'Grava um novo conhecimento permanente (chunk). '
-                'Use quando o usuário pedir para lembrar, gravar na memória ou ensinar um procedimento.'
+                'Use quando o usuário pedir para lembrar, gravar na memória ou ensinar um procedimento. '
+                'O conteudo deve respeitar as limitações de tools do Assistente '
+                '(não gravar "criar chip" — use escalar/mensagem interna à TI).'
             ),
             'parameters': {
                 'type': 'object',
@@ -189,6 +191,8 @@ def _system_prompt() -> str:
     for c in AssistenteChunk.objects.filter(ativo=True)[:40]:
         resumo.append(f'- #{c.pk} [{c.origem}] [{c.categoria_hint or "-"}] {c.titulo}')
     lista = '\n'.join(resumo) or '(nenhuma memória ainda)'
+    from integracoes.assistente_limites import prompt_limitacoes_aprendizado
+
     return (
         'Você é o tutor de aprendizado do Assistente de TI da empresa. '
         'A TI conversa com você para corrigir e enriquecer a memória (chunks) usada no Helpdesk. '
@@ -196,9 +200,12 @@ def _system_prompt() -> str:
         'esquecer algo, use as tools gravar_memoria / atualizar_memoria / remover_memoria. '
         'remover_memoria apenas desativa o chunk (não apaga). '
         'Antes de atualizar/remover, use listar_memorias se precisar do id. '
+        'Ao gravar/atualizar, NÃO ensine ações que o Assistente não consegue executar '
+        '(ex.: criar chip); reformule para consulta/status + escalar/mensagem interna. '
         'Responda sempre em português, de forma objetiva e legível. '
         'Use Markdown leve (negrito com **, listas numeradas) só quando ajudar a leitura. '
         'Confirme o que foi gravado.\n\n'
+        f'{prompt_limitacoes_aprendizado()}\n\n'
         f'Memórias atuais:\n{lista}'
     )
 
@@ -341,11 +348,18 @@ def aprender_de_orientacao(ticket, texto_dica: str, autor=None) -> dict:
         comps.append(f'- {autor_txt}{marca}: {(c.text or "")[:350]}')
     comps.reverse()
 
+    from integracoes.assistente_limites import prompt_limitacoes_aprendizado
+
     prompt = (
         'A TI orientou o Assistente de helpdesk neste chamado. '
         'Gere UM objeto JSON com chaves: titulo, conteudo, categoria_hint, tags (lista). '
         'O chunk deve capturar o procedimento/correção para próximos chamados semelhantes. '
-        'conteudo máx. 1000 caracteres. Responda SOMENTE o JSON.\n\n'
+        'Adapte a orientação às limitações de tools do Assistente: se a TI pediu algo '
+        'que a IA não executa (ex.: criar/entregar chip), grave o que a IA deve fazer '
+        '(consultar/atualizar + mensagem interna + escalar). '
+        'conteudo máx. 1000 caracteres.\n\n'
+        f'{prompt_limitacoes_aprendizado()}\n\n'
+        'Responda SOMENTE o JSON.\n\n'
         f'Chamado #{ticket.pk}: {ticket.title}\n'
         f'Descrição: {(ticket.description or "")[:500]}\n'
         f'Orientação da TI: {dica}\n'
@@ -355,7 +369,10 @@ def aprender_de_orientacao(ticket, texto_dica: str, autor=None) -> dict:
         raw = chat_text([
             {
                 'role': 'system',
-                'content': 'Você extrai aprendizado operacional de TI. Responda só JSON válido.',
+                'content': (
+                    'Você extrai aprendizado operacional de TI para o Assistente automático. '
+                    'Nunca ensine ações fora das tools disponíveis. Responda só JSON válido.'
+                ),
             },
             {'role': 'user', 'content': prompt},
         ], temperature=0.2)

@@ -240,8 +240,9 @@ TOOLS_SPEC = [
         'function': {
             'name': 'consultar_chips',
             'description': (
-                'Consulta chips WhatsApp por nome do consultor ou número da linha. '
-                'Use antes de orientar ativação de chip novo (verificar quantos já tem).'
+                'Consulta chips WhatsApp por nome do consultor ou número da linha '
+                '(quantos em uso, status). NÃO cria nem registra chip novo — '
+                'entrega/troca de chip é ação humana da TI (mensagem interna + escalar).'
             ),
             'parameters': {
                 'type': 'object',
@@ -756,6 +757,8 @@ def _system_prompt() -> str:
         '- Se Prioridade estiver "(não definida)", tria com triar_chamado nesta interação.\n'
         '- Discador JoyTec: só inventário local (consulta). Não cria/libera acesso; '
         'oriente a TI com send_assistente_message interno=true.\n'
+        '- Chips WhatsApp: só consultar e atualizar status/obs. Não cria chip novo '
+        'nem entrega chip reserva — use mensagem interna + escalar_para_ti.\n'
         '- MoneyConsig: sistema interno; sem API — use escalar_para_ti.'
     )
 
@@ -1229,6 +1232,8 @@ def gerar_chunks_aprendizado(
             f' Período: {data_inicio or "…"} a {data_fim or "…"}.'
         )
 
+    from integracoes.assistente_limites import prompt_limitacoes_aprendizado
+
     prompt = (
         'Com base nos chamados de helpdesk abaixo (já finalizados pela TI real), '
         'gere um JSON array de objetos com chaves: titulo, conteudo, categoria_hint, '
@@ -1237,11 +1242,24 @@ def gerar_chunks_aprendizado(
         'Priorize padrões das notas [INTERNO TI] (como a TI resolveu). '
         'Cada item é um "chunk" de aprendizado (tom de resposta, padrões, o que perguntar, '
         'quando escalar). Gere entre 5 e 12 chunks. '
-        f'conteudo com no máximo 1200 caracteres.{periodo_txt} Responda SOMENTE o JSON.\n\n'
+        'IMPORTANTE: os chunks serão usados pelo Assistente automático — '
+        'escreva só ações compatíveis com as limitações abaixo; se a TI humana '
+        'fez algo que a IA não pode (ex.: criar/entregar chip), ensine a IA a '
+        'consultar/atualizar o que puder e escalar/avisar a TI para o resto. '
+        f'conteudo com no máximo 1200 caracteres.{periodo_txt}\n\n'
+        f'{prompt_limitacoes_aprendizado()}\n\n'
+        'Responda SOMENTE o JSON.\n\n'
         + '\n\n---\n\n'.join(blocos)
     )
     raw = chat_text([
-        {'role': 'system', 'content': 'Você extrai padrões de atendimento de TI. Responda só JSON válido.'},
+        {
+            'role': 'system',
+            'content': (
+                'Você extrai padrões de atendimento de TI para o Assistente automático. '
+                'Nunca ensine ações fora das tools disponíveis (ex.: criar chip). '
+                'Responda só JSON válido.'
+            ),
+        },
         {'role': 'user', 'content': prompt},
     ], temperature=0.3)
 
