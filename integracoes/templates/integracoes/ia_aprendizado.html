@@ -30,18 +30,14 @@
     border-color: #0f172a;
     color: #0f172a;
 }
-/* Drawer memória (mobile) — estados via .is-open */
-#memoria-drawer-overlay.is-open {
+#memoria-modal-overlay.is-open {
     opacity: 1;
     pointer-events: auto;
 }
-#memoria-chat-panel.is-open {
-    transform: translateX(0);
-}
-@media (min-width: 1024px) {
-    #memoria-chat-panel {
-        transform: none !important;
-    }
+#memoria-modal.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
 }
 </style>
 
@@ -66,14 +62,10 @@
                 Assistente inativo
             </span>
             {% endif %}
-            <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
-                  onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
-                {% csrf_token %}
-                <button type="submit"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
-                    Gerar aprendizado
-                </button>
-            </form>
+            <a href="?tab=config#reanalisar"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                Reanalisar período
+            </a>
         </div>
     </div>
 
@@ -134,9 +126,8 @@
         </a>
     </div>
 
-    {# Workspace: split lg+ / drawer no mobile #}
-    <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-4 lg:h-[calc(100vh-12rem)] lg:min-h-[480px] lg:items-stretch">
-        <div class="min-w-0 flex flex-col gap-4 lg:overflow-y-auto lg:pr-1 lg:pb-2">
+    {# Conteúdo full-width (chat é modal flutuante) #}
+    <div class="min-w-0 flex flex-col gap-4">
 
             {% if tab == 'chunks' %}
             {# Aba Chunks #}
@@ -471,18 +462,36 @@
                 {% endif %}
             </form>
 
-            <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-3">
-                <h3 class="text-base font-bold text-slate-900">Geração e embeddings</h3>
+            <div id="reanalisar" class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
+                <h3 class="text-base font-bold text-slate-900">Reanalisar período</h3>
                 <p class="text-sm text-slate-500">
-                    Gerar analisa chamados resolvidos e substitui só chunks da IA (manuais/chat preservados).
-                    Use o botão no topo da página ou abaixo.
+                    Analisa chamados resolvidos/arquivados no intervalo e substitui só chunks gerados pela IA
+                    (manuais e do chat são preservados).
                 </p>
-                <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}"
-                      onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Gerando…';">
+                <form method="post" action="{% url 'integracoes:ia_aprendizado_gerar' %}" class="space-y-3"
+                      onsubmit="var b=this.querySelector('[type=submit]'); b.disabled=true; b.textContent='Gerando…';">
                     {% csrf_token %}
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Data início</label>
+                            <input type="date" name="data_inicio"
+                                   class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Data fim</label>
+                            <input type="date" name="data_fim"
+                                   class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Limite de chamados</label>
+                            <input type="number" name="limite" value="30" min="1" max="80"
+                                   class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Deixe as datas vazias para usar os últimos N chamados.</p>
                     <button type="submit"
                             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
-                        Gerar aprendizado com a IA
+                        Reanalisar com a IA
                     </button>
                 </form>
                 {% if embeddings_disponivel %}
@@ -504,77 +513,101 @@
             {% endif %}
         </div>
 
-        {# Overlay mobile do drawer #}
-        <div id="memoria-drawer-overlay"
-             class="fixed inset-0 z-30 bg-slate-900/40 opacity-0 pointer-events-none transition-opacity duration-200 lg:hidden"
-             aria-hidden="true"></div>
+    {# Overlay + modal flutuante de memória #}
+    <div id="memoria-modal-overlay"
+         class="fixed inset-0 z-40 bg-slate-900/30 opacity-0 pointer-events-none transition-opacity duration-200"
+         aria-hidden="true"></div>
 
-        {# Chat memória: coluna no desktop, drawer no mobile #}
-        <aside id="memoria-chat-panel"
-               class="fixed inset-y-0 right-0 z-40 w-full max-w-md flex flex-col bg-white border-l border-slate-200 shadow-xl
-                      translate-x-full transition-transform duration-200 ease-out
-                      lg:static lg:z-auto lg:max-w-none lg:w-auto lg:translate-x-0 lg:shadow-sm lg:border lg:border-slate-200 lg:rounded-xl
-                      lg:h-full lg:min-h-0">
-            <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
-                <div class="min-w-0">
-                    <h3 class="text-sm font-bold text-slate-900">Chat · Grave na memória</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Lembrar, corrigir ou esquecer procedimentos.</p>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" id="memoria-chat-limpar"
-                            class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-white">
-                        Limpar
-                    </button>
-                    <button type="button" id="memoria-drawer-fechar"
-                            class="lg:hidden text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg p-1.5"
-                            aria-label="Fechar chat">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+    <div id="memoria-modal"
+         class="fixed z-50 bottom-24 right-5 w-[min(100vw-1.5rem,420px)] h-[min(70vh,560px)]
+                flex flex-col bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden
+                opacity-0 pointer-events-none scale-95 translate-y-2 transition-all duration-200 origin-bottom-right"
+         role="dialog" aria-modal="true" aria-labelledby="memoria-modal-title">
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+            <div class="min-w-0">
+                <h3 id="memoria-modal-title" class="text-sm font-bold text-slate-900">Memória</h3>
+                <p class="text-[11px] text-slate-500 truncate" id="memoria-modal-subtitulo">Grave, corrija ou esqueça procedimentos</p>
             </div>
-            <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 min-h-0">
-                {% for msg in chat_historico %}
-                <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-                    {% if msg.role == 'user' %}
-                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md">{{ msg.content }}</div>
-                    {% else %}
-                    <div class="max-w-[90%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md">{{ msg.content|markdown_leve }}</div>
-                    {% endif %}
-                </div>
-                {% empty %}
-                <div class="text-center text-sm text-slate-400 py-8 px-4">
-                    Exemplos:<br>
-                    “Grave na memória: em problema de discador, sempre pedir print da campanha.”<br>
-                    “Corrija o chunk de blacklist: Joytec não tem blacklist manual.”
-                </div>
-                {% endfor %}
-            </div>
-            <form id="memoria-chat-form" class="p-4 border-t border-slate-100 shrink-0 space-y-2">
-                {% csrf_token %}
-                <textarea id="memoria-chat-input" rows="3" required
-                          placeholder="Ex.: Grave na memória que..."
-                          class="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
-                <button type="submit" id="memoria-chat-enviar"
-                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
-                    Enviar
+            <div class="flex items-center gap-1 shrink-0">
+                <button type="button" id="memoria-conversa-nova"
+                        class="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg">
+                    Nova
                 </button>
-                <p id="memoria-chat-status" class="text-xs text-slate-400 text-center hidden"></p>
-            </form>
-        </aside>
+                <button type="button" id="memoria-modal-fechar"
+                        class="text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg p-1.5" aria-label="Fechar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="flex flex-1 min-h-0">
+            <aside class="w-[132px] border-r border-slate-100 bg-slate-50/80 overflow-y-auto shrink-0">
+                <p class="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Histórico</p>
+                <ul id="memoria-conversas-lista" class="px-1.5 pb-2 space-y-0.5">
+                    {% for c in conversas_memoria %}
+                    <li>
+                        <button type="button"
+                                data-conversa-id="{{ c.id }}"
+                                class="memoria-conv-btn w-full text-left text-[11px] px-2 py-1.5 rounded-lg truncate
+                                       {% if conversa_ativa_id == c.id %}bg-blue-100 text-blue-900 font-semibold{% else %}text-slate-600 hover:bg-white{% endif %}">
+                            {{ c.titulo }}
+                        </button>
+                    </li>
+                    {% empty %}
+                    <li class="px-2 py-3 text-[11px] text-slate-400">Nenhuma conversa ainda.</li>
+                    {% endfor %}
+                </ul>
+            </aside>
+            <div class="flex-1 flex flex-col min-w-0 min-h-0">
+                <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-white">
+                    {% for msg in chat_historico %}
+                    <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+                        {% if msg.role == 'user' %}
+                        <div class="max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md">{{ msg.content }}</div>
+                        {% else %}
+                        <div class="max-w-[92%] rounded-2xl px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-xs">{{ msg.content|markdown_leve }}</div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-xs text-slate-400 py-8 px-3">
+                        Exemplos:<br>
+                        “Grave: em discador, pedir print da campanha.”<br>
+                        “Corrija o chunk de blacklist…”
+                    </div>
+                    {% endfor %}
+                </div>
+                <form id="memoria-chat-form" class="p-3 border-t border-slate-100 shrink-0 space-y-2 bg-slate-50/50">
+                    {% csrf_token %}
+                    <input type="hidden" id="memoria-conversa-id" value="{{ conversa_ativa_id|default:'' }}">
+                    <textarea id="memoria-chat-input" rows="2" required
+                              placeholder="Ex.: Grave na memória que..."
+                              class="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="memoria-chat-arquivar"
+                                class="text-[11px] font-semibold text-slate-500 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-white">
+                            Arquivar
+                        </button>
+                        <button type="submit" id="memoria-chat-enviar"
+                                class="flex-1 inline-flex justify-center items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+                            Enviar
+                        </button>
+                    </div>
+                    <p id="memoria-chat-status" class="text-[11px] text-slate-400 text-center hidden"></p>
+                </form>
+            </div>
+        </div>
     </div>
 
-    {# FAB mobile — abre drawer de memória #}
     <button type="button" id="memoria-fab"
-            class="lg:hidden fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 px-4 py-3 rounded-full
-                   bg-blue-600 text-white text-sm font-semibold shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            class="fixed bottom-5 right-5 z-30 inline-flex items-center justify-center w-14 h-14 rounded-full
+                   bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            aria-label="Abrir chat de memória" title="Memória">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
         </svg>
-        Memória
-        {% if chat_historico %}
-        <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-white text-blue-700 text-[11px] font-bold">{{ chat_historico|length }}</span>
+        {% if conversas_memoria %}
+        <span id="memoria-fab-badge" class="absolute -top-0.5 -right-0.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold flex items-center justify-center">{{ conversas_memoria|length }}</span>
         {% endif %}
     </button>
 </div>
@@ -586,34 +619,58 @@
     const input = document.getElementById('memoria-chat-input');
     const btn = document.getElementById('memoria-chat-enviar');
     const status = document.getElementById('memoria-chat-status');
-    const limpar = document.getElementById('memoria-chat-limpar');
+    const arquivar = document.getElementById('memoria-chat-arquivar');
     const fab = document.getElementById('memoria-fab');
-    const panel = document.getElementById('memoria-chat-panel');
-    const overlay = document.getElementById('memoria-drawer-overlay');
-    const fechar = document.getElementById('memoria-drawer-fechar');
+    const modal = document.getElementById('memoria-modal');
+    const overlay = document.getElementById('memoria-modal-overlay');
+    const fechar = document.getElementById('memoria-modal-fechar');
+    const novaBtn = document.getElementById('memoria-conversa-nova');
+    const lista = document.getElementById('memoria-conversas-lista');
+    const conversaInput = document.getElementById('memoria-conversa-id');
+    const subtitulo = document.getElementById('memoria-modal-subtitulo');
     const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    function abrirDrawer() {
-        panel.classList.add('is-open');
+    function abrirModal() {
+        modal.classList.add('is-open');
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('overflow-hidden');
-        setTimeout(function () { input.focus(); }, 200);
+        setTimeout(function () { input.focus(); }, 150);
     }
-
-    function fecharDrawer() {
-        panel.classList.remove('is-open');
+    function fecharModal() {
+        modal.classList.remove('is-open');
         overlay.classList.remove('is-open');
         overlay.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('overflow-hidden');
+    }
+    if (fab) fab.addEventListener('click', abrirModal);
+    if (fechar) fechar.addEventListener('click', fecharModal);
+    if (overlay) overlay.addEventListener('click', fecharModal);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') fecharModal();
+    });
+
+    function setConversaAtiva(id, titulo) {
+        conversaInput.value = id || '';
+        if (subtitulo) subtitulo.textContent = titulo || 'Grave, corrija ou esqueça procedimentos';
+        lista.querySelectorAll('.memoria-conv-btn').forEach(function (b) {
+            const on = String(b.getAttribute('data-conversa-id')) === String(id);
+            b.classList.toggle('bg-blue-100', on);
+            b.classList.toggle('text-blue-900', on);
+            b.classList.toggle('font-semibold', on);
+            b.classList.toggle('text-slate-600', !on);
+            b.classList.toggle('hover:bg-white', !on);
+        });
     }
 
-    if (fab) fab.addEventListener('click', abrirDrawer);
-    if (fechar) fechar.addEventListener('click', fecharDrawer);
-    if (overlay) overlay.addEventListener('click', fecharDrawer);
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') fecharDrawer();
-    });
+    function renderLog(mensagens) {
+        log.innerHTML = '';
+        if (!mensagens || !mensagens.length) {
+            log.innerHTML = '<div class="text-center text-xs text-slate-400 py-8 px-3">Comece uma conversa para gravar memórias.</div>';
+            return;
+        }
+        mensagens.forEach(function (m) {
+            appendBubble(m.role, m.content, m.content_html);
+        });
+    }
 
     function appendBubble(role, text, html) {
         const empty = log.querySelector('.text-center');
@@ -622,19 +679,60 @@
         wrap.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
         const bubble = document.createElement('div');
         if (role === 'user') {
-            bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md';
+            bubble.className = 'max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md';
             bubble.textContent = text;
         } else {
-            bubble.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md';
-            if (html) {
-                bubble.innerHTML = html;
-            } else {
-                bubble.textContent = text;
-            }
+            bubble.className = 'max-w-[92%] rounded-2xl px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-xs';
+            if (html) bubble.innerHTML = html;
+            else bubble.textContent = text;
         }
         wrap.appendChild(bubble);
         log.appendChild(wrap);
         log.scrollTop = log.scrollHeight;
+    }
+
+    function upsertListaItem(id, titulo) {
+        let btnEl = lista.querySelector('[data-conversa-id="' + id + '"]');
+        if (!btnEl) {
+            const empty = lista.querySelector('li .text-slate-400');
+            if (empty) empty.closest('li').remove();
+            const li = document.createElement('li');
+            btnEl = document.createElement('button');
+            btnEl.type = 'button';
+            btnEl.className = 'memoria-conv-btn w-full text-left text-[11px] px-2 py-1.5 rounded-lg truncate text-slate-600 hover:bg-white';
+            btnEl.setAttribute('data-conversa-id', id);
+            btnEl.addEventListener('click', onClickConversa);
+            li.appendChild(btnEl);
+            lista.prepend(li);
+        }
+        btnEl.textContent = titulo || ('Conversa #' + id);
+        setConversaAtiva(id, titulo);
+    }
+
+    async function onClickConversa(e) {
+        const id = e.currentTarget.getAttribute('data-conversa-id');
+        const resp = await fetch('{% url "integracoes:ia_aprendizado_conversa_get" 0 %}'.replace('/0/', '/' + id + '/'));
+        const data = await resp.json();
+        if (!data.ok) return;
+        setConversaAtiva(data.conversa_id, data.titulo);
+        renderLog(data.mensagens || []);
+    }
+    lista.querySelectorAll('.memoria-conv-btn').forEach(function (b) {
+        b.addEventListener('click', onClickConversa);
+    });
+
+    if (novaBtn) {
+        novaBtn.addEventListener('click', async function () {
+            const resp = await fetch('{% url "integracoes:ia_aprendizado_conversa_nova" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf },
+            });
+            const data = await resp.json();
+            if (!data.ok) return;
+            upsertListaItem(data.conversa_id, data.titulo);
+            renderLog([]);
+            input.focus();
+        });
     }
 
     form.addEventListener('submit', async function (e) {
@@ -645,7 +743,7 @@
         input.value = '';
         btn.disabled = true;
         status.classList.remove('hidden');
-        status.textContent = 'Pensando e gravando se necessário…';
+        status.textContent = 'Pensando…';
         try {
             const resp = await fetch('{% url "integracoes:ia_aprendizado_chat" %}', {
                 method: 'POST',
@@ -653,16 +751,22 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrf,
                 },
-                body: JSON.stringify({ message: message }),
+                body: JSON.stringify({
+                    message: message,
+                    conversa_id: conversaInput.value || null,
+                }),
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 appendBubble('assistant', data.error || 'Falha ao processar.');
             } else {
                 appendBubble('assistant', data.reply, data.reply_html);
+                if (data.conversa_id) {
+                    upsertListaItem(data.conversa_id, data.titulo);
+                }
                 if (data.memoria_alterada) {
-                    status.textContent = 'Memória atualizada — recarregando chunks…';
-                    setTimeout(function () { window.location.reload(); }, 600);
+                    status.textContent = 'Memória atualizada — recarregando…';
+                    setTimeout(function () { window.location.reload(); }, 700);
                     return;
                 }
             }
@@ -673,13 +777,26 @@
         status.classList.add('hidden');
     });
 
-    limpar.addEventListener('click', async function () {
-        await fetch('{% url "integracoes:ia_aprendizado_chat_limpar" %}', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrf },
+    if (arquivar) {
+        arquivar.addEventListener('click', async function () {
+            await fetch('{% url "integracoes:ia_aprendizado_chat_limpar" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf,
+                },
+                body: JSON.stringify({ conversa_id: conversaInput.value || null }),
+            });
+            const id = conversaInput.value;
+            if (id) {
+                const el = lista.querySelector('[data-conversa-id="' + id + '"]');
+                if (el) el.closest('li').remove();
+            }
+            conversaInput.value = '';
+            renderLog([]);
+            setConversaAtiva('', 'Nova conversa');
         });
-        log.innerHTML = '<div class="text-center text-sm text-slate-400 py-8 px-4">Conversa limpa. Pode gravar novas memórias.</div>';
-    });
+    }
 
     input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -688,7 +805,6 @@
         }
     });
 
-    // Abre edição se a URL apontar para um chunk
     if (window.location.hash && window.location.hash.indexOf('chunk-') === 1) {
         const el = document.querySelector(window.location.hash);
         if (el) {

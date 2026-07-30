@@ -1161,24 +1161,48 @@ def _titulo_normalizado(titulo: str) -> str:
     return re.sub(r'\s+', ' ', (titulo or '').strip().lower())
 
 
-def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
+def gerar_chunks_aprendizado(
+    limite_tickets: int = 30,
+    data_inicio=None,
+    data_fim=None,
+) -> dict:
     """Usa a IA para gerar chunks a partir de chamados finalizados/arquivados.
 
     Substitui apenas chunks com origem=ia; preserva manual e chat.
+    data_inicio/data_fim: date ou None (filtra resolved_at, fallback updated_at).
     """
+    from datetime import datetime, time
+
     from django.utils import timezone
 
     from integracoes.llm import chat_text
     from integracoes.models import AssistenteChunk, AssistenteConfig
 
-    tickets = (
-        Ticket.objects.filter(Q(status=Ticket.StatusChoices.RESOLVED) | Q(is_archived=True))
-        .select_related('category')
-        .prefetch_related('comments', 'comments__author')
-        .order_by('-resolved_at', '-updated_at')[:limite_tickets]
-    )
+    limite_tickets = max(1, min(int(limite_tickets or 30), 80))
+    qs = Ticket.objects.filter(
+        Q(status=Ticket.StatusChoices.RESOLVED) | Q(is_archived=True)
+    ).select_related('category').prefetch_related('comments', 'comments__author')
+
+    if data_inicio or data_fim:
+        # Intervalo sobre resolved_at; se nulo, usa updated_at
+        if data_inicio:
+            ini = timezone.make_aware(datetime.combine(data_inicio, time.min))
+            qs = qs.filter(
+                Q(resolved_at__gte=ini)
+                | Q(resolved_at__isnull=True, updated_at__gte=ini)
+            )
+        if data_fim:
+            fim = timezone.make_aware(
+                datetime.combine(data_fim, time.max.replace(microsecond=0))
+            )
+            qs = qs.filter(
+                Q(resolved_at__lte=fim)
+                | Q(resolved_at__isnull=True, updated_at__lte=fim)
+            )
+
+    tickets = list(qs.order_by('-resolved_at', '-updated_at')[:limite_tickets])
     if not tickets:
-        raise LlmError('Não há chamados resolvidos/arquivados para aprender.')
+        raise LlmError('Não há chamados resolvidos/arquivados no período para aprender.')
 
     blocos = []
     ids = []
@@ -1199,6 +1223,12 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
             f'Desc: {t.description[:500]}\nComentários:\n' + '\n'.join(comps)
         )
 
+    periodo_txt = ''
+    if data_inicio or data_fim:
+        periodo_txt = (
+            f' Período: {data_inicio or "…"} a {data_fim or "…"}.'
+        )
+
     prompt = (
         'Com base nos chamados de helpdesk abaixo (já finalizados pela TI real), '
         'gere um JSON array de objetos com chaves: titulo, conteudo, categoria_hint, '
@@ -1207,7 +1237,7 @@ def gerar_chunks_aprendizado(limite_tickets: int = 30) -> dict:
         'Priorize padrões das notas [INTERNO TI] (como a TI resolveu). '
         'Cada item é um "chunk" de aprendizado (tom de resposta, padrões, o que perguntar, '
         'quando escalar). Gere entre 5 e 12 chunks. '
-        'conteudo com no máximo 1200 caracteres. Responda SOMENTE o JSON.\n\n'
+        f'conteudo com no máximo 1200 caracteres.{periodo_txt} Responda SOMENTE o JSON.\n\n'
         + '\n\n---\n\n'.join(blocos)
     )
     raw = chat_text([

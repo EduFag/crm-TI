@@ -277,9 +277,19 @@
                     </label>
                     {% endif %}
                 </div>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                    Enviar Comentário
-                </button>
+                <div class="flex items-center gap-2">
+                    {% if pode_ver_internos %}
+                    <button type="submit" name="orientar_ia" value="1"
+                            class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                            title="Envia dica interna ao Assistente e grava aprendizado permanente"
+                            onclick="var t=document.getElementById('comment-interno-{{ ticket.id }}'); if(t){ t.checked=true; t.dispatchEvent(new Event('change')); }">
+                        Orientar IA
+                    </button>
+                    {% endif %}
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        Enviar Comentário
+                    </button>
+                </div>
             </div>
         </form>
         <script>

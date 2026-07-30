@@ -887,8 +887,13 @@ def ticket_add_comment(request, pk):
         return HttpResponseForbidden('Sem permissão para comentar neste chamado.')
     text = request.POST.get('text', '').strip()
     attachment = request.FILES.get('attachment')
-    quer_interno = request.POST.get('is_interno') in ('1', 'true', 'on', 'yes')
+    quer_orientar_ia = request.POST.get('orientar_ia') in ('1', 'true', 'on', 'yes')
+    quer_interno = request.POST.get('is_interno') in ('1', 'true', 'on', 'yes') or quer_orientar_ia
     is_interno = quer_interno and usuario_pode_ver_comentarios_internos(request.user)
+    if quer_orientar_ia and is_interno and text:
+        from integracoes.memoria_chat import ORIENTACAO_PREFIXO
+        if not text.upper().startswith(ORIENTACAO_PREFIXO):
+            text = f'{ORIENTACAO_PREFIXO} {text}'
     if text or attachment:
         if attachment:
             from django.core.exceptions import ValidationError
@@ -954,6 +959,13 @@ def ticket_add_comment(request, pk):
         # Assistente: responde a solicitante OU a orientação interna da TI
         if is_interno and usuario_pode_ver_comentarios_internos(request.user):
             _agendar_assistente(ticket.pk)
+            if quer_orientar_ia and text:
+                try:
+                    from integracoes.memoria_chat import aprender_de_orientacao
+                    aprender_de_orientacao(ticket, text, autor=request.user)
+                except Exception:
+                    # Não bloqueia o comentário se o aprendizado falhar
+                    pass
         elif not usuario_eh_operador_helpdesk(request.user) and not getattr(comment, 'is_assistente', False):
             _agendar_assistente(ticket.pk)
 

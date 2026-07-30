@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
-from integracoes.llm import LlmError, chat_completion
-from integracoes.models import AssistenteChunk
+from integracoes.llm import LlmError, chat_completion, chat_text
+from integracoes.models import AssistenteChunk, AssistenteMemoriaConversa
 
 logger = logging.getLogger(__name__)
 
 MAX_ROUNDS = 5
 SESSION_KEY = 'aprendizado_chat_messages'
+SESSION_CONVERSA_ID = 'aprendizado_chat_conversa_id'
+ORIENTACAO_PREFIXO = '[ORIENTAÇÃO IA]'
 
 MEMORIA_TOOLS = [
     {
@@ -261,3 +264,145 @@ def processar_mensagem_memoria(historico: list[dict], mensagem_usuario: str) -> 
         'historico': novo_historico,
         'memoria_alterada': memoria_alterada,
     }
+
+
+def _titulo_de_mensagem(texto: str) -> str:
+    limpo = (texto or '').strip().replace('\n', ' ')
+    if len(limpo) <= 48:
+        return limpo or 'Nova conversa'
+    return limpo[:45].rstrip() + '…'
+
+
+def listar_conversas_usuario(user, limite: int = 40) -> list[dict]:
+    qs = (
+        AssistenteMemoriaConversa.objects.filter(user=user, ativo=True)
+        .order_by('-atualizado_em')[: max(1, min(int(limite or 40), 80))]
+    )
+    return [
+        {
+            'id': c.pk,
+            'titulo': c.titulo or 'Nova conversa',
+            'atualizado_em': c.atualizado_em.isoformat() if c.atualizado_em else None,
+            'mensagens_count': len(c.mensagens or []),
+        }
+        for c in qs
+    ]
+
+
+def obter_ou_criar_conversa(user, conversa_id=None) -> AssistenteMemoriaConversa:
+    if conversa_id:
+        try:
+            conv = AssistenteMemoriaConversa.objects.get(
+                pk=int(conversa_id), user=user, ativo=True,
+            )
+            return conv
+        except (AssistenteMemoriaConversa.DoesNotExist, TypeError, ValueError):
+            pass
+    return AssistenteMemoriaConversa.objects.create(
+        user=user,
+        titulo='Nova conversa',
+        mensagens=[],
+    )
+
+
+def processar_mensagem_conversa(user, mensagem_usuario: str, conversa_id=None) -> dict:
+    """Processa mensagem, persiste na conversa do usuário e devolve reply + conversa_id."""
+    conv = obter_ou_criar_conversa(user, conversa_id)
+    historico = list(conv.mensagens or [])
+    resultado = processar_mensagem_memoria(historico, mensagem_usuario)
+    conv.mensagens = resultado['historico']
+    if not conv.titulo or conv.titulo == 'Nova conversa':
+        conv.titulo = _titulo_de_mensagem(mensagem_usuario)
+    conv.save(update_fields=['mensagens', 'titulo', 'atualizado_em'])
+    return {
+        **resultado,
+        'conversa_id': conv.pk,
+        'titulo': conv.titulo,
+    }
+
+
+def aprender_de_orientacao(ticket, texto_dica: str, autor=None) -> dict:
+    """Destila orientação da TI + contexto do chamado em chunk permanente (origem=chat)."""
+    dica = (texto_dica or '').strip()
+    if dica.upper().startswith(ORIENTACAO_PREFIXO):
+        dica = dica[len(ORIENTACAO_PREFIXO):].strip()
+    if not dica:
+        return {'ok': False, 'error': 'Dica vazia.'}
+
+    comps = []
+    for c in ticket.comments.filter(is_active=True).order_by('-created_at')[:15]:
+        if c.is_assistente:
+            autor_txt = 'Assistente'
+        elif c.author_id:
+            autor_txt = c.author.get_full_name() or c.author.username
+        else:
+            autor_txt = 'Sistema'
+        marca = ' [INTERNO]' if c.is_interno else ''
+        comps.append(f'- {autor_txt}{marca}: {(c.text or "")[:350]}')
+    comps.reverse()
+
+    prompt = (
+        'A TI orientou o Assistente de helpdesk neste chamado. '
+        'Gere UM objeto JSON com chaves: titulo, conteudo, categoria_hint, tags (lista). '
+        'O chunk deve capturar o procedimento/correção para próximos chamados semelhantes. '
+        'conteudo máx. 1000 caracteres. Responda SOMENTE o JSON.\n\n'
+        f'Chamado #{ticket.pk}: {ticket.title}\n'
+        f'Descrição: {(ticket.description or "")[:500]}\n'
+        f'Orientação da TI: {dica}\n'
+        f'Contexto recente:\n' + ('\n'.join(comps) or '(sem comentários)')
+    )
+    try:
+        raw = chat_text([
+            {
+                'role': 'system',
+                'content': 'Você extrai aprendizado operacional de TI. Responda só JSON válido.',
+            },
+            {'role': 'user', 'content': prompt},
+        ], temperature=0.2)
+    except LlmError as exc:
+        logger.warning('aprender_de_orientacao falhou (LLM): %s', exc)
+        # Fallback sem LLM: grava a dica crua
+        chunk = AssistenteChunk.objects.create(
+            titulo=f'Orientação ticket #{ticket.pk}'[:200],
+            conteudo=dica[:1200],
+            categoria_hint='orientacao',
+            fonte_ticket_ids=[ticket.pk],
+            origem=AssistenteChunk.Origem.CHAT,
+            ativo=True,
+            tags=['orientacao'],
+        )
+        from integracoes.embeddings import atualizar_embedding_chunk
+        atualizar_embedding_chunk(chunk)
+        return {'ok': True, 'chunk_id': chunk.pk, 'fallback': True}
+
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    data = {}
+    if match:
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            data = {}
+    titulo = (data.get('titulo') or f'Orientação ticket #{ticket.pk}').strip()[:200]
+    conteudo = (data.get('conteudo') or dica).strip()[:1200]
+    categoria = (data.get('categoria_hint') or 'orientacao').strip()[:120]
+    tags = data.get('tags') if isinstance(data.get('tags'), list) else []
+    tags = [str(t).strip()[:40] for t in tags if str(t).strip()][:8]
+    if 'orientacao' not in tags:
+        tags.insert(0, 'orientacao')
+
+    chunk = AssistenteChunk.objects.create(
+        titulo=titulo,
+        conteudo=conteudo,
+        categoria_hint=categoria,
+        fonte_ticket_ids=[ticket.pk],
+        origem=AssistenteChunk.Origem.CHAT,
+        ativo=True,
+        tags=tags,
+    )
+    from integracoes.embeddings import atualizar_embedding_chunk
+    atualizar_embedding_chunk(chunk)
+    logger.info(
+        'Chunk #%s criado a partir de orientação no ticket #%s (autor=%s)',
+        chunk.pk, ticket.pk, getattr(autor, 'pk', None),
+    )
+    return {'ok': True, 'chunk_id': chunk.pk, 'titulo': chunk.titulo}

@@ -263,7 +263,7 @@ def ia_aprendizado(request):
     from django.core.paginator import Paginator
     from django.db.models import Count, Q
 
-    from integracoes.memoria_chat import SESSION_KEY
+    from integracoes.memoria_chat import listar_conversas_usuario
     from integracoes.models import AssistenteChunk, AssistenteConfig, AssistenteInteracao
     from integracoes.regras_seed import garantir_chunks_regras
 
@@ -366,7 +366,21 @@ def ia_aprendizado(request):
     ]
 
     integracoes = IntegracaoIA.objects.filter(is_active=True).order_by('name')
-    chat_historico = request.session.get(SESSION_KEY) or []
+    from integracoes.memoria_chat import listar_conversas_usuario
+    from integracoes.models import AssistenteMemoriaConversa
+
+    conversas = listar_conversas_usuario(request.user)
+    conversa_ativa = None
+    conversa_id = request.GET.get('conversa')
+    if conversa_id:
+        conversa_ativa = AssistenteMemoriaConversa.objects.filter(
+            pk=conversa_id, user=request.user, ativo=True,
+        ).first()
+    if conversa_ativa is None and conversas:
+        conversa_ativa = AssistenteMemoriaConversa.objects.filter(
+            pk=conversas[0]['id'], user=request.user, ativo=True,
+        ).first()
+    chat_historico = list(conversa_ativa.mensagens) if conversa_ativa else []
     from integracoes.llm import obter_integracao_embedding
     return render(request, 'integracoes/ia_aprendizado.html', {
         'config': config,
@@ -386,6 +400,8 @@ def ia_aprendizado(request):
         'por_origem_curadoria': por_origem_curadoria,
         'integracoes': integracoes,
         'chat_historico': chat_historico,
+        'conversas_memoria': conversas,
+        'conversa_ativa_id': conversa_ativa.pk if conversa_ativa else None,
         'interacoes': interacoes,
         'eval_contagens': eval_contagens,
         'chunks_ruins': chunks_ruins,
@@ -450,11 +466,33 @@ def ia_aprendizado_toggle(request):
 @requer_modulo(MODULO_INTEGRACOES)
 @require_POST
 def ia_aprendizado_gerar(request):
+    from datetime import datetime
+
     from integracoes.assistente_runtime import gerar_chunks_aprendizado
     from integracoes.llm import LlmError
 
+    def _parse_date(raw):
+        raw = (raw or '').strip()
+        if not raw:
+            return None
+        try:
+            return datetime.strptime(raw, '%Y-%m-%d').date()
+        except ValueError:
+            return None
+
+    data_inicio = _parse_date(request.POST.get('data_inicio'))
+    data_fim = _parse_date(request.POST.get('data_fim'))
     try:
-        resultado = gerar_chunks_aprendizado()
+        limite = int(request.POST.get('limite') or 30)
+    except (TypeError, ValueError):
+        limite = 30
+
+    try:
+        resultado = gerar_chunks_aprendizado(
+            limite_tickets=limite,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+        )
         registrar_acao(
             modulo=MODULO_CORE,
             acao=RegistroAcao.AcaoChoices.CREATED,
@@ -463,20 +501,28 @@ def ia_aprendizado_gerar(request):
                 f'a partir de {resultado["tickets_analisados"]} chamados.'
             ),
             actor=request.user,
-            metadata=resultado,
+            metadata={
+                **resultado,
+                'data_inicio': str(data_inicio) if data_inicio else None,
+                'data_fim': str(data_fim) if data_fim else None,
+                'limite': limite,
+            },
         )
         preservados = resultado.get('preservados_curadoria', 0)
+        periodo = ''
+        if data_inicio or data_fim:
+            periodo = f' Período {data_inicio or "…"} → {data_fim or "…"}.'
         messages.success(
             request,
             f'Aprendizado gerado: {resultado["chunks"]} chunks IA '
-            f'({resultado["tickets_analisados"]} chamados). '
+            f'({resultado["tickets_analisados"]} chamados).{periodo} '
             f'Preservados {preservados} chunks manuais/chat.',
         )
     except LlmError as exc:
         messages.error(request, f'Falha ao gerar aprendizado: {exc}')
     except Exception:
         messages.error(request, 'Erro inesperado ao gerar aprendizado.')
-    return _redirect_aprendizado(request, tab='chunks')
+    return _redirect_aprendizado(request, tab='config')
 
 
 @requer_modulo(MODULO_INTEGRACOES)
@@ -670,7 +716,7 @@ def ia_aprendizado_chat(request):
 
     from integracoes.llm import LlmError
     from integracoes.markdown_safe import render_markdown_leve
-    from integracoes.memoria_chat import SESSION_KEY, processar_mensagem_memoria
+    from integracoes.memoria_chat import processar_mensagem_conversa
 
     try:
         body = json.loads(request.body.decode('utf-8')) if request.body else {}
@@ -680,19 +726,13 @@ def ia_aprendizado_chat(request):
     if not mensagem:
         return JsonResponse({'ok': False, 'error': 'Mensagem vazia.'}, status=400)
 
-    historico = request.session.get(SESSION_KEY) or []
-    if not isinstance(historico, list):
-        historico = []
-
+    conversa_id = body.get('conversa_id') or request.POST.get('conversa_id')
     try:
-        resultado = processar_mensagem_memoria(historico, mensagem)
+        resultado = processar_mensagem_conversa(request.user, mensagem, conversa_id)
     except LlmError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=502)
     except Exception:
         return JsonResponse({'ok': False, 'error': 'Erro ao processar o chat.'}, status=500)
-
-    request.session[SESSION_KEY] = resultado['historico']
-    request.session.modified = True
 
     if resultado.get('memoria_alterada'):
         registrar_acao(
@@ -700,7 +740,10 @@ def ia_aprendizado_chat(request):
             acao=RegistroAcao.AcaoChoices.UPDATED,
             descricao='Memória do Assistente atualizada via chat de aprendizado.',
             actor=request.user,
-            metadata={'via': 'chat_memoria'},
+            metadata={
+                'via': 'chat_memoria',
+                'conversa_id': resultado.get('conversa_id'),
+            },
         )
 
     return JsonResponse({
@@ -708,16 +751,86 @@ def ia_aprendizado_chat(request):
         'reply': resultado['reply'],
         'reply_html': render_markdown_leve(resultado['reply'] or ''),
         'memoria_alterada': resultado['memoria_alterada'],
+        'conversa_id': resultado.get('conversa_id'),
+        'titulo': resultado.get('titulo') or '',
+    })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+def ia_aprendizado_conversas(request):
+    """Lista conversas de memória do usuário (JSON)."""
+    from django.http import JsonResponse
+
+    from integracoes.memoria_chat import listar_conversas_usuario
+
+    return JsonResponse({
+        'ok': True,
+        'results': listar_conversas_usuario(request.user),
+    })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def ia_aprendizado_conversa_nova(request):
+    """Cria uma nova conversa vazia."""
+    from django.http import JsonResponse
+
+    from integracoes.memoria_chat import obter_ou_criar_conversa
+
+    conv = obter_ou_criar_conversa(request.user, conversa_id=None)
+    return JsonResponse({
+        'ok': True,
+        'conversa_id': conv.pk,
+        'titulo': conv.titulo,
+        'mensagens': [],
+    })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+def ia_aprendizado_conversa_get(request, pk):
+    """Retorna mensagens de uma conversa do usuário."""
+    from django.http import JsonResponse
+
+    from integracoes.markdown_safe import render_markdown_leve
+    from integracoes.models import AssistenteMemoriaConversa
+
+    conv = get_object_or_404(
+        AssistenteMemoriaConversa, pk=pk, user=request.user, ativo=True,
+    )
+    mensagens = []
+    for m in (conv.mensagens or []):
+        item = {
+            'role': m.get('role'),
+            'content': m.get('content') or '',
+        }
+        if item['role'] == 'assistant':
+            item['content_html'] = render_markdown_leve(item['content'])
+        mensagens.append(item)
+    return JsonResponse({
+        'ok': True,
+        'conversa_id': conv.pk,
+        'titulo': conv.titulo,
+        'mensagens': mensagens,
     })
 
 
 @requer_modulo(MODULO_INTEGRACOES)
 @require_POST
 def ia_aprendizado_chat_limpar(request):
+    """Arquiva a conversa ativa (ou cria histórico limpo)."""
+    import json
+
     from django.http import JsonResponse
 
-    from integracoes.memoria_chat import SESSION_KEY
+    from integracoes.models import AssistenteMemoriaConversa
 
-    request.session[SESSION_KEY] = []
-    request.session.modified = True
+    try:
+        body = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except json.JSONDecodeError:
+        body = {}
+    conversa_id = body.get('conversa_id') or request.POST.get('conversa_id')
+    if conversa_id:
+        AssistenteMemoriaConversa.objects.filter(
+            pk=conversa_id, user=request.user, ativo=True,
+        ).update(ativo=False)
     return JsonResponse({'ok': True})

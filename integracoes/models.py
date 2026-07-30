@@ -200,3 +200,33 @@ class AssistenteInteracao(models.Model):
 
     def __str__(self) -> str:
         return f'Interação ticket #{self.ticket_id} @ {self.criado_em}'
+
+
+class AssistenteMemoriaConversa(models.Model):
+    """Thread persistente do chat de memória na página de Aprendizado."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversas_memoria_assistente',
+    )
+    titulo = models.CharField(max_length=160, blank=True, default='Nova conversa')
+    mensagens = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Lista de {role, content} (user/assistant).',
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text='False = arquivada (some do histórico ativo).',
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-atualizado_em']
+        verbose_name = 'conversa de memória'
+        verbose_name_plural = 'conversas de memória'
+
+    def __str__(self) -> str:
+        return f'{self.titulo} (#{self.pk})'
