@@ -30,14 +30,37 @@
     border-color: #0f172a;
     color: #0f172a;
 }
+#memoria-modal-overlay {
+    transition: opacity 0.22s ease;
+}
 #memoria-modal-overlay.is-open {
     opacity: 1;
     pointer-events: auto;
+}
+#memoria-modal {
+    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 #memoria-modal.is-open {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0) scale(1);
+}
+@keyframes memoria-fab-pulse {
+    0%, 100% { box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.45); }
+    50% { box-shadow: 0 10px 28px -3px rgba(37, 99, 235, 0.7), 0 0 0 6px rgba(37, 99, 235, 0.12); }
+}
+#memoria-fab {
+    animation: memoria-fab-pulse 2.4s ease-in-out infinite;
+}
+#memoria-fab:hover {
+    animation: none;
+}
+@keyframes memoria-badge-pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
+#memoria-fab-badge {
+    animation: memoria-badge-pop 2s ease-in-out infinite;
 }
 </style>
 
@@ -79,28 +102,28 @@
     </div>
     {% endif %}
 
-    {# KPI strip compacto #}
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-3 py-2.5 flex items-center justify-between gap-2 border-l-4 border-l-amber-400">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">Eval pendentes</p>
-            <p class="text-xl font-bold text-slate-900 tabular-nums">{{ eval_contagens.pendentes }}</p>
+    {# KPI strip #}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center justify-between gap-3 border-l-4 border-l-amber-400">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 leading-tight">Eval pendentes</p>
+            <p class="text-2xl font-bold text-slate-900 tabular-nums">{{ eval_contagens.pendentes }}</p>
         </div>
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-3 py-2.5 flex items-center justify-between gap-2 border-l-4 border-l-emerald-500">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">% útil</p>
-            <p class="text-xl font-bold text-slate-900 tabular-nums">
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center justify-between gap-3 border-l-4 border-l-emerald-500">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 leading-tight">% útil</p>
+            <p class="text-2xl font-bold text-slate-900 tabular-nums">
                 {% if eval_contagens.pct_util != None %}{{ eval_contagens.pct_util }}%{% else %}—{% endif %}
             </p>
         </div>
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-3 py-2.5 flex items-center justify-between gap-2 border-l-4 border-l-blue-500">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">Chunks ativos</p>
-            <p class="text-xl font-bold text-slate-900 tabular-nums">{{ contagens.ativos }}</p>
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center justify-between gap-3 border-l-4 border-l-blue-500">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 leading-tight">Chunks ativos</p>
+            <p class="text-2xl font-bold text-slate-900 tabular-nums">{{ contagens.ativos }}</p>
         </div>
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-3 py-2.5 flex items-center justify-between gap-2 border-l-4 border-l-slate-400">
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center justify-between gap-3 border-l-4 border-l-slate-400">
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">Manual + Chat</p>
-                <p class="text-[10px] text-slate-400 truncate">M {{ por_origem.manual|default:0 }} · C {{ por_origem.chat|default:0 }}</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 leading-tight">Manual + Chat</p>
+                <p class="text-[11px] text-slate-400 truncate">M {{ por_origem.manual|default:0 }} · C {{ por_origem.chat|default:0 }}</p>
             </div>
-            <p class="text-xl font-bold text-slate-900 tabular-nums">{{ por_origem_curadoria }}</p>
+            <p class="text-2xl font-bold text-slate-900 tabular-nums">{{ por_origem_curadoria }}</p>
         </div>
     </div>
 
@@ -513,28 +536,35 @@
             {% endif %}
         </div>
 
-    {# Overlay + modal flutuante de memória #}
+    {# Overlay + modal flutuante de memória (canto inferior direito) #}
     <div id="memoria-modal-overlay"
-         class="fixed inset-0 z-40 bg-slate-900/30 opacity-0 pointer-events-none transition-opacity duration-200"
+         class="fixed inset-0 z-[55] bg-slate-900/25 opacity-0 pointer-events-none"
          aria-hidden="true"></div>
 
     <div id="memoria-modal"
-         class="fixed z-50 bottom-24 right-5 w-[min(100vw-1.5rem,420px)] h-[min(70vh,560px)]
-                flex flex-col bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden
-                opacity-0 pointer-events-none scale-95 translate-y-2 transition-all duration-200 origin-bottom-right"
+         class="fixed z-[60] bottom-24 right-6 w-[min(100vw-2rem,440px)] h-[min(78vh,640px)]
+                flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-2xl overflow-hidden
+                opacity-0 pointer-events-none scale-[0.94] translate-y-4 origin-bottom-right"
          role="dialog" aria-modal="true" aria-labelledby="memoria-modal-title">
-        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
-            <div class="min-w-0">
-                <h3 id="memoria-modal-title" class="text-sm font-bold text-slate-900">Memória</h3>
-                <p class="text-[11px] text-slate-500 truncate" id="memoria-modal-subtitulo">Grave, corrija ou esqueça procedimentos</p>
+        <div class="px-4 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between gap-2 shrink-0 shadow-sm">
+            <div class="min-w-0 flex items-center gap-2.5">
+                <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 text-white shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                </span>
+                <div class="min-w-0">
+                    <h3 id="memoria-modal-title" class="text-base font-bold text-white leading-tight">Memória</h3>
+                    <p class="text-xs text-blue-100 truncate" id="memoria-modal-subtitulo">Grave, corrija ou esqueça procedimentos</p>
+                </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
                 <button type="button" id="memoria-conversa-nova"
-                        class="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg">
+                        class="text-xs font-semibold text-white bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-lg transition-colors">
                     Nova
                 </button>
                 <button type="button" id="memoria-modal-fechar"
-                        class="text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg p-1.5" aria-label="Fechar">
+                        class="text-white/90 hover:text-white hover:bg-white/15 rounded-lg p-1.5 transition-colors" aria-label="Fechar">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
@@ -542,72 +572,87 @@
             </div>
         </div>
         <div class="flex flex-1 min-h-0">
-            <aside class="w-[132px] border-r border-slate-100 bg-slate-50/80 overflow-y-auto shrink-0">
-                <p class="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Histórico</p>
-                <ul id="memoria-conversas-lista" class="px-1.5 pb-2 space-y-0.5">
+            <aside class="w-[150px] border-r border-slate-100 bg-slate-50 overflow-y-auto shrink-0">
+                <p class="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Histórico</p>
+                <ul id="memoria-conversas-lista" class="px-1.5 pb-3 space-y-0.5">
                     {% for c in conversas_memoria %}
                     <li>
                         <button type="button"
                                 data-conversa-id="{{ c.id }}"
-                                class="memoria-conv-btn w-full text-left text-[11px] px-2 py-1.5 rounded-lg truncate
-                                       {% if conversa_ativa_id == c.id %}bg-blue-100 text-blue-900 font-semibold{% else %}text-slate-600 hover:bg-white{% endif %}">
+                                class="memoria-conv-btn w-full text-left text-xs px-2.5 py-2 rounded-lg truncate transition-colors
+                                       {% if conversa_ativa_id == c.id %}bg-blue-50 text-blue-900 font-semibold border-l-2 border-blue-600{% else %}text-slate-600 hover:bg-white border-l-2 border-transparent{% endif %}">
                             {{ c.titulo }}
                         </button>
                     </li>
                     {% empty %}
-                    <li class="px-2 py-3 text-[11px] text-slate-400">Nenhuma conversa ainda.</li>
+                    <li class="px-2.5 py-4 text-center">
+                        <div class="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-snug">Nenhuma conversa.<br>Clique em <strong class="text-blue-600">Nova</strong>.</p>
+                    </li>
                     {% endfor %}
                 </ul>
             </aside>
             <div class="flex-1 flex flex-col min-w-0 min-h-0">
-                <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-white">
+                <div id="memoria-chat-log" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50/80 to-white">
                     {% for msg in chat_historico %}
                     <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
                         {% if msg.role == 'user' %}
-                        <div class="max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md">{{ msg.content }}</div>
+                        <div class="max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md shadow-sm">{{ msg.content }}</div>
                         {% else %}
-                        <div class="max-w-[92%] rounded-2xl px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-xs">{{ msg.content|markdown_leve }}</div>
+                        <div class="max-w-[92%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-sm shadow-sm">{{ msg.content|markdown_leve }}</div>
                         {% endif %}
                     </div>
                     {% empty %}
-                    <div class="text-center text-xs text-slate-400 py-8 px-3">
-                        Exemplos:<br>
-                        “Grave: em discador, pedir print da campanha.”<br>
-                        “Corrija o chunk de blacklist…”
+                    <div class="flex flex-col items-center justify-center text-center py-10 px-4">
+                        <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-800 mb-1">Ensine o Assistente</p>
+                        <p class="text-xs text-slate-500 leading-relaxed max-w-[260px]">
+                            Ex.: “Grave: em discador, pedir print da campanha.”<br>
+                            “Corrija o chunk de blacklist…”
+                        </p>
                     </div>
                     {% endfor %}
                 </div>
-                <form id="memoria-chat-form" class="p-3 border-t border-slate-100 shrink-0 space-y-2 bg-slate-50/50">
+                <form id="memoria-chat-form" class="p-3.5 border-t border-slate-100 shrink-0 space-y-2.5 bg-white">
                     {% csrf_token %}
                     <input type="hidden" id="memoria-conversa-id" value="{{ conversa_ativa_id|default:'' }}">
                     <textarea id="memoria-chat-input" rows="2" required
                               placeholder="Ex.: Grave na memória que..."
-                              class="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
+                              class="w-full text-sm rounded-xl border border-slate-300 px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-inner"></textarea>
                     <div class="flex items-center gap-2">
                         <button type="button" id="memoria-chat-arquivar"
-                                class="text-[11px] font-semibold text-slate-500 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-white">
+                                class="text-xs font-semibold text-slate-500 hover:text-red-600 px-2.5 py-2 rounded-lg hover:bg-red-50 transition-colors">
                             Arquivar
                         </button>
                         <button type="submit" id="memoria-chat-enviar"
-                                class="flex-1 inline-flex justify-center items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+                                class="flex-1 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 shadow-sm">
                             Enviar
                         </button>
                     </div>
-                    <p id="memoria-chat-status" class="text-[11px] text-slate-400 text-center hidden"></p>
+                    <p id="memoria-chat-status" class="text-xs text-slate-400 text-center hidden"></p>
                 </form>
             </div>
         </div>
     </div>
 
     <button type="button" id="memoria-fab"
-            class="fixed bottom-5 right-5 z-30 inline-flex items-center justify-center w-14 h-14 rounded-full
-                   bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="fixed bottom-6 right-6 z-[60] inline-flex items-center justify-center w-16 h-16 rounded-full
+                   bg-blue-600 text-white shadow-xl hover:bg-blue-700 hover:scale-105 active:scale-95
+                   transition-transform focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             aria-label="Abrir chat de memória" title="Memória">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
         </svg>
         {% if conversas_memoria %}
-        <span id="memoria-fab-badge" class="absolute -top-0.5 -right-0.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold flex items-center justify-center">{{ conversas_memoria|length }}</span>
+        <span id="memoria-fab-badge" class="absolute -top-0.5 -right-0.5 min-w-[1.35rem] h-5 px-1.5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-bold flex items-center justify-center ring-2 ring-white">{{ conversas_memoria|length }}</span>
         {% endif %}
     </button>
 </div>
@@ -653,9 +698,11 @@
         if (subtitulo) subtitulo.textContent = titulo || 'Grave, corrija ou esqueça procedimentos';
         lista.querySelectorAll('.memoria-conv-btn').forEach(function (b) {
             const on = String(b.getAttribute('data-conversa-id')) === String(id);
-            b.classList.toggle('bg-blue-100', on);
+            b.classList.toggle('bg-blue-50', on);
             b.classList.toggle('text-blue-900', on);
             b.classList.toggle('font-semibold', on);
+            b.classList.toggle('border-blue-600', on);
+            b.classList.toggle('border-transparent', !on);
             b.classList.toggle('text-slate-600', !on);
             b.classList.toggle('hover:bg-white', !on);
         });
@@ -664,7 +711,15 @@
     function renderLog(mensagens) {
         log.innerHTML = '';
         if (!mensagens || !mensagens.length) {
-            log.innerHTML = '<div class="text-center text-xs text-slate-400 py-8 px-3">Comece uma conversa para gravar memórias.</div>';
+            log.innerHTML =
+                '<div class="flex flex-col items-center justify-center text-center py-10 px-4">' +
+                '<div class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>' +
+                '</svg></div>' +
+                '<p class="text-sm font-semibold text-slate-800 mb-1">Ensine o Assistente</p>' +
+                '<p class="text-xs text-slate-500 leading-relaxed max-w-[260px]">Comece uma conversa para gravar, corrigir ou esquecer procedimentos.</p>' +
+                '</div>';
             return;
         }
         mensagens.forEach(function (m) {
@@ -673,16 +728,16 @@
     }
 
     function appendBubble(role, text, html) {
-        const empty = log.querySelector('.text-center');
+        const empty = log.querySelector('.flex.flex-col.items-center') || log.querySelector('.text-center');
         if (empty) empty.remove();
         const wrap = document.createElement('div');
         wrap.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
         const bubble = document.createElement('div');
         if (role === 'user') {
-            bubble.className = 'max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md';
+            bubble.className = 'max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-blue-600 text-white rounded-br-md shadow-sm';
             bubble.textContent = text;
         } else {
-            bubble.className = 'max-w-[92%] rounded-2xl px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-xs';
+            bubble.className = 'max-w-[92%] rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-bl-md memoria-md text-sm shadow-sm';
             if (html) bubble.innerHTML = html;
             else bubble.textContent = text;
         }
@@ -694,12 +749,14 @@
     function upsertListaItem(id, titulo) {
         let btnEl = lista.querySelector('[data-conversa-id="' + id + '"]');
         if (!btnEl) {
-            const empty = lista.querySelector('li .text-slate-400');
-            if (empty) empty.closest('li').remove();
+            // Remove empty state do histórico (li sem botão de conversa)
+            lista.querySelectorAll('li').forEach(function (li) {
+                if (!li.querySelector('.memoria-conv-btn')) li.remove();
+            });
             const li = document.createElement('li');
             btnEl = document.createElement('button');
             btnEl.type = 'button';
-            btnEl.className = 'memoria-conv-btn w-full text-left text-[11px] px-2 py-1.5 rounded-lg truncate text-slate-600 hover:bg-white';
+            btnEl.className = 'memoria-conv-btn w-full text-left text-xs px-2.5 py-2 rounded-lg truncate transition-colors text-slate-600 hover:bg-white border-l-2 border-transparent';
             btnEl.setAttribute('data-conversa-id', id);
             btnEl.addEventListener('click', onClickConversa);
             li.appendChild(btnEl);
