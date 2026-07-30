@@ -85,6 +85,40 @@
     right: -0.125rem;
     animation: memoria-badge-pop 2s ease-in-out infinite;
 }
+/* Modal visualizar chunk */
+#chunk-view-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(15, 23, 42, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+#chunk-view-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+#chunk-view-modal {
+    position: fixed;
+    z-index: 71;
+    left: 50%;
+    top: 50%;
+    width: min(100vw - 2rem, 640px);
+    max-height: min(85vh, 720px);
+    transform: translate(-50%, -46%) scale(0.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#chunk-view-modal.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+}
+.chunk-view-open:hover {
+    background: #f8fafc;
+}
 </style>
 
 <div class="flex flex-col w-full gap-4">
@@ -248,7 +282,11 @@
                     {% for chunk in chunks %}
                     <li class="px-5 py-3 {% if not chunk.ativo %}opacity-60 bg-slate-50/80{% endif %}" id="chunk-{{ chunk.pk }}">
                         <div class="flex flex-wrap items-start justify-between gap-2">
-                            <div class="min-w-0 flex-1 space-y-1">
+                            <button type="button"
+                                    class="chunk-view-open min-w-0 flex-1 space-y-1 text-left rounded-lg -mx-1 px-1 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    data-chunk-id="{{ chunk.pk }}"
+                                    title="Visualizar chunk completo"
+                                    aria-label="Visualizar {{ chunk.titulo|truncatechars:60 }}">
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     {% if chunk.origem == 'ia' %}
                                     <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">IA</span>
@@ -269,7 +307,7 @@
                                 </div>
                                 <p class="text-sm font-semibold text-slate-900 truncate">{{ chunk.titulo }}</p>
                                 <p class="text-xs text-slate-500 line-clamp-2">{{ chunk.conteudo|truncatechars:140 }}</p>
-                            </div>
+                            </button>
                             <div class="flex items-center gap-1 shrink-0">
                                 <form method="post" action="{% url 'integracoes:ia_chunk_toggle' chunk.pk %}">
                                     {% csrf_token %}
@@ -296,6 +334,18 @@
                                     </button>
                                 </form>
                             </div>
+                        </div>
+                        {# Payload para o modal de visualização #}
+                        <div class="hidden chunk-view-payload" id="chunk-payload-{{ chunk.pk }}"
+                             data-id="{{ chunk.pk }}"
+                             data-origem="{{ chunk.origem }}"
+                             data-categoria="{{ chunk.categoria_hint|default:'' }}"
+                             data-ativo="{% if chunk.ativo %}1{% else %}0{% endif %}"
+                             data-titulo="{{ chunk.titulo }}"
+                             data-tags="{% if chunk.tags %}{{ chunk.tags|join:', ' }}{% endif %}"
+                             data-fontes="{% if chunk.fonte_ticket_ids %}{{ chunk.fonte_ticket_ids|join:', ' }}{% endif %}"
+                             data-atualizado="{{ chunk.atualizado_em|date:'d/m/Y H:i' }}">
+                            <pre class="chunk-conteudo-raw">{{ chunk.conteudo }}</pre>
                         </div>
                         <details class="mt-2 group">
                             <summary class="cursor-pointer list-none text-xs font-semibold text-blue-600 hover:text-blue-800">
@@ -558,6 +608,41 @@
             </div>
             {% endif %}
         </div>
+
+    {# Modal visualizar chunk completo #}
+    <div id="chunk-view-overlay" aria-hidden="true"></div>
+    <div id="chunk-view-modal"
+         class="flex flex-col bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+         role="dialog" aria-modal="true" aria-labelledby="chunk-view-title">
+        <div class="px-5 py-3.5 bg-gradient-to-r from-slate-800 to-slate-900 flex items-start justify-between gap-3 shrink-0">
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Visualizar chunk</p>
+                <h3 id="chunk-view-title" class="text-base font-bold text-white leading-snug break-words"></h3>
+                <div id="chunk-view-badges" class="flex flex-wrap items-center gap-1.5 mt-2"></div>
+            </div>
+            <button type="button" id="chunk-view-fechar"
+                    class="text-white/80 hover:text-white hover:bg-white/10 rounded-lg p-1.5 shrink-0 transition-colors"
+                    aria-label="Fechar">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Conteúdo</p>
+                <div id="chunk-view-conteudo"
+                     class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words bg-slate-50 border border-slate-100 rounded-xl px-4 py-3"></div>
+            </div>
+            <div id="chunk-view-meta" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-500"></div>
+        </div>
+        <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2 shrink-0">
+            <button type="button" id="chunk-view-fechar-btn"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                Fechar
+            </button>
+        </div>
+    </div>
 
     {# Overlay + modal flutuante de memória (canto inferior direito) #}
     <div id="memoria-modal-overlay"
@@ -900,6 +985,90 @@
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
+})();
+
+(function () {
+    const overlay = document.getElementById('chunk-view-overlay');
+    const modal = document.getElementById('chunk-view-modal');
+    const titleEl = document.getElementById('chunk-view-title');
+    const badgesEl = document.getElementById('chunk-view-badges');
+    const conteudoEl = document.getElementById('chunk-view-conteudo');
+    const metaEl = document.getElementById('chunk-view-meta');
+    const fecharX = document.getElementById('chunk-view-fechar');
+    const fecharBtn = document.getElementById('chunk-view-fechar-btn');
+    if (!overlay || !modal) return;
+
+    [overlay, modal].forEach(function (el) {
+        if (el.parentElement !== document.body) document.body.appendChild(el);
+    });
+
+    function origemLabel(o) {
+        if (o === 'ia') return { txt: 'IA', cls: 'bg-blue-50 text-blue-700 border-blue-100' };
+        if (o === 'chat') return { txt: 'Chat', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
+        return { txt: 'Manual', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+    }
+
+    function abrirChunkView(id) {
+        const payload = document.getElementById('chunk-payload-' + id);
+        if (!payload) return;
+        const titulo = payload.getAttribute('data-titulo') || '';
+        const origem = payload.getAttribute('data-origem') || 'manual';
+        const categoria = payload.getAttribute('data-categoria') || '';
+        const ativo = payload.getAttribute('data-ativo') === '1';
+        const tags = payload.getAttribute('data-tags') || '';
+        const fontes = payload.getAttribute('data-fontes') || '';
+        const atualizado = payload.getAttribute('data-atualizado') || '';
+        const raw = payload.querySelector('.chunk-conteudo-raw');
+        const conteudo = raw ? raw.textContent : '';
+
+        titleEl.textContent = titulo;
+        const o = origemLabel(origem);
+        let badges = '<span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border ' + o.cls + '">' + o.txt + '</span>';
+        if (categoria === 'regras') {
+            badges += '<span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-100">Regra</span>';
+        } else if (categoria) {
+            badges += '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-slate-200 border border-white/20">' + categoria + '</span>';
+        }
+        if (!ativo) {
+            badges += '<span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Inativo</span>';
+        }
+        badges += '<span class="text-[10px] text-slate-400">#' + id + '</span>';
+        badgesEl.innerHTML = badges;
+        conteudoEl.textContent = conteudo;
+
+        const metas = [];
+        metas.push('<div><span class="font-semibold text-slate-600">Atualizado</span><br>' + (atualizado || '—') + '</div>');
+        metas.push('<div><span class="font-semibold text-slate-600">Status</span><br>' + (ativo ? 'Ativo' : 'Inativo') + '</div>');
+        if (tags) metas.push('<div class="sm:col-span-2"><span class="font-semibold text-slate-600">Tags</span><br>' + tags + '</div>');
+        if (fontes) metas.push('<div class="sm:col-span-2"><span class="font-semibold text-slate-600">Tickets fonte</span><br>#' + fontes.split(',').map(function (s) { return s.trim(); }).filter(Boolean).join(', #') + '</div>');
+        metaEl.innerHTML = metas.join('');
+
+        modal.classList.add('is-open');
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        fecharX.focus();
+    }
+
+    function fecharChunkView() {
+        modal.classList.remove('is-open');
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('.chunk-view-open').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            abrirChunkView(btn.getAttribute('data-chunk-id'));
+        });
+    });
+    if (fecharX) fecharX.addEventListener('click', fecharChunkView);
+    if (fecharBtn) fecharBtn.addEventListener('click', fecharChunkView);
+    overlay.addEventListener('click', fecharChunkView);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+            e.stopPropagation();
+            fecharChunkView();
+        }
+    }, true);
 })();
 </script>
 {% endblock %}
