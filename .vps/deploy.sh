@@ -57,6 +57,10 @@ git checkout "${BRANCH}"
 # Produção deve espelhar o GitHub — descarta alterações locais acidentais
 git reset --hard "origin/${BRANCH}"
 
+# Fallback de cache-bust (?v=) se o processo não achar .git em runtime
+git rev-parse --short HEAD > helpdesk/.frontend_git_version
+log "Versão frontend: $(cat helpdesk/.frontend_git_version)"
+
 log "Ativando ambiente virtual..."
 # shellcheck source=/dev/null
 source "${VENV}/bin/activate"

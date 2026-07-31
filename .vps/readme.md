@@ -44,6 +44,8 @@ sudo systemctl daemon-reload
 sudo systemctl restart crm-ti
 ```
 
+**Cache de estáticos:** o exemplo em `nginx.conf.exemple` usa `expires 30d` em `/static/` (seguro com `?v=` nos templates). Se o site na VPS já tem SSL, copie só o bloco `location /static/` (não sobrescreva o conf inteiro) e rode `sudo nginx -t && sudo systemctl reload nginx`.
+
 **Após copiar nginx** — use `cp` do exemplo **só na primeira instalação** (sem SSL). Se o certbot já rodou, **não sobrescreva** o arquivo; edite com `nano` ou rode `sudo certbot --nginx -d ti.moneypromotora.com.br` (opção 1 reinstall):
 
 ```bash

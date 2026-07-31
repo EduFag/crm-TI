@@ -1,9 +1,8 @@
 from django import template
-from django.conf import settings
-from django.templatetags.static import static
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
+from core.templatetags.asset_version import url_com_versao, versao_assets
 from helpdesk.mentions import MENTION_RE
 from helpdesk.ticket_access import (
     usuario_pode_contestar_chamado,
@@ -13,22 +12,16 @@ from helpdesk.ticket_access import (
 register = template.Library()
 
 
-def _versao_frontend() -> str:
-    return getattr(settings, 'HELPDESK_FRONTEND_VERSION', '1') or '1'
-
-
 @register.simple_tag
 def helpdesk_static(path):
     """URL de static do helpdesk com ?v= para invalidar cache do browser."""
-    url = static(path)
-    sep = '&' if '?' in url else '?'
-    return f'{url}{sep}v={_versao_frontend()}'
+    return url_com_versao(path)
 
 
 @register.simple_tag
 def helpdesk_v():
     """Só o valor da versão (útil em hx-get e meta tags)."""
-    return _versao_frontend()
+    return versao_assets()
 
 
 @register.simple_tag(takes_context=True)

@@ -16,6 +16,9 @@ server {
 
     location /static/ {
         alias /home/edufa/crm-TI/staticfiles/;
+        # Cache longo OK: templates usam ?v=<hash> e invalidam a URL a cada deploy
+        expires 30d;
+        add_header Cache-Control "public";
         # Após collectstatic: chown edufa:www-data + chmod 755 em staticfiles e /home/edufa
     }
 
