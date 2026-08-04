@@ -1538,3 +1538,55 @@ def _msg_validacao(exc) -> str:
     if hasattr(exc, 'messages'):
         return '; '.join(str(m) for m in exc.messages)
     return str(exc)
+
+
+# ---------------------------------------------------------------------------
+# MoneyConsig (API B2B via Integrações → APIs)
+# ---------------------------------------------------------------------------
+
+
+def moneyconsig_auth_me() -> dict:
+    from integracoes.moneyconsig_client import auth_me
+    return auth_me()
+
+
+def moneyconsig_usuario_consultar(*, username: str = '', q: str = '') -> dict:
+    from integracoes.moneyconsig_client import usuarios_consulta
+    return usuarios_consulta(username=username, q=q)
+
+
+def moneyconsig_alerta_ti_listar(*, limite: int = 50) -> dict:
+    from integracoes.moneyconsig_client import alerta_ti_listar
+    return alerta_ti_listar(limite=limite)
+
+
+def moneyconsig_alerta_ti_criar(
+    *,
+    mensagem: str = '',
+    tipo_destinatario: str = '',
+    destinatarios_ids: list | None = None,
+) -> dict:
+    from integracoes.moneyconsig_client import alerta_ti_criar
+    return alerta_ti_criar(
+        mensagem=mensagem,
+        tipo_destinatario=tipo_destinatario,
+        destinatarios_ids=destinatarios_ids,
+    )
+
+
+def moneyconsig_alerta_ti_destinatarios(
+    *,
+    tipo: str = '',
+    empresas: str = '',
+    departamentos: str = '',
+    setores: str = '',
+    cargos: str = '',
+) -> dict:
+    from integracoes.moneyconsig_client import alerta_ti_destinatarios
+    return alerta_ti_destinatarios(
+        tipo,
+        empresas=empresas,
+        departamentos=departamentos,
+        setores=setores,
+        cargos=cargos,
+    )

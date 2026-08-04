@@ -8,6 +8,7 @@ from mcp_api.views import (
     emails,
     equipment,
     helpdesk,
+    moneyconsig,
     operadores,
     users,
 )
@@ -48,6 +49,17 @@ urlpatterns = [
     path('discador/acessos/criar/', discador.post_criar_acesso, name='mcp_discador_criar_acesso'),
     path('discador/acessos/liberar/', discador.post_liberar_acesso, name='mcp_discador_liberar_acesso'),
     path('discador/ramais/liberar-licenca/', discador.post_liberar_licenca, name='mcp_discador_liberar_licenca'),
+
+    # MoneyConsig (API B2B via integração cadastrada)
+    path('moneyconsig/auth-me/', moneyconsig.get_auth_me, name='mcp_moneyconsig_auth_me'),
+    path('moneyconsig/usuarios/consulta/', moneyconsig.get_usuarios_consulta, name='mcp_moneyconsig_usuarios'),
+    path('moneyconsig/alerta-ti/', moneyconsig.get_alerta_ti, name='mcp_moneyconsig_alerta_ti_list'),
+    path('moneyconsig/alerta-ti/criar/', moneyconsig.post_alerta_ti, name='mcp_moneyconsig_alerta_ti_criar'),
+    path(
+        'moneyconsig/alerta-ti/destinatarios/<str:tipo>/',
+        moneyconsig.get_alerta_ti_destinatarios,
+        name='mcp_moneyconsig_alerta_ti_destinatarios',
+    ),
 
     # Chips
     path('chips/', chips.list_chips, name='mcp_list_chips'),

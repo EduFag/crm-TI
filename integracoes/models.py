@@ -64,6 +64,61 @@ class IntegracaoIA(models.Model):
         return mascarar_token(self.token_hint)
 
 
+class IntegracaoApi(models.Model):
+    """Credencial de API externa (ex.: MoneyConsig B2B) cadastrada no sistema."""
+
+    class Provider(models.TextChoices):
+        MONEYCONSIG = 'moneyconsig', 'MoneyConsig'
+
+    name = models.CharField(max_length=120, help_text='Nome amigável da integração.')
+    provider = models.CharField(
+        max_length=32,
+        choices=Provider.choices,
+        help_text='Provedor da API externa.',
+    )
+    credentials_encrypted = models.TextField(
+        help_text='Credenciais JSON criptografadas (Fernet).',
+    )
+    token_hint = models.CharField(
+        max_length=8,
+        blank=True,
+        default='',
+        help_text='Últimos caracteres do token para exibição mascarada.',
+    )
+    is_active = models.BooleanField(default=True, help_text='Integração ativa.')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='integracoes_api_criadas',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'integração API'
+        verbose_name_plural = 'integrações API'
+
+    def __str__(self) -> str:
+        return f'{self.name} ({self.get_provider_display()})'
+
+    def set_credentials(self, data: dict) -> None:
+        """Criptografa credenciais e atualiza token_hint a partir de api_token."""
+        api_token = (data.get('api_token') or '').strip()
+        if api_token:
+            self.token_hint = api_token[-4:] if len(api_token) >= 4 else api_token
+        self.credentials_encrypted = encrypt_credentials(data)
+
+    def get_credentials(self) -> dict:
+        return decrypt_credentials(self.credentials_encrypted)
+
+    @property
+    def token_mascarado(self) -> str:
+        return mascarar_token(self.token_hint)
+
+
 class AssistenteConfig(models.Model):
     """Configuração singleton do Assistente no Helpdesk (pk=1)."""
 

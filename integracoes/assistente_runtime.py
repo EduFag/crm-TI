@@ -32,6 +32,11 @@ from helpdesk.assistente_services import (
     listar_campanhas_discador,
     listar_categorias_especificas,
     listar_ramais_discador,
+    moneyconsig_alerta_ti_criar,
+    moneyconsig_alerta_ti_destinatarios,
+    moneyconsig_alerta_ti_listar,
+    moneyconsig_auth_me,
+    moneyconsig_usuario_consultar,
     recusar_chamado,
     send_assistente_message,
     set_ticket_priority,
@@ -452,11 +457,98 @@ TOOLS_SPEC = [
     {
         'type': 'function',
         'function': {
+            'name': 'moneyconsig_auth_me',
+            'description': (
+                'Valida o token MoneyConsig cadastrado e retorna identidade/escopo. '
+                'Use se precisar confirmar se a integração B2B está ok.'
+            ),
+            'parameters': {'type': 'object', 'properties': {}, 'required': []},
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'moneyconsig_usuario_consultar',
+            'description': (
+                'Consulta usuário/funcionário no MoneyConsig (API B2B). '
+                'Passe username e/ou q (nome). Diferente de consultar_usuario (CRM local).'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'username': {'type': 'string'},
+                    'q': {'type': 'string', 'description': 'Busca por nome ou trecho.'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'moneyconsig_alerta_ti_listar',
+            'description': 'Lista alertas TI recentes no MoneyConsig (escopo do token).',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'limite': {'type': 'integer', 'description': '1–100, padrão 50.'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'moneyconsig_alerta_ti_criar',
+            'description': (
+                'Cria alerta TI no MoneyConsig. Use moneyconsig_alerta_ti_destinatarios '
+                'antes para obter IDs. Exige mensagem, tipo_destinatario e destinatarios_ids.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'mensagem': {'type': 'string'},
+                    'tipo_destinatario': {'type': 'string'},
+                    'destinatarios_ids': {
+                        'type': 'array',
+                        'items': {'type': 'integer'},
+                    },
+                },
+                'required': ['mensagem', 'tipo_destinatario', 'destinatarios_ids'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'moneyconsig_alerta_ti_destinatarios',
+            'description': (
+                'Lista destinatários MoneyConsig por tipo: '
+                'funcionarios|empresas|departamentos|setores|lojas|equipes|cargos. '
+                'Filtros opcionais em CSV: empresas, departamentos, setores, cargos.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tipo': {'type': 'string'},
+                    'empresas': {'type': 'string'},
+                    'departamentos': {'type': 'string'},
+                    'setores': {'type': 'string'},
+                    'cargos': {'type': 'string'},
+                },
+                'required': ['tipo'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'escalar_para_ti',
             'description': (
-                'Encerra o Assistente e pede técnico de TI. Use para MoneyConsig '
-                '(sistema interno Money Promotora — sem API/MCP ainda), AnyDesk, hardware, '
-                'permissões, ou quando o inventário discador estiver no limite (comprar ramais). '
+                'Encerra o Assistente e pede técnico de TI. Use para AnyDesk, hardware, '
+                'permissões, UI/abas MoneyConsig que a API não resolve, falha da API B2B, '
+                'ou inventário discador no limite (comprar ramais). '
                 'Nunca diga que MoneyConsig é de terceiros.'
             ),
             'parameters': {
@@ -759,7 +851,8 @@ def _system_prompt() -> str:
         'oriente a TI com send_assistente_message interno=true.\n'
         '- Chips WhatsApp: só consultar e atualizar status/obs. Não cria chip novo '
         'nem entrega chip reserva — use mensagem interna + escalar_para_ti.\n'
-        '- MoneyConsig: sistema interno; sem API — use escalar_para_ti.'
+        '- MoneyConsig: sistema interno; use tools moneyconsig_* (API B2B). '
+        'Escale só se a API falhar ou for UI/permissão humana.'
     )
 
 
@@ -877,6 +970,41 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
         if name == 'listar_campanhas_discador':
             return json.dumps(
                 listar_campanhas_discador(args.get('slug') or 'joytec'),
+                ensure_ascii=False,
+            )
+        if name == 'moneyconsig_auth_me':
+            return json.dumps(moneyconsig_auth_me(), ensure_ascii=False)
+        if name == 'moneyconsig_usuario_consultar':
+            return json.dumps(
+                moneyconsig_usuario_consultar(
+                    username=args.get('username') or '',
+                    q=args.get('q') or '',
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'moneyconsig_alerta_ti_listar':
+            return json.dumps(
+                moneyconsig_alerta_ti_listar(limite=args.get('limite') or 50),
+                ensure_ascii=False,
+            )
+        if name == 'moneyconsig_alerta_ti_criar':
+            return json.dumps(
+                moneyconsig_alerta_ti_criar(
+                    mensagem=args.get('mensagem') or '',
+                    tipo_destinatario=args.get('tipo_destinatario') or '',
+                    destinatarios_ids=args.get('destinatarios_ids') or [],
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'moneyconsig_alerta_ti_destinatarios':
+            return json.dumps(
+                moneyconsig_alerta_ti_destinatarios(
+                    tipo=args.get('tipo') or '',
+                    empresas=args.get('empresas') or '',
+                    departamentos=args.get('departamentos') or '',
+                    setores=args.get('setores') or '',
+                    cargos=args.get('cargos') or '',
+                ),
                 ensure_ascii=False,
             )
         if name == 'escalar_para_ti':

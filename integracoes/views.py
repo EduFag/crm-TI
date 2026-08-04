@@ -1,4 +1,4 @@
-"""Views da listagem e wizard de integrações IA."""
+"""Views da listagem e wizard de integrações IA e APIs externas."""
 
 from django.contrib import messages
 from django.http import HttpResponse
@@ -11,7 +11,13 @@ from django.views.generic import ListView
 from core.audit import MODULO_CORE, registrar_acao
 from core.models import RegistroAcao
 from core.permissions import MODULO_INTEGRACOES, ModuloObrigatorioMixin, requer_modulo
-from integracoes.models import IntegracaoIA
+from integracoes.api_providers import (
+    CAMPOS_META_API,
+    campos_do_provedor_api,
+    default_base_url_api,
+    lista_provedores_api,
+)
+from integracoes.models import IntegracaoApi, IntegracaoIA
 from integracoes.providers import (
     CAMPOS_META,
     base_url_do_provedor,
@@ -253,6 +259,288 @@ def ia_delete(request, pk):
     integracao.delete()
     messages.success(request, f'Integração "{nome}" removida.')
     return redirect('integracoes:ia_list')
+
+
+# ---------------------------------------------------------------------------
+# Integrações de API externa (MoneyConsig, etc.)
+# ---------------------------------------------------------------------------
+
+
+def _valores_formulario_api(request) -> dict:
+    valores = {k: request.POST.get(k, '') for k in request.POST.keys()}
+    valores.pop('api_token', None)
+    return valores
+
+
+def _extrair_payload_api(request, provider: str, *, exigindo_token: bool):
+    """Valida POST e devolve (name, credentials_dict, erros)."""
+    erros = []
+    fields = campos_do_provedor_api(provider)
+    if not fields:
+        return '', {}, ['Provedor inválido.']
+
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        erros.append('Informe o nome da integração.')
+
+    credentials = {}
+    for field in fields:
+        fname = field['name']
+        if fname in CAMPOS_META_API:
+            continue
+        valor = (request.POST.get(fname) or '').strip()
+        if valor:
+            credentials[fname] = valor
+        elif field.get('default') and fname == 'base_url':
+            credentials[fname] = field['default']
+
+    api_token = (credentials.get('api_token') or '').strip()
+    if exigindo_token and not api_token:
+        erros.append('Informe o Token Bearer.')
+
+    base_url = (credentials.get('base_url') or '').strip().rstrip('/')
+    if not base_url:
+        base_url = default_base_url_api(provider)
+    if not base_url:
+        erros.append('Informe a URL base.')
+    else:
+        credentials['base_url'] = base_url
+
+    return name, credentials, erros
+
+
+class ApiListView(ModuloObrigatorioMixin, ListView):
+    model = IntegracaoApi
+    template_name = 'integracoes/api_list.html'
+    context_object_name = 'integracoes'
+    modulo_obrigatorio = MODULO_INTEGRACOES
+
+    def get_queryset(self):
+        return IntegracaoApi.objects.all().order_by('-is_active', 'name')
+
+
+class ApiWizardCreateView(ModuloObrigatorioMixin, View):
+    """Modal wizard: passo 1 provedor, passo 2 credenciais."""
+    modulo_obrigatorio = MODULO_INTEGRACOES
+
+    def get(self, request):
+        if not request.headers.get('HX-Request'):
+            return redirect('integracoes:api_list')
+        return render(request, 'integracoes/_api_wizard_modal.html', {
+            'provedores': lista_provedores_api(),
+            'modo': 'create',
+            'form_action': reverse('integracoes:api_create'),
+        })
+
+    def post(self, request):
+        provider = (request.POST.get('provider') or '').strip()
+        if provider not in IntegracaoApi.Provider.values:
+            return render(request, 'integracoes/_api_wizard_modal.html', {
+                'provedores': lista_provedores_api(),
+                'modo': 'create',
+                'form_action': reverse('integracoes:api_create'),
+                'erro': 'Selecione um provedor de API.',
+                'provider_selecionado': provider,
+            }, status=422)
+
+        name, credentials, erros = _extrair_payload_api(
+            request, provider, exigindo_token=True,
+        )
+        if erros:
+            return render(request, 'integracoes/_api_wizard_modal.html', {
+                'provedores': lista_provedores_api(),
+                'modo': 'create',
+                'form_action': reverse('integracoes:api_create'),
+                'erro': ' '.join(erros),
+                'provider_selecionado': provider,
+                'valores': _valores_formulario_api(request),
+            }, status=422)
+
+        obj = IntegracaoApi(name=name, provider=provider, created_by=request.user)
+        obj.set_credentials(credentials)
+        obj.save()
+
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.CREATED,
+            descricao=f'Integração API "{obj.name}" ({obj.get_provider_display()}) criada.',
+            actor=request.user,
+            obj=obj,
+            metadata={'provider': obj.provider},
+        )
+        messages.success(request, f'Integração "{obj.name}" criada com sucesso.')
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('integracoes:api_list')
+        return response
+
+
+class ApiUpdateView(ModuloObrigatorioMixin, View):
+    """Edição em um passo (provedor fixo)."""
+    modulo_obrigatorio = MODULO_INTEGRACOES
+
+    def get(self, request, pk):
+        if not request.headers.get('HX-Request'):
+            return redirect('integracoes:api_list')
+        integracao = get_object_or_404(IntegracaoApi, pk=pk)
+        creds = integracao.get_credentials()
+        valores = {'name': integracao.name, **creds}
+        valores.pop('api_token', None)
+        return render(request, 'integracoes/_api_edit_modal.html', {
+            'integracao': integracao,
+            'campos': campos_do_provedor_api(integracao.provider),
+            'valores': valores,
+            'form_action': reverse('integracoes:api_update', args=[pk]),
+        })
+
+    def post(self, request, pk):
+        integracao = get_object_or_404(IntegracaoApi, pk=pk)
+        name, credentials, erros = _extrair_payload_api(
+            request, integracao.provider, exigindo_token=False,
+        )
+        atual = integracao.get_credentials()
+        if not credentials.get('api_token'):
+            if atual.get('api_token'):
+                credentials['api_token'] = atual['api_token']
+            else:
+                erros.append('Informe o Token Bearer.')
+
+        if erros:
+            valores_erro = _valores_formulario_api(request)
+            valores_erro['name'] = name or request.POST.get('name', '')
+            return render(request, 'integracoes/_api_edit_modal.html', {
+                'integracao': integracao,
+                'campos': campos_do_provedor_api(integracao.provider),
+                'valores': valores_erro,
+                'erro': ' '.join(erros),
+                'form_action': reverse('integracoes:api_update', args=[pk]),
+            }, status=422)
+
+        integracao.name = name
+        integracao.set_credentials(credentials)
+        integracao.save()
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.UPDATED,
+            descricao=f'Integração API "{integracao.name}" atualizada.',
+            actor=request.user,
+            obj=integracao,
+            metadata={'provider': integracao.provider},
+        )
+        messages.success(request, f'Integração "{integracao.name}" atualizada.')
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('integracoes:api_list')
+        return response
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def api_toggle_active(request, pk):
+    integracao = get_object_or_404(IntegracaoApi, pk=pk)
+    integracao.is_active = not integracao.is_active
+    integracao.save(update_fields=['is_active', 'updated_at'])
+    estado = 'ativada' if integracao.is_active else 'desativada'
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=(
+            RegistroAcao.AcaoChoices.ACTIVATED
+            if integracao.is_active
+            else RegistroAcao.AcaoChoices.DEACTIVATED
+        ),
+        descricao=f'Integração API "{integracao.name}" {estado}.',
+        actor=request.user,
+        obj=integracao,
+        metadata={'provider': integracao.provider, 'is_active': integracao.is_active},
+    )
+    messages.success(request, f'Integração "{integracao.name}" {estado}.')
+    return redirect('integracoes:api_list')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def api_delete(request, pk):
+    integracao = get_object_or_404(IntegracaoApi, pk=pk)
+    nome = integracao.name
+    provider = integracao.provider
+    pk_antigo = integracao.pk
+    registrar_acao(
+        modulo=MODULO_CORE,
+        acao=RegistroAcao.AcaoChoices.DELETED,
+        descricao=f'Integração API "{nome}" removida.',
+        actor=request.user,
+        obj=integracao,
+        metadata={'provider': provider, 'pk': pk_antigo},
+    )
+    integracao.delete()
+    messages.success(request, f'Integração "{nome}" removida.')
+    return redirect('integracoes:api_list')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def api_testar(request, pk):
+    """Testa conexão MoneyConsig via GET /api/b2b/auth/me/."""
+    integracao = get_object_or_404(IntegracaoApi, pk=pk)
+    if integracao.provider != IntegracaoApi.Provider.MONEYCONSIG:
+        return render(request, 'integracoes/_api_teste_resultado.html', {
+            'ok': False,
+            'mensagem': 'Teste disponível apenas para MoneyConsig.',
+            'integracao': integracao,
+        })
+
+    # Usa temporariamente esta integração mesmo se houver outra ativa
+    # (auth_me pega a primeira ativa — se for outra, ainda valida o token cadastrado)
+    from integracoes import moneyconsig_client as mc
+
+    creds = integracao.get_credentials()
+    token = (creds.get('api_token') or '').strip()
+    base = (creds.get('base_url') or mc.DEFAULT_BASE).strip().rstrip('/')
+    if not token:
+        return render(request, 'integracoes/_api_teste_resultado.html', {
+            'ok': False,
+            'mensagem': 'Token ausente nesta integração.',
+            'integracao': integracao,
+        })
+
+    # Chamada direta com as credenciais desta linha (não depende de “primeira ativa”)
+    import requests
+    from urllib.parse import urljoin
+
+    url = urljoin(base + '/', 'api/b2b/auth/me/')
+    try:
+        resp = requests.get(
+            url,
+            headers=mc._headers(token),
+            timeout=mc.TIMEOUT,
+        )
+        data = resp.json() if resp.content else {}
+    except Exception as exc:
+        return render(request, 'integracoes/_api_teste_resultado.html', {
+            'ok': False,
+            'mensagem': f'Falha ao conectar: {exc}',
+            'integracao': integracao,
+        })
+
+    if resp.status_code == 401:
+        return render(request, 'integracoes/_api_teste_resultado.html', {
+            'ok': False,
+            'mensagem': 'Token inválido ou sem permissão B2B (HTTP 401).',
+            'integracao': integracao,
+        })
+    if resp.status_code >= 400:
+        return render(request, 'integracoes/_api_teste_resultado.html', {
+            'ok': False,
+            'mensagem': f'HTTP {resp.status_code}: {data.get("detail") or data.get("erro") or resp.reason}',
+            'integracao': integracao,
+        })
+
+    nome = data.get('nome') or data.get('username') or '—'
+    escopo = data.get('escopo_label') or data.get('escopo') or '—'
+    return render(request, 'integracoes/_api_teste_resultado.html', {
+        'ok': True,
+        'mensagem': f'Conexão OK — {nome} · escopo {escopo}',
+        'integracao': integracao,
+        'detalhe': data,
+    })
 
 
 @requer_modulo(MODULO_INTEGRACOES)

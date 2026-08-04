@@ -9,13 +9,14 @@ Servidores MCP (stdio) que chamam a API Django em `/api/mcp/` com Bearer token.
 | mcp-helpdesk | `crm_mcp.helpdesk.server` | tickets, assistente (triagem/anexos/solicitante), aprendizado (chunks R/W), helpers chips/usuário |
 | mcp-chips | `crm_mcp.chips.server` | list/get/lookup + movements + `atualizar_status_chip` / `atualizar_observacao_chip` |
 | mcp-discador | `crm_mcp.discador.server` | inventário local CRM (licenças, ramais, acessos, campanhas, criar/liberar) — **não** acessa o site JoyTec |
+| mcp-moneyconsig | `crm_mcp.moneyconsig.server` | API B2B MoneyConsig (auth, usuários, alertas TI) via integração em Integrações → APIs |
 | mcp-equipment | `crm_mcp.equipment.server` | list_equipment, get_equipment, lookup_equipment_by_tag, list_equipment_logs |
 | mcp-emails | `crm_mcp.emails.server` | list_domains, list_accounts, get_account |
 | mcp-operadores | `crm_mcp.operadores.server` | list/get operadores, list/get WhatsApp (somente leitura) |
 | mcp-users | `crm_mcp.users.server` | list_users, get_user, lookup_user_by_username, list_equipes, list_equipe_membros |
 | mcp-audit | `crm_mcp.audit.server` | list_acoes, get_acao, sistema_status |
 
-**MoneyConsig:** sistema interno da Money; API oficial ainda não liberada — sem MCP neste repo.
+**MoneyConsig:** sistema interno da Money; token B2B cadastrado em Integrações → APIs. Use `mcp-moneyconsig`.
 
 **Discador JoyTec:** site externo. O MCP/CRM só controla o inventário manual (ramais + responsáveis). Criar ramal novo = suporte humano da discadora.
 
@@ -71,6 +72,18 @@ Discador **não** é espelhado no helpdesk MCP — use `mcp-discador`.
 | `criar_acesso_discador` | POST `discador/acessos/criar/` |
 | `liberar_acesso_discador` | POST `discador/acessos/liberar/` |
 | `liberar_licenca_ramal` | POST `discador/ramais/liberar-licenca/` |
+
+## Tools MoneyConsig (`mcp-moneyconsig`) — API B2B
+
+Requer integração ativa em Integrações → APIs (token Bearer + URL base).
+
+| Tool | Endpoint |
+|------|----------|
+| `moneyconsig_auth_me` | GET `moneyconsig/auth-me/` |
+| `moneyconsig_usuario_consultar` | GET `moneyconsig/usuarios/consulta/` |
+| `moneyconsig_alerta_ti_listar` | GET `moneyconsig/alerta-ti/` |
+| `moneyconsig_alerta_ti_criar` | POST `moneyconsig/alerta-ti/criar/` |
+| `moneyconsig_alerta_ti_destinatarios` | GET `moneyconsig/alerta-ti/destinatarios/<tipo>/` |
 
 ## Tools Operadores (`mcp-operadores`)
 

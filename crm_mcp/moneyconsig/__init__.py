@@ -1,0 +1,1 @@
+"""Pacote MCP MoneyConsig."""

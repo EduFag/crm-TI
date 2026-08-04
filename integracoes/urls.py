@@ -24,4 +24,11 @@ urlpatterns = [
     path('ia/<int:pk>/editar/', views.IAUpdateView.as_view(), name='ia_update'),
     path('ia/<int:pk>/toggle/', views.ia_toggle_active, name='ia_toggle'),
     path('ia/<int:pk>/excluir/', views.ia_delete, name='ia_delete'),
+    # APIs externas (MoneyConsig, etc.)
+    path('api/', views.ApiListView.as_view(), name='api_list'),
+    path('api/nova/', views.ApiWizardCreateView.as_view(), name='api_create'),
+    path('api/<int:pk>/editar/', views.ApiUpdateView.as_view(), name='api_update'),
+    path('api/<int:pk>/toggle/', views.api_toggle_active, name='api_toggle'),
+    path('api/<int:pk>/excluir/', views.api_delete, name='api_delete'),
+    path('api/<int:pk>/testar/', views.api_testar, name='api_testar'),
 ]

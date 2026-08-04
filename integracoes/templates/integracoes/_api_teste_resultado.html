@@ -1,0 +1,5 @@
+{# Resultado do teste de conexão MoneyConsig #}
+<div class="px-4 py-3 rounded-lg text-sm font-medium border
+     {% if ok %}bg-emerald-50 text-emerald-800 border-emerald-100{% else %}bg-red-50 text-red-700 border-red-100{% endif %}">
+    <span class="font-semibold">{{ integracao.name }}:</span> {{ mensagem }}
+</div>
