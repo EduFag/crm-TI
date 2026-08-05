@@ -16,6 +16,21 @@ TIMEOUT = 30
 DEFAULT_BASE = 'https://sistema.moneypromotora.com.br'
 
 
+def normalizar_base_url(url: str) -> str:
+    """Garante scheme https:// e remove barra final.
+
+    Aceita host sem scheme (ex.: sistema.moneypromotora.com.br).
+    """
+    base = (url or '').strip().rstrip('/')
+    if not base:
+        return DEFAULT_BASE
+    low = base.lower()
+    if low.startswith('http://') or low.startswith('https://'):
+        return base
+    # Host sem scheme → assume HTTPS
+    return f'https://{base}'
+
+
 def obter_integracao_moneyconsig() -> IntegracaoApi | None:
     """Retorna a primeira integração MoneyConsig ativa."""
     return (
@@ -48,9 +63,7 @@ def _resolver_creds() -> tuple[str, str] | dict:
     token = (creds.get('api_token') or '').strip()
     if not token:
         return _erro('Token MoneyConsig ausente na integração cadastrada.')
-    base = (creds.get('base_url') or DEFAULT_BASE).strip().rstrip('/')
-    if not base:
-        base = DEFAULT_BASE
+    base = normalizar_base_url(creds.get('base_url') or DEFAULT_BASE)
     return base, token
 
 

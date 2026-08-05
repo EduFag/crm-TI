@@ -298,13 +298,15 @@ def _extrair_payload_api(request, provider: str, *, exigindo_token: bool):
     if exigindo_token and not api_token:
         erros.append('Informe o Token Bearer.')
 
+    from integracoes.moneyconsig_client import normalizar_base_url
+
     base_url = (credentials.get('base_url') or '').strip().rstrip('/')
     if not base_url:
         base_url = default_base_url_api(provider)
     if not base_url:
         erros.append('Informe a URL base.')
     else:
-        credentials['base_url'] = base_url
+        credentials['base_url'] = normalizar_base_url(base_url)
 
     return name, credentials, erros
 
@@ -493,7 +495,7 @@ def api_testar(request, pk):
 
     creds = integracao.get_credentials()
     token = (creds.get('api_token') or '').strip()
-    base = (creds.get('base_url') or mc.DEFAULT_BASE).strip().rstrip('/')
+    base = mc.normalizar_base_url(creds.get('base_url') or mc.DEFAULT_BASE)
     if not token:
         return render(request, 'integracoes/_api_teste_resultado.html', {
             'ok': False,

@@ -86,6 +86,8 @@
                         {% endwith %}
                         {% if field.name == 'api_token' %}
                         <p class="mt-1 text-[11px] text-slate-400">Token gerado em Integração → Tokens no MoneyConsig. Será criptografado.</p>
+                        {% elif field.name == 'base_url' %}
+                        <p class="mt-1 text-[11px] text-slate-400">Pode informar só o host; o sistema adiciona https:// se faltar.</p>
                         {% endif %}
                     </div>
                     {% endfor %}
