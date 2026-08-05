@@ -59,7 +59,12 @@ from helpdesk.ticket_access import (
 )
 
 
-def _agendar_assistente(ticket_id: int) -> None:
+def _agendar_assistente(
+    ticket_id: int,
+    *,
+    comment_id: int | None = None,
+    gatilho: str = 'auto',
+) -> None:
     """Agenda processamento do Assistente em thread após o commit da request."""
     def _processar():
         from django.db import close_old_connections
@@ -67,7 +72,11 @@ def _agendar_assistente(ticket_id: int) -> None:
 
         close_old_connections()
         try:
-            processar_assistente(ticket_id)
+            processar_assistente(
+                ticket_id,
+                comment_id=comment_id,
+                gatilho=gatilho,
+            )
         finally:
             close_old_connections()
 
@@ -245,6 +254,13 @@ def _contexto_drawer(request, ticket, edit_form=None):
         ticket.comments.filter(is_active=True).order_by('-created_at'),
         request.user,
     )
+    ti_online = []
+    if usuario_eh_operador_helpdesk(request.user):
+        try:
+            from helpdesk.presence import listar_ti_online_resumo
+            ti_online = listar_ti_online_resumo()
+        except Exception:
+            ti_online = []
     return {
         'ticket': ticket,
         'comments': comments,
@@ -261,6 +277,7 @@ def _contexto_drawer(request, ticket, edit_form=None):
         'tecnicos': usuarios_tecnicos_para_transferencia() if usuario_pode_transferir_chamado(request.user) else CustomUser.objects.none(),
         'edit_form': edit_form or (TicketUpdateForm(instance=ticket, user=request.user) if pode_editar else None),
         'mostrar_edicao': edit_form is not None,
+        'ti_online': ti_online,
     }
 
 class KanbanView(ModuloObrigatorioMixin, TemplateView):
@@ -284,7 +301,15 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         tickets = filtrar_chamados_para_usuario(
             Ticket.objects.filter(is_active=True, is_archived=False),
             self.request.user,
-        ).select_related('assigned_to', 'created_by', 'requester_user', 'category', 'specific_category', 'equipe').prefetch_related('co_authors', 'attachments')
+        ).select_related(
+            'assigned_to', 'created_by', 'requester_user', 'category',
+            'specific_category', 'equipe', 'tag',
+        ).prefetch_related('co_authors', 'attachments')
+
+        # Filtro de funil por tag
+        tag_slug = (self.request.GET.get('tag') or '').strip()
+        if tag_slug:
+            tickets = tickets.filter(tag__slug=tag_slug)
         
         priority_ordering = Case(
             When(priority='URGENT', then=Value(4)),
@@ -336,8 +361,10 @@ class KanbanView(ModuloObrigatorioMixin, TemplateView):
         context['tickets_resolved'] = tickets_annotated.filter(status=Ticket.StatusChoices.RESOLVED).order_by('-updated_at')
         context['pode_operar_kanban'] = usuario_pode_operar_kanban(self.request.user)
 
-        from helpdesk.models import TicketSpecificCategory
+        from helpdesk.models import TicketSpecificCategory, TicketTag
         context['specific_categories'] = TicketSpecificCategory.objects.filter(is_active=True).order_by('name')
+        context['ticket_tags'] = TicketTag.objects.order_by('nome')[:80]
+        context['tag_filtro'] = tag_slug
 
         return context
 
@@ -457,6 +484,14 @@ def ticket_update_status(request, pk):
         status_anterior = ticket.status
         prioridade_anterior = ticket.priority
         triagem_anterior = ticket.specific_category
+
+        # Pendente: só TI e apenas a partir de Em Atendimento
+        if new_status == Ticket.StatusChoices.PENDING:
+            if status_anterior != Ticket.StatusChoices.IN_PROGRESS:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Só é possível mover para Pendente a partir de Em Atendimento.',
+                }, status=400)
 
         ticket.status = new_status
 
@@ -671,7 +706,9 @@ def ticket_contest(request, pk):
 @requer_modulo(MODULO_HELPDESK)
 def ticket_drawer(request, pk):
     ticket = get_object_or_404(
-        Ticket.objects.select_related('assigned_to', 'created_by', 'requester_user', 'category').prefetch_related('co_authors'),
+        Ticket.objects.select_related(
+            'assigned_to', 'created_by', 'requester_user', 'category', 'tag',
+        ).prefetch_related('co_authors'),
         pk=pk,
         is_active=True,
     )
@@ -956,9 +993,24 @@ def ticket_add_comment(request, pk):
             if mencionados:
                 agendar_notificacao_mencoes(ticket, mencionados, preview)
 
-        # Assistente: responde a solicitante OU a orientação interna da TI
-        if is_interno and usuario_pode_ver_comentarios_internos(request.user):
-            _agendar_assistente(ticket.pk)
+        # Assistente: responde a solicitante, orientação interna ou @assistente
+        from helpdesk.mentions import texto_menciona_assistente
+        mencionou_assistente = bool(text and texto_menciona_assistente(text))
+
+        if mencionou_assistente:
+            gatilho = 'mencao'
+            if quer_orientar_ia:
+                gatilho = 'orientacao'
+            _agendar_assistente(ticket.pk, comment_id=comment.pk, gatilho=gatilho)
+            if quer_orientar_ia and text and is_interno:
+                try:
+                    from integracoes.memoria_chat import aprender_de_orientacao
+                    aprender_de_orientacao(ticket, text, autor=request.user)
+                except Exception:
+                    pass
+        elif is_interno and usuario_pode_ver_comentarios_internos(request.user):
+            gatilho = 'orientacao' if quer_orientar_ia else 'continuacao'
+            _agendar_assistente(ticket.pk, comment_id=comment.pk, gatilho=gatilho)
             if quer_orientar_ia and text:
                 try:
                     from integracoes.memoria_chat import aprender_de_orientacao
@@ -967,7 +1019,7 @@ def ticket_add_comment(request, pk):
                     # Não bloqueia o comentário se o aprendizado falhar
                     pass
         elif not usuario_eh_operador_helpdesk(request.user) and not getattr(comment, 'is_assistente', False):
-            _agendar_assistente(ticket.pk)
+            _agendar_assistente(ticket.pk, comment_id=comment.pk, gatilho='auto')
 
     response = render(request, 'helpdesk/_comments_list.html', _contexto_comentarios(request, ticket))
     response['HX-Trigger'] = json.dumps({'ticketUpdated': True})
@@ -976,27 +1028,28 @@ def ticket_add_comment(request, pk):
 
 @requer_modulo(MODULO_HELPDESK)
 def mention_users_search(request):
-    """Autocomplete de @username — exclusivo para operadores helpdesk."""
-    if not usuario_eh_operador_helpdesk(request.user):
-        return JsonResponse({'results': []}, status=403)
-
+    """Autocomplete de @ — @assistente para todos; usernames só para operadores."""
     q = (request.GET.get('q') or '').strip().lstrip('@')
-    qs = CustomUser.objects.filter(is_active=True).exclude(pk=request.user.pk)
-    if q:
-        qs = qs.filter(
-            Q(username__icontains=q)
-            | Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-        )
-    qs = qs.order_by('username')[:15]
-    results = [
-        {
-            'username': u.username,
-            'label': u.get_full_name() or u.username,
-        }
-        for u in qs
-    ]
-    return JsonResponse({'results': results})
+    results = []
+    if not q or 'assistente'.startswith(q.lower()) or 'assist'.startswith(q.lower()):
+        results.append({
+            'username': 'assistente',
+            'label': 'Assistente (IA)',
+        })
+    if usuario_eh_operador_helpdesk(request.user):
+        qs = CustomUser.objects.filter(is_active=True).exclude(pk=request.user.pk)
+        if q:
+            qs = qs.filter(
+                Q(username__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+            )
+        for u in qs.order_by('username')[:15]:
+            results.append({
+                'username': u.username,
+                'label': u.get_full_name() or u.username,
+            })
+    return JsonResponse({'results': results[:16]})
 
 
 @requer_modulo(MODULO_HELPDESK)

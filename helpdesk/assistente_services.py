@@ -223,6 +223,11 @@ def send_assistente_message(
         texto = (text or '').strip()
     else:
         texto = limpar_texto_para_solicitante(text)
+        # Pública deve ser breve — corta em ~2 frases / 280 chars
+        if len(texto) > 280:
+            corte = texto[:280]
+            ponto = max(corte.rfind('.'), corte.rfind('!'), corte.rfind('?'))
+            texto = (corte[: ponto + 1] if ponto >= 80 else corte).strip()
     if not texto:
         raise AssistenteServiceError(
             'Texto do comentário é obrigatório'
@@ -235,6 +240,33 @@ def send_assistente_message(
     ticket = Ticket.objects.filter(pk=ticket_id).first()
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
+
+    # Anti-repetição: compara com últimas mensagens públicas do Assistente
+    if not interno:
+        recentes = list(
+            Comment.objects.filter(
+                ticket=ticket,
+                is_active=True,
+                is_assistente=True,
+                is_interno=False,
+            )
+            .order_by('-created_at')
+            .values_list('text', flat=True)[:8]
+        )
+        norm_novo = re.sub(r'\s+', ' ', texto.lower()).strip()
+        for antigo in recentes:
+            norm_antigo = re.sub(r'\s+', ' ', (antigo or '').lower()).strip()
+            if not norm_antigo:
+                continue
+            if norm_novo == norm_antigo or (
+                len(norm_novo) > 40 and norm_novo in norm_antigo
+            ) or (
+                len(norm_antigo) > 40 and norm_antigo in norm_novo
+            ):
+                raise AssistenteServiceError(
+                    'Mensagem repetida em relação ao histórico recente do Assistente. '
+                    'Reformule ou use canal interno para detalhes.'
+                )
 
     pedacos = _partir_texto_assistente(texto)
     # Mensagem interna: uma bolha só (orientação à TI)
@@ -316,10 +348,16 @@ def set_ticket_priority(ticket_id: int, priority: str) -> dict:
     }
 
 
-def set_ticket_status(ticket_id: int, status: str) -> dict:
+def set_ticket_status(ticket_id: int, status: str, *, via_assistente: bool = False) -> dict:
     status = (status or '').strip().upper()
     if status not in STATUS_VALIDOS:
         raise AssistenteServiceError(f'Status inválido. Use: {", ".join(sorted(STATUS_VALIDOS))}.')
+    # Assistente não usa Pendente — só TI após Em Atendimento
+    if via_assistente and status == Ticket.StatusChoices.PENDING:
+        raise AssistenteServiceError(
+            'O Assistente não pode mover para Pendente. '
+            'Use IN_PROGRESS, RESOLVED ou escalar_para_ti.'
+        )
     ticket = Ticket.objects.filter(pk=ticket_id).first()
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
@@ -351,31 +389,50 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> dict:
         'assistente_followup_mencao_em',
         'updated_at',
     ]
-    if ticket.status == Ticket.StatusChoices.NEW:
-        ticket.status = Ticket.StatusChoices.PENDING
-        update_fields.append('status')
+    # Não move para PENDING — só TI coloca Pendente a partir de Em Atendimento
     ticket.save(update_fields=update_fields)
 
     motivo_limpo = (motivo or '').strip()
-    texto = (
+    # Mensagem pública breve (máx. 2 frases)
+    texto_publico = (
         'Encaminhei este chamado para a equipe de TI analisar. '
         'Um técnico assumirá o atendimento em breve.'
     )
-    if motivo_limpo:
-        texto = f'{texto}\n\nMotivo: {motivo_limpo}'
     comment = Comment.objects.create(
         ticket=ticket,
         author=None,
-        text=texto,
+        text=texto_publico,
         is_assistente=True,
+        is_interno=False,
     )
-    _notificar_comentario_assistente(ticket, texto)
+    _notificar_comentario_assistente(ticket, texto_publico)
+
+    comment_interno_id = None
+    if motivo_limpo:
+        texto_interno = (
+            f'[ESCALONAMENTO] Diagnóstico e próximos passos para a TI:\n{motivo_limpo}'
+        )
+        c_int = Comment.objects.create(
+            ticket=ticket,
+            author=None,
+            text=texto_interno,
+            is_assistente=True,
+            is_interno=True,
+        )
+        comment_interno_id = c_int.pk
+        try:
+            from helpdesk.views.kanban import adicionar_nao_lido_operadores
+            adicionar_nao_lido_operadores(ticket, None)
+        except Exception:
+            pass
+
     return {
         'ok': True,
         'ticket_id': ticket.pk,
         'assistente_escalado': True,
         'status': ticket.status,
         'comment_id': comment.pk,
+        'comment_interno_id': comment_interno_id,
     }
 
 
@@ -1590,3 +1647,292 @@ def moneyconsig_alerta_ti_destinatarios(
         setores=setores,
         cargos=cargos,
     )
+
+
+# ---------------------------------------------------------------------------
+# Tags de funil
+# ---------------------------------------------------------------------------
+
+
+def _normalizar_tag_nome(nome: str) -> str:
+    nome = re.sub(r'\s+', ' ', (nome or '').strip())
+    if len(nome) > 30:
+        nome = nome[:30].rstrip()
+    return nome
+
+
+def definir_tag_chamado(ticket_id: int, tag: str = '', *, limpar: bool = False) -> dict:
+    """Define ou remove a única tag do chamado (cria TicketTag se necessário)."""
+    from django.utils.text import slugify
+
+    from helpdesk.models import TicketTag
+
+    ticket = Ticket.objects.filter(pk=ticket_id).select_related('tag').first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+
+    if limpar or not (tag or '').strip():
+        antes = ticket.tag.nome if ticket.tag_id else None
+        ticket.tag = None
+        ticket.save(update_fields=['tag', 'updated_at'])
+        return {'ok': True, 'ticket_id': ticket.pk, 'tag': None, 'tag_antes': antes}
+
+    nome = _normalizar_tag_nome(tag)
+    if len(nome) < 2:
+        raise AssistenteServiceError('Tag muito curta (mín. 2 caracteres).')
+    slug = slugify(nome)[:40] or 'tag'
+    obj, created = TicketTag.objects.get_or_create(
+        slug=slug,
+        defaults={'nome': nome, 'criada_por_ia': True},
+    )
+    if not created and obj.nome != nome and len(nome) <= 30:
+        # Mantém nome existente; só associa
+        pass
+    antes = ticket.tag.nome if ticket.tag_id else None
+    ticket.tag = obj
+    ticket.save(update_fields=['tag', 'updated_at'])
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'tag': obj.nome,
+        'tag_id': obj.pk,
+        'criada': created,
+        'tag_antes': antes,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Presença / ajuda TI
+# ---------------------------------------------------------------------------
+
+
+def listar_ti_online() -> dict:
+    from helpdesk.presence import listar_ti_online_resumo
+    itens = listar_ti_online_resumo()
+    return {'ok': True, 'count': len(itens), 'results': itens}
+
+
+def pedir_ajuda_ti(ticket_id: int, pergunta: str) -> dict:
+    """Pergunta interna mencionando todos os TI online (anti-spam 10 min)."""
+    from datetime import timedelta
+
+    from helpdesk.mentions import processar_mencoes_assistente
+    from helpdesk.presence import usuarios_ti_online
+
+    pergunta = (pergunta or '').strip()
+    if not pergunta:
+        raise AssistenteServiceError('Informe a pergunta para a TI.')
+
+    ticket = Ticket.objects.filter(pk=ticket_id).first()
+    if not ticket:
+        raise AssistenteServiceError('Chamado não encontrado.', 404)
+
+    if ticket.assistente_ajuda_ti_em:
+        delta = timezone.now() - ticket.assistente_ajuda_ti_em
+        if delta < timedelta(minutes=10):
+            # Se TI já respondeu internamente depois, libera
+            respondeu = Comment.objects.filter(
+                ticket=ticket,
+                is_active=True,
+                is_interno=True,
+                is_assistente=False,
+                created_at__gt=ticket.assistente_ajuda_ti_em,
+            ).exists()
+            if not respondeu:
+                raise AssistenteServiceError(
+                    'Já existe pedido de ajuda recente aguardando resposta da TI. '
+                    'Aguarde ou continue com o contexto disponível.'
+                )
+
+    online = usuarios_ti_online()
+    if not online:
+        raise AssistenteServiceError(
+            'Nenhum membro da TI online no momento. '
+            'Deixe nota interna sem @ ou use escalar_para_ti.'
+        )
+
+    mencoes = ' '.join(f'@{u.username}' for u in online)
+    texto = f'{mencoes}\n[AJUDA TI] {pergunta}'
+    comment = Comment.objects.create(
+        ticket=ticket,
+        author=None,
+        text=texto,
+        is_assistente=True,
+        is_interno=True,
+    )
+    mencionados = processar_mencoes_assistente(ticket, comment)
+    ticket.assistente_ajuda_ti_em = timezone.now()
+    ticket.save(update_fields=['assistente_ajuda_ti_em', 'updated_at'])
+
+    try:
+        from helpdesk.views.kanban import adicionar_nao_lido_operadores
+        adicionar_nao_lido_operadores(ticket, None)
+    except Exception:
+        pass
+    if mencionados:
+        try:
+            from helpdesk.notifications import agendar_notificacao_mencoes
+            agendar_notificacao_mencoes(ticket, mencionados, f'[Interno] {pergunta[:100]}')
+        except Exception:
+            pass
+
+    return {
+        'ok': True,
+        'ticket_id': ticket.pk,
+        'comment_id': comment.pk,
+        'mencionados': [u.username for u in mencionados],
+        'online': len(online),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Chips — só com autorização de menção interna TI
+# ---------------------------------------------------------------------------
+
+
+def _resolver_titular_chip(
+    *,
+    tipo_titular: str,
+    nome_livre: str = '',
+    user_id=None,
+    operador_id=None,
+):
+    from core.models import CustomUser
+
+    tipo = (tipo_titular or 'texto').strip().lower()
+    if tipo == 'usuario':
+        if not user_id:
+            raise AssistenteServiceError('Informe user_id para titular tipo usuario.')
+        user = CustomUser.objects.filter(pk=user_id, is_active=True).first()
+        if not user:
+            raise AssistenteServiceError('Usuário não encontrado.', 404)
+        nome = user.get_full_name() or user.username
+        return nome, user, None
+    if tipo == 'operador':
+        if not operador_id:
+            raise AssistenteServiceError('Informe operador_id para titular tipo operador.')
+        from operadores.models import Operador
+        op = Operador.objects.filter(pk=operador_id).first()
+        if not op:
+            raise AssistenteServiceError('Operador não encontrado.', 404)
+        nome = getattr(op, 'nome', None) or str(op)
+        return nome, None, op
+    nome = (nome_livre or '').strip()
+    if not nome:
+        raise AssistenteServiceError('Informe nome_livre para titular tipo texto.')
+    return nome, None, None
+
+
+def criar_chip_assistente(
+    ticket_id: int,
+    *,
+    line_number: str,
+    operator_id: int,
+    tipo_titular: str = 'texto',
+    nome_livre: str = '',
+    user_id=None,
+    operador_id=None,
+    observacao: str = '',
+    actor=None,
+) -> dict:
+    """Cria chip operacional (somente com autorização TI interna)."""
+    from django.core.exceptions import ValidationError
+
+    from chips.models import Operator
+    from chips.services import criar_chip_operacional
+
+    line_number = (line_number or '').strip()
+    if not line_number:
+        raise AssistenteServiceError('Informe line_number.')
+    if not operator_id:
+        raise AssistenteServiceError('Informe operator_id da operadora.')
+    operator = Operator.objects.filter(pk=operator_id).first()
+    if not operator:
+        raise AssistenteServiceError('Operadora não encontrada.', 404)
+
+    nome, emp_user, emp_op = _resolver_titular_chip(
+        tipo_titular=tipo_titular,
+        nome_livre=nome_livre,
+        user_id=user_id,
+        operador_id=operador_id,
+    )
+    try:
+        grid = criar_chip_operacional(
+            line_number=line_number,
+            operator=operator,
+            employee_name=nome,
+            employee_user=emp_user,
+            employee_operador=emp_op,
+            observacao=observacao or '',
+            actor=actor,
+        )
+    except ValidationError as exc:
+        raise AssistenteServiceError(str(exc)) from exc
+
+    send_assistente_message(
+        ticket_id,
+        f'Chip {line_number} criado/entregue para {nome} (pedido TI).',
+        interno=True,
+    )
+    return {'ok': True, 'ticket_id': ticket_id, 'chip': grid}
+
+
+def transferir_chip_assistente(
+    ticket_id: int,
+    *,
+    chip_id=None,
+    line_number: str = '',
+    tipo_titular: str = 'texto',
+    nome_livre: str = '',
+    user_id=None,
+    operador_id=None,
+    actor=None,
+) -> dict:
+    """Entrega (AVAILABLE) ou transfere (IN_USE) chip — só com autorização TI."""
+    from django.core.exceptions import ValidationError
+
+    from chips.models import Chip
+    from chips.services import entregar_chip, transferir_chip
+
+    chip = None
+    if chip_id:
+        chip = Chip.objects.filter(pk=chip_id).first()
+    elif line_number:
+        chip = Chip.objects.filter(line_number__iexact=line_number.strip()).first()
+    if not chip:
+        raise AssistenteServiceError('Chip não encontrado.', 404)
+
+    nome, emp_user, emp_op = _resolver_titular_chip(
+        tipo_titular=tipo_titular,
+        nome_livre=nome_livre,
+        user_id=user_id,
+        operador_id=operador_id,
+    )
+    try:
+        if chip.usage_status == Chip.UsageChoices.AVAILABLE:
+            grid = entregar_chip(
+                chip,
+                employee_name=nome,
+                employee_user=emp_user,
+                employee_operador=emp_op,
+                actor=actor,
+            )
+            acao = 'entregue'
+        else:
+            grid = transferir_chip(
+                chip,
+                novo_nome=nome,
+                novo_user=emp_user,
+                novo_operador=emp_op,
+                actor=actor,
+            )
+            acao = 'transferido'
+    except ValidationError as exc:
+        raise AssistenteServiceError(str(exc)) from exc
+
+    send_assistente_message(
+        ticket_id,
+        f'Chip {chip.line_number} {acao} para {nome} (pedido TI).',
+        interno=True,
+    )
+    return {'ok': True, 'ticket_id': ticket_id, 'acao': acao, 'chip': grid}

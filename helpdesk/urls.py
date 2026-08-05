@@ -66,4 +66,6 @@ urlpatterns = [
     path('informative/<int:message_id>/acknowledge/', views.informative_acknowledge, name='informative_acknowledge'),
 
     path('api/mention-users/', views.mention_users_search, name='mention_users_search'),
+    path('api/presence/heartbeat/', views.presence_heartbeat, name='presence_heartbeat'),
+    path('api/presence/ti-online/', views.presence_ti_online, name='presence_ti_online'),
 ]

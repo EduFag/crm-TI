@@ -174,6 +174,19 @@ class Ticket(models.Model):
         blank=True,
         help_text='Quando o Assistente cobrou resposta com @menção (follow-up de 5 min).',
     )
+    tag = models.ForeignKey(
+        'TicketTag',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tickets',
+        help_text='Tag curta de funil/follow-up (uma por chamado).',
+    )
+    assistente_ajuda_ti_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Última solicitação de ajuda do Assistente aos técnicos online (anti-spam).',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
@@ -507,11 +520,43 @@ class TicketMention(models.Model):
         return f'@{self.user.username} em chamado #{self.ticket_id}'
 
 
+class TicketTag(models.Model):
+    """Tag curta reutilizável para funil/follow-up dos chamados (máx. 1 por ticket)."""
+
+    nome = models.CharField(max_length=30, unique=True, help_text='Nome curto da tag (sem espaços longos).')
+    slug = models.SlugField(max_length=40, unique=True, help_text='Identificador normalizado.')
+    criada_por_ia = models.BooleanField(default=False, help_text='True se criada pelo Assistente.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['nome']
+        verbose_name = 'tag de chamado'
+        verbose_name_plural = 'tags de chamado'
+
+    def __str__(self) -> str:
+        return self.nome
+
+
 class InformativeMessage(models.Model):
     """
     Mensagens informativas trocadas no chat 'Central Informativa'.
     """
     text = models.TextField(help_text='Conteúdo da mensagem.')
+    palavras_chave = models.CharField(
+        max_length=400,
+        blank=True,
+        default='',
+        help_text='Palavras-chave separadas por vírgula para o Assistente consultar.',
+    )
+    valido_ate = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Opcional: data de validade do comunicado (inclusive).',
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text='Se falso, o Assistente ignora o comunicado.',
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -533,3 +578,34 @@ class InformativeMessage(models.Model):
 
     def __str__(self):
         return f'Info by {self.created_by.username} at {self.created_at}'
+
+    @property
+    def vigente(self) -> bool:
+        """True se ativo e sem validade expirada."""
+        if not self.ativo:
+            return False
+        if self.valido_ate is None:
+            return True
+        return self.valido_ate >= timezone.localdate()
+
+
+class UserPresence(models.Model):
+    """Heartbeat de presença online dos usuários (TI no helpdesk)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='presence',
+        help_text='Usuário monitorado.',
+    )
+    last_seen = models.DateTimeField(
+        db_index=True,
+        help_text='Último heartbeat recebido.',
+    )
+
+    class Meta:
+        verbose_name = 'presença de usuário'
+        verbose_name_plural = 'presenças de usuários'
+
+    def __str__(self) -> str:
+        return f'{self.user_id} @ {self.last_seen}'

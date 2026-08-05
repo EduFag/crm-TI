@@ -227,6 +227,11 @@ class AssistenteInteracao(models.Model):
 
     ticket_id = models.PositiveIntegerField(db_index=True)
     chunk_ids = models.JSONField(default=list, blank=True)
+    informative_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='IDs de InformativeMessage usados nesta rodada.',
+    )
     hybrid = models.BooleanField(
         default=False,
         help_text='True se a query usou embedding semântico nesta rodada.',

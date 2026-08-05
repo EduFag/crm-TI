@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from contextvars import ContextVar
 from typing import Any
 
 from django.db.models import Q
@@ -23,6 +24,8 @@ from helpdesk.assistente_services import (
     consultar_equipamento,
     consultar_licencas_discador,
     consultar_usuario,
+    criar_chip_assistente,
+    definir_tag_chamado,
     descrever_imagem_anexo,
     escalar_para_ti,
     extrair_texto_pdf_anexo,
@@ -32,16 +35,19 @@ from helpdesk.assistente_services import (
     listar_campanhas_discador,
     listar_categorias_especificas,
     listar_ramais_discador,
+    listar_ti_online,
     moneyconsig_alerta_ti_criar,
     moneyconsig_alerta_ti_destinatarios,
     moneyconsig_alerta_ti_listar,
     moneyconsig_auth_me,
     moneyconsig_usuario_consultar,
+    pedir_ajuda_ti,
     recusar_chamado,
     send_assistente_message,
     set_ticket_priority,
     set_ticket_status,
     ticket_tem_orientacao_interna_pendente,
+    transferir_chip_assistente,
     triar_chamado,
 )
 from helpdesk.models import Comment, Ticket
@@ -53,18 +59,27 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 6
 
+# Contexto da rodada atual (gatilho, autorização chips, etc.)
+_rodada_ctx: ContextVar[dict] = ContextVar('assistente_rodada', default={})
+
+GATILHO_AUTO = 'auto'
+GATILHO_MENCAO = 'mencao'
+GATILHO_ORIENTACAO = 'orientacao'
+GATILHO_CONTINUACAO = 'continuacao'
+
+TOOLS_CHIP_SENSIVEIS = frozenset({
+    'criar_chip_operacional',
+    'transferir_chip',
+})
 TOOLS_SPEC = [
     {
         'type': 'function',
         'function': {
             'name': 'send_assistente_message',
             'description': (
-                'Envia uma mensagem CURTA. Por padrão (interno=false) vai ao solicitante. '
-                'Com interno=true: só TI/staff vê (canal privado) — use para orientar a TI '
-                'após triagem/escalonamento ou alinhar sem o solicitante ler. '
-                'Chame de novo para a próxima fala pública — prefira 2–4 bolhas. '
-                'O campo text: sem raciocínio, "Ok, vou...", "1ª mensagem:" ou planos. '
-                'Use Markdown leve (**negrito**, listas).'
+                'Envia mensagem. Público (interno=false): BREVE e direta (1–2 frases), '
+                'sem diagnóstico longo. Interno (interno=true): pode detalhar para a TI. '
+                'Não repita o que já disse no histórico. Prefira 2–4 bolhas públicas curtas.'
             ),
             'parameters': {
                 'type': 'object',
@@ -107,13 +122,16 @@ TOOLS_SPEC = [
         'type': 'function',
         'function': {
             'name': 'set_ticket_status',
-            'description': 'Altera a coluna/status do Kanban. Use RESOLVED só se o problema foi resolvido sem TI.',
+            'description': (
+                'Altera status do Kanban. NÃO use PENDING (só TI após Em Atendimento). '
+                'Use RESOLVED só se o problema foi resolvido sem TI.'
+            ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'status': {
                         'type': 'string',
-                        'enum': ['NEW', 'IN_PROGRESS', 'PENDING', 'RESOLVED'],
+                        'enum': ['NEW', 'IN_PROGRESS', 'RESOLVED'],
                     },
                 },
                 'required': ['status'],
@@ -544,12 +562,107 @@ TOOLS_SPEC = [
     {
         'type': 'function',
         'function': {
+            'name': 'definir_tag_chamado',
+            'description': (
+                'Define a única tag curta do chamado (funil/follow-up, máx. 30 chars). '
+                'Ex.: sem-internet, joytec-524, chip-ban. Use limpar=true para remover.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tag': {'type': 'string'},
+                    'limpar': {'type': 'boolean'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'listar_ti_online',
+            'description': 'Lista membros da TI online agora (para pedir ajuda interna).',
+            'parameters': {'type': 'object', 'properties': {}, 'required': []},
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'pedir_ajuda_ti',
+            'description': (
+                'Pergunta no chat INTERNO mencionando todos os TI online. '
+                'Use quando faltar informação, dúvida ou o usuário não entender. '
+                'Anti-spam: não repita se já houver pedido recente sem resposta.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'pergunta': {'type': 'string'},
+                },
+                'required': ['pergunta'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'criar_chip_operacional',
+            'description': (
+                'Cria chip e entrega. SÓ funciona se esta rodada veio de @assistente '
+                'em mensagem INTERNA de membro TI. Confirma só no canal interno.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'line_number': {'type': 'string'},
+                    'operator_id': {'type': 'integer'},
+                    'tipo_titular': {
+                        'type': 'string',
+                        'enum': ['texto', 'usuario', 'operador'],
+                    },
+                    'nome_livre': {'type': 'string'},
+                    'user_id': {'type': 'integer'},
+                    'operador_id': {'type': 'integer'},
+                    'observacao': {'type': 'string'},
+                },
+                'required': ['line_number', 'operator_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'transferir_chip',
+            'description': (
+                'Entrega (AVAILABLE) ou transfere (IN_USE) chip. SÓ com @assistente '
+                'em mensagem INTERNA de TI nesta rodada.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'chip_id': {'type': 'integer'},
+                    'line_number': {'type': 'string'},
+                    'tipo_titular': {
+                        'type': 'string',
+                        'enum': ['texto', 'usuario', 'operador'],
+                    },
+                    'nome_livre': {'type': 'string'},
+                    'user_id': {'type': 'integer'},
+                    'operador_id': {'type': 'integer'},
+                },
+                'required': [],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'escalar_para_ti',
             'description': (
-                'Encerra o Assistente e pede técnico de TI. Use para AnyDesk, hardware, '
-                'permissões, UI/abas MoneyConsig que a API não resolve, falha da API B2B, '
-                'ou inventário discador no limite (comprar ramais). '
-                'Nunca diga que MoneyConsig é de terceiros.'
+                'Encerra o Assistente e pede técnico de TI. A mensagem PÚBLICA será breve; '
+                'coloque diagnóstico detalhado em motivo (vai para o chat interno). '
+                'Use para AnyDesk, hardware, permissões, UI MoneyConsig, falha de API, etc. '
+                'Nunca diga que MoneyConsig é de terceiros. NÃO move para Pendente.'
             ),
             'parameters': {
                 'type': 'object',
@@ -762,13 +875,54 @@ def _resumo_anexos(ticket: Ticket) -> str:
     return '\n'.join(linhas)
 
 
-def _montar_contexto(ticket: Ticket) -> tuple[str, list[int], bool]:
-    """Monta o contexto do chamado. Retorna (texto, chunk_ids, hybrid)."""
-    comentarios = (
+def _selecionar_historico_recente(
+    ticket: Ticket,
+    *,
+    comment_id: int | None = None,
+) -> list[Comment]:
+    """Até 15 msgs da IA + 5 TI + 5 usuário, mais o comentário gatilho."""
+    qs = (
         Comment.objects.filter(ticket=ticket, is_active=True)
         .select_related('author')
-        .order_by('created_at')[:40]
+        .order_by('-created_at')
     )
+    ia: list[Comment] = []
+    ti: list[Comment] = []
+    user: list[Comment] = []
+    for c in qs[:120]:
+        if c.is_assistente:
+            if len(ia) < 15:
+                ia.append(c)
+        elif c.author_id and usuario_eh_operador_helpdesk(c.author):
+            if len(ti) < 5:
+                ti.append(c)
+        else:
+            if len(user) < 5:
+                user.append(c)
+        if len(ia) >= 15 and len(ti) >= 5 and len(user) >= 5:
+            break
+
+    por_id = {c.pk: c for c in (ia + ti + user)}
+    if comment_id and comment_id not in por_id:
+        gatilho = (
+            Comment.objects.filter(pk=comment_id, ticket=ticket, is_active=True)
+            .select_related('author')
+            .first()
+        )
+        if gatilho:
+            por_id[gatilho.pk] = gatilho
+
+    return sorted(por_id.values(), key=lambda c: c.created_at)
+
+
+def _montar_contexto(
+    ticket: Ticket,
+    *,
+    comment_id: int | None = None,
+    gatilho: str = GATILHO_AUTO,
+) -> tuple[str, list[int], bool, list[int]]:
+    """Monta o contexto. Retorna (texto, chunk_ids, hybrid, informative_ids)."""
+    comentarios = _selecionar_historico_recente(ticket, comment_id=comment_id)
     linhas = []
     for c in comentarios:
         if c.is_assistente:
@@ -779,7 +933,8 @@ def _montar_contexto(ticket: Ticket) -> tuple[str, list[int], bool]:
             autor = 'Sistema'
         marca = ' [INTERNO TI]' if c.is_interno else ''
         extra = ' [tem anexo]' if c.attachment else ''
-        linhas.append(f'[{autor}]{marca}{extra} {c.text}')
+        gatilho_marca = ' [GATILHO DESTA RODADA]' if comment_id and c.pk == comment_id else ''
+        linhas.append(f'[{autor}]{marca}{extra}{gatilho_marca} {c.text}')
 
     chunks, hybrid = _chunks_relevantes(ticket)
     from integracoes.regras_seed import chunk_eh_regra
@@ -792,6 +947,7 @@ def _montar_contexto(ticket: Ticket) -> tuple[str, list[int], bool]:
     ) or '(sem chunks de aprendizado)'
     cat_esp = ticket.specific_category.name if ticket.specific_category_id else '(não triado)'
     equipe_nome = ticket.equipe.name if ticket.equipe_id else '(não informada)'
+    tag_txt = ticket.tag.nome if getattr(ticket, 'tag_id', None) else '(sem tag)'
 
     if ticket.requester_user_id:
         ru = ticket.requester_user
@@ -812,25 +968,38 @@ def _montar_contexto(ticket: Ticket) -> tuple[str, list[int], bool]:
         if usuario_eh_operador_helpdesk(cb):
             criador_txt += ' [membro da TI]'
 
+    # Central Informativa
+    from helpdesk.informative_retrieval import (
+        buscar_comunicados_relevantes,
+        formatar_comunicados_para_contexto,
+    )
+    comunicados = buscar_comunicados_relevantes(ticket, limite=5)
+    info_ids = [c['id'] for c in comunicados]
+    central_txt = formatar_comunicados_para_contexto(comunicados)
+
     texto = (
         f'Chamado #{ticket.pk}\n'
         f'Título: {ticket.title}\n'
         f'Descrição: {ticket.description}\n'
         f'Status: {ticket.status}\n'
         f'Prioridade: {ticket.priority or "(não definida)"}\n'
+        f'Tag de funil: {tag_txt}\n'
         f'Categoria: {ticket.category.name if ticket.category_id else "-"}\n'
         f'Categoria específica: {cat_esp}\n'
         f'Equipe/Setor (unidade afetada — NÃO é o solicitante): {equipe_nome}\n'
         f'Solicitante: {sol_txt}\n'
         f'Aberto por (created_by): {criador_txt}\n'
-        f'Atribuído a: {(ticket.assigned_to.username if ticket.assigned_to_id else "(ninguém)")}\n\n'
+        f'Atribuído a: {(ticket.assigned_to.username if ticket.assigned_to_id else "(ninguém)")}\n'
+        f'Gatilho desta rodada: {gatilho}\n\n'
         f'Anexos:\n{_resumo_anexos(ticket)}\n\n'
-        f'Histórico de comentários:\n' + ('\n'.join(linhas) or '(vazio)') + '\n\n'
+        f'Histórico recente (até 15 Assistente / 5 TI / 5 usuário):\n'
+        + ('\n'.join(linhas) or '(vazio)') + '\n\n'
         f'Regras de negócio (obrigatórias):\n{regras_txt}\n\n'
         f'Aprendizado (estilo TI / chunks):\n{aprendizado_txt}'
     )
-    return texto, [ch.pk for ch in chunks], hybrid
-
+    if central_txt:
+        texto += f'\n\n{central_txt}'
+    return texto, [ch.pk for ch in chunks], hybrid, info_ids
 
 
 def _system_prompt() -> str:
@@ -838,21 +1007,20 @@ def _system_prompt() -> str:
     return (
         'Você é o Assistente de TI da Money Promotora no helpdesk. '
         'Responda em português, claro e profissional.\n\n'
-        'Siga SEMPRE as "Regras de negócio (obrigatórias)" e o "Aprendizado" do contexto, '
+        'Siga SEMPRE as "Regras de negócio (obrigatórias)", a Central Informativa '
+        '(se houver comunicado vigente) e o "Aprendizado" do contexto, '
         'além das tools disponíveis. '
         'Não invente procedimentos fora desses chunks e do histórico do chamado.\n\n'
         'Lembretes fixos:\n'
         '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
-        '- Use Markdown leve; ao solicitante prefira 2–4 bolhas curtas.\n'
-        '- O campo text das mensagens não deve conter raciocínio interno nem rótulos '
-        '("1ª mensagem:", "Vou verificar…").\n'
-        '- Se Prioridade estiver "(não definida)", tria com triar_chamado nesta interação.\n'
-        '- Discador JoyTec: só inventário local (consulta). Não cria/libera acesso; '
-        'oriente a TI com send_assistente_message interno=true.\n'
-        '- Chips WhatsApp: só consultar e atualizar status/obs. Não cria chip novo '
-        'nem entrega chip reserva — use mensagem interna + escalar_para_ti.\n'
-        '- MoneyConsig: sistema interno; use tools moneyconsig_* (API B2B). '
-        'Escale só se a API falhar ou for UI/permissão humana.'
+        '- Público = breve (1–2 frases). Detalhes/diagnóstico = interno=true.\n'
+        '- Não repita o que já disse no histórico recente.\n'
+        '- NÃO use status PENDING.\n'
+        '- Defina/atualize tag curta com definir_tag_chamado quando o tema estiver claro.\n'
+        '- Se faltar info: pedir_ajuda_ti (menciona TI online) em vez de inventar.\n'
+        '- Criar/transferir chip só quando a rodada for @assistente interno de TI.\n'
+        '- Discador JoyTec: só inventário local. MoneyConsig: tools moneyconsig_*.\n'
+        '- Comunicado vigente da Central prevalece sobre passo a passo genérico.'
     )
 
 
@@ -870,7 +1038,14 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
         if name == 'set_ticket_priority':
             return json.dumps(set_ticket_priority(ticket_id, args.get('priority', '')), ensure_ascii=False)
         if name == 'set_ticket_status':
-            return json.dumps(set_ticket_status(ticket_id, args.get('status', '')), ensure_ascii=False)
+            return json.dumps(
+                set_ticket_status(
+                    ticket_id,
+                    args.get('status', ''),
+                    via_assistente=True,
+                ),
+                ensure_ascii=False,
+            )
         if name == 'listar_categorias_especificas':
             return json.dumps(listar_categorias_especificas(), ensure_ascii=False)
         if name == 'triar_chamado':
@@ -1004,6 +1179,61 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
                     departamentos=args.get('departamentos') or '',
                     setores=args.get('setores') or '',
                     cargos=args.get('cargos') or '',
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'definir_tag_chamado':
+            return json.dumps(
+                definir_tag_chamado(
+                    ticket_id,
+                    args.get('tag') or '',
+                    limpar=bool(args.get('limpar')),
+                ),
+                ensure_ascii=False,
+            )
+        if name == 'listar_ti_online':
+            return json.dumps(listar_ti_online(), ensure_ascii=False)
+        if name == 'pedir_ajuda_ti':
+            return json.dumps(
+                pedir_ajuda_ti(ticket_id, args.get('pergunta') or ''),
+                ensure_ascii=False,
+            )
+        if name in TOOLS_CHIP_SENSIVEIS:
+            ctx = _rodada_ctx.get() or {}
+            if not ctx.get('autoriza_chips'):
+                return json.dumps({
+                    'ok': False,
+                    'error': (
+                        'Criar/transferir chip só é permitido quando um membro TI '
+                        'pede em mensagem INTERNA com @assistente nesta rodada.'
+                    ),
+                }, ensure_ascii=False)
+            actor = ctx.get('autor_ti')
+            if name == 'criar_chip_operacional':
+                return json.dumps(
+                    criar_chip_assistente(
+                        ticket_id,
+                        line_number=args.get('line_number') or '',
+                        operator_id=args.get('operator_id') or 0,
+                        tipo_titular=args.get('tipo_titular') or 'texto',
+                        nome_livre=args.get('nome_livre') or '',
+                        user_id=args.get('user_id'),
+                        operador_id=args.get('operador_id'),
+                        observacao=args.get('observacao') or '',
+                        actor=actor,
+                    ),
+                    ensure_ascii=False,
+                )
+            return json.dumps(
+                transferir_chip_assistente(
+                    ticket_id,
+                    chip_id=args.get('chip_id'),
+                    line_number=args.get('line_number') or '',
+                    tipo_titular=args.get('tipo_titular') or 'texto',
+                    nome_livre=args.get('nome_livre') or '',
+                    user_id=args.get('user_id'),
+                    operador_id=args.get('operador_id'),
+                    actor=actor,
                 ),
                 ensure_ascii=False,
             )
@@ -1157,7 +1387,12 @@ def _textos_anexos_prelidos(ticket_id: int) -> str:
     return '\n'.join(linhas)
 
 
-def _registrar_interacao(ticket_id: int, chunk_ids: list[int], hybrid: bool) -> None:
+def _registrar_interacao(
+    ticket_id: int,
+    chunk_ids: list[int],
+    hybrid: bool,
+    informative_ids: list[int] | None = None,
+) -> None:
     """Persiste eval da rodada; nunca interrompe o atendimento."""
     try:
         from integracoes.models import AssistenteInteracao
@@ -1165,36 +1400,107 @@ def _registrar_interacao(ticket_id: int, chunk_ids: list[int], hybrid: bool) -> 
         AssistenteInteracao.objects.create(
             ticket_id=ticket_id,
             chunk_ids=list(chunk_ids or []),
+            informative_ids=list(informative_ids or []),
             hybrid=bool(hybrid),
         )
     except Exception:
         logger.exception('Falha ao registrar AssistenteInteracao ticket=%s', ticket_id)
 
 
-def processar_assistente(ticket_id: int) -> None:
+def processar_assistente(
+    ticket_id: int,
+    *,
+    comment_id: int | None = None,
+    gatilho: str = GATILHO_AUTO,
+) -> None:
     """Processa uma rodada do Assistente no chamado. Seguro para on_commit/thread."""
     try:
         ticket = Ticket.objects.select_related(
             'category', 'specific_category', 'created_by', 'assigned_to',
-            'requester_user', 'equipe',
+            'requester_user', 'equipe', 'tag',
+        ).get(pk=ticket_id)
+    except Ticket.DoesNotExist:
+        return
+
+    # Autorização chips: menção interna TI no comentário gatilho
+    autoriza_chips = False
+    autor_ti = None
+    if comment_id:
+        from helpdesk.mentions import texto_menciona_assistente
+        c_gatilho = (
+            Comment.objects.filter(pk=comment_id, ticket_id=ticket_id, is_active=True)
+            .select_related('author')
+            .first()
+        )
+        if c_gatilho and texto_menciona_assistente(c_gatilho.text or ''):
+            # Qualquer @assistente reativa o atendimento
+            if ticket.assistente_escalado:
+                ticket.assistente_escalado = False
+                ticket.save(update_fields=['assistente_escalado', 'updated_at'])
+            if (
+                c_gatilho.is_interno
+                and c_gatilho.author_id
+                and usuario_eh_operador_helpdesk(c_gatilho.author)
+            ):
+                autoriza_chips = True
+                autor_ti = c_gatilho.author
+
+    token = _rodada_ctx.set({
+        'comment_id': comment_id,
+        'gatilho': gatilho,
+        'autoriza_chips': autoriza_chips,
+        'autor_ti': autor_ti,
+    })
+    try:
+        _processar_assistente_inner(
+            ticket_id,
+            comment_id=comment_id,
+            gatilho=gatilho,
+        )
+    finally:
+        _rodada_ctx.reset(token)
+
+
+def _processar_assistente_inner(
+    ticket_id: int,
+    *,
+    comment_id: int | None = None,
+    gatilho: str = GATILHO_AUTO,
+) -> None:
+    try:
+        ticket = Ticket.objects.select_related(
+            'category', 'specific_category', 'created_by', 'assigned_to',
+            'requester_user', 'equipe', 'tag',
         ).get(pk=ticket_id)
     except Ticket.DoesNotExist:
         return
 
     motivo = assistente_motivo_bloqueio(ticket)
-    if motivo:
-        logger.info(
-            'Assistente não atuou no ticket %s: %s',
-            ticket_id,
-            motivo,
-        )
+    # Menção @assistente ou orientação interna: permite continuar
+    if motivo and gatilho not in (GATILHO_MENCAO, GATILHO_ORIENTACAO):
+        # Se há orientação interna pendente, o gate padrão já libera
+        if not (motivo == 'assistente_escalado' and ticket_tem_orientacao_interna_pendente(ticket)):
+            logger.info(
+                'Assistente não atuou no ticket %s: %s',
+                ticket_id,
+                motivo,
+            )
+            return
+    elif motivo and gatilho == GATILHO_MENCAO and motivo not in (
+        'assistente_escalado',
+        'assumido_pela_ti',
+    ):
+        logger.info('Assistente bloqueado no ticket %s (menção): %s', ticket_id, motivo)
         return
 
     chunk_ids: list[int] = []
+    informative_ids: list[int] = []
     hybrid = False
     contexto_ok = False
     try:
-        contexto, chunk_ids, hybrid = _montar_contexto(ticket)
+        contexto, chunk_ids, hybrid, informative_ids = _montar_contexto(
+            ticket, comment_id=comment_id, gatilho=gatilho,
+        )
         contexto_ok = True
         textos_anexos = _textos_anexos_prelidos(ticket_id)
         if textos_anexos:
@@ -1211,7 +1517,23 @@ def processar_assistente(ticket_id: int) -> None:
 
         orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
         pedido = 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto
-        if orientacao_interna:
+        if gatilho == GATILHO_MENCAO:
+            ctx = _rodada_ctx.get() or {}
+            if ctx.get('autoriza_chips') or (
+                comment_id and orientacao_interna
+            ):
+                pedido += (
+                    '\n\nVocê foi mencionado com @assistente por membro da TI no canal interno. '
+                    'Execute o pedido diretamente quando os dados estiverem completos. '
+                    'Dúvidas só no canal interno (interno=true). Não reinicie saudação.'
+                )
+            else:
+                pedido += (
+                    '\n\nVocê foi mencionado com @assistente pelo usuário. '
+                    'Com base no contexto, oriente e pergunte só se o objetivo não estiver claro. '
+                    'Se já estava atendendo, continue sem reiniciar.'
+                )
+        if orientacao_interna and gatilho != GATILHO_MENCAO:
             pedido += (
                 '\n\nHá orientação INTERNA recente da TI ([INTERNO TI]). '
                 'Priorize: se pedirem correção do que você falou, mande mensagem PÚBLICA '
@@ -1229,12 +1551,13 @@ def processar_assistente(ticket_id: int) -> None:
             for _ in range(MAX_TOOL_ROUNDS):
                 ticket.refresh_from_db()
                 if not assistente_pode_atuar(ticket) and enviou_mensagem:
-                    break
-                # Após escalar, ainda permite terminar se veio de orientação interna
+                    if gatilho not in (GATILHO_MENCAO, GATILHO_ORIENTACAO):
+                        break
                 if (
                     ticket.assistente_escalado
                     and enviou_mensagem
                     and not ticket_tem_orientacao_interna_pendente(ticket)
+                    and gatilho != GATILHO_MENCAO
                 ):
                     break
                 if ticket.is_rejected and enviou_mensagem:
@@ -1244,11 +1567,9 @@ def processar_assistente(ticket_id: int) -> None:
                 enviou_mensagem = _rodada_tools(
                     ticket_id, messages, enviou_mensagem=enviou_mensagem,
                 )
-                # Resposta sem tools → fim
                 last = messages[-1] if messages else {}
                 if last.get('role') == 'assistant' and not (last.get('tool_calls') or []):
                     break
-                # Nada novo anexado (proteção)
                 if len(messages) == qtd_msgs:
                     break
 
@@ -1264,7 +1585,6 @@ def processar_assistente(ticket_id: int) -> None:
                 _garantir_triagem(ticket_id, messages)
         except (LlmError, AssistenteServiceError, Exception):
             logger.exception('Falha ao processar Assistente no ticket %s', ticket_id)
-            # Best-effort: chamado não fica mudo se o LLM falhar (exceto trigger só-interno)
             try:
                 if (
                     not enviou_mensagem
@@ -1277,15 +1597,9 @@ def processar_assistente(ticket_id: int) -> None:
                     'Falha ao enviar fallback do Assistente no ticket %s',
                     ticket_id,
                 )
-            if not orientacao_interna:
-                try:
-                    _garantir_triagem(ticket_id, messages)
-                except Exception:
-                    pass
     finally:
-        # Sempre registra eval desta rodada (mesmo se LLM falhou após montar contexto)
         if contexto_ok:
-            _registrar_interacao(ticket_id, chunk_ids, hybrid)
+            _registrar_interacao(ticket_id, chunk_ids, hybrid, informative_ids)
 
 
 def _titulo_normalizado(titulo: str) -> str:

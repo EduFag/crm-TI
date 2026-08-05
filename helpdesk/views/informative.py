@@ -36,10 +36,22 @@ def informative_create(request):
     """
     if request.method == 'POST':
         text = request.POST.get('text', '').strip()
+        palavras = request.POST.get('palavras_chave', '').strip()[:400]
+        valido_raw = (request.POST.get('valido_ate') or '').strip()
+        valido_ate = None
+        if valido_raw:
+            from datetime import datetime
+            try:
+                valido_ate = datetime.strptime(valido_raw, '%Y-%m-%d').date()
+            except ValueError:
+                valido_ate = None
         if text:
             InformativeMessage.objects.create(
                 text=text,
-                created_by=request.user
+                created_by=request.user,
+                palavras_chave=palavras,
+                valido_ate=valido_ate,
+                ativo=True,
             )
     # Retorna a lista atualizada
     return informative_list(request)

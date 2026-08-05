@@ -956,3 +956,142 @@ class ChamadoRestritoCriador25TestCase(TestCase):
 
         qs_outro = filtrar_chamados_para_usuario(Ticket.objects.all(), self.outro_ti)
         self.assertNotIn(ticket, qs_outro)
+
+
+class AssistenteContextualTestCase(TestCase):
+    """Testes dos ajustes: menção, tags, PENDING, histórico, Central, presença."""
+
+    def setUp(self):
+        self.categoria = TicketCategory.objects.get_or_create(
+            name='Dúvidas', defaults={'is_active': True},
+        )[0]
+        self.ti = CustomUser.objects.create_user(
+            username='ti_ctx', password='pass', role=CustomUser.RoleChoices.IT_USER,
+        )
+        self.user = CustomUser.objects.create_user(
+            username='user_ctx', password='pass', role=CustomUser.RoleChoices.STANDARD,
+        )
+        self.ticket = Ticket.objects.create(
+            title='JoyTec 524 timeout',
+            description='crm.joytec.com.br login timeout loja CAN',
+            category=self.categoria,
+            created_by=self.user,
+            requester_user=self.user,
+            requester_name='User Ctx',
+        )
+
+    def test_texto_menciona_assistente(self):
+        from helpdesk.mentions import texto_menciona_assistente
+        self.assertTrue(texto_menciona_assistente('Oi @assistente ajuda'))
+        self.assertTrue(texto_menciona_assistente('@Assistente por favor'))
+        self.assertFalse(texto_menciona_assistente('fala com @ti_ctx'))
+
+    def test_definir_tag_unica(self):
+        from helpdesk.assistente_services import definir_tag_chamado
+        r1 = definir_tag_chamado(self.ticket.pk, 'joytec-524')
+        self.assertTrue(r1['ok'])
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.tag.nome, 'joytec-524')
+        r2 = definir_tag_chamado(self.ticket.pk, 'sem-internet')
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.tag.nome, 'sem-internet')
+        r3 = definir_tag_chamado(self.ticket.pk, limpar=True)
+        self.ticket.refresh_from_db()
+        self.assertIsNone(self.ticket.tag_id)
+
+    def test_set_status_pending_bloqueado_assistente(self):
+        from helpdesk.assistente_services import AssistenteServiceError, set_ticket_status
+        with self.assertRaises(AssistenteServiceError):
+            set_ticket_status(self.ticket.pk, 'PENDING', via_assistente=True)
+        # Humano / via API sem flag ainda pode
+        ok = set_ticket_status(self.ticket.pk, 'IN_PROGRESS', via_assistente=True)
+        self.assertTrue(ok['ok'])
+
+    def test_escalar_nao_move_para_pending(self):
+        from helpdesk.assistente_services import escalar_para_ti
+        self.ticket.status = Ticket.StatusChoices.NEW
+        self.ticket.save(update_fields=['status'])
+        r = escalar_para_ti(self.ticket.pk, motivo='Erro 524 detalhado para TI')
+        self.ticket.refresh_from_db()
+        self.assertTrue(r['ok'])
+        self.assertTrue(self.ticket.assistente_escalado)
+        self.assertEqual(self.ticket.status, Ticket.StatusChoices.NEW)
+        # Público breve + interno detalhado
+        pubs = Comment.objects.filter(
+            ticket=self.ticket, is_assistente=True, is_interno=False,
+        )
+        ints = Comment.objects.filter(
+            ticket=self.ticket, is_assistente=True, is_interno=True,
+        )
+        self.assertEqual(pubs.count(), 1)
+        self.assertIn('Encaminhei', pubs.first().text)
+        self.assertNotIn('524', pubs.first().text)
+        self.assertEqual(ints.count(), 1)
+        self.assertIn('524', ints.first().text)
+
+    def test_antirrepeticao_mensagem_publica(self):
+        from helpdesk.assistente_services import AssistenteServiceError, send_assistente_message
+        send_assistente_message(self.ticket.pk, 'Já verifiquei o acesso do usuário.')
+        with self.assertRaises(AssistenteServiceError):
+            send_assistente_message(self.ticket.pk, 'Já verifiquei o acesso do usuário.')
+
+    def test_historico_15_5_5(self):
+        from integracoes.assistente_runtime import _selecionar_historico_recente
+        for i in range(20):
+            Comment.objects.create(
+                ticket=self.ticket, author=None, text=f'IA {i}', is_assistente=True,
+            )
+        for i in range(8):
+            Comment.objects.create(
+                ticket=self.ticket, author=self.ti, text=f'TI {i}',
+            )
+        for i in range(8):
+            Comment.objects.create(
+                ticket=self.ticket, author=self.user, text=f'User {i}',
+            )
+        sel = _selecionar_historico_recente(self.ticket)
+        n_ia = sum(1 for c in sel if c.is_assistente)
+        n_ti = sum(1 for c in sel if not c.is_assistente and c.author_id == self.ti.pk)
+        n_user = sum(1 for c in sel if not c.is_assistente and c.author_id == self.user.pk)
+        self.assertLessEqual(n_ia, 15)
+        self.assertLessEqual(n_ti, 5)
+        self.assertLessEqual(n_user, 5)
+        self.assertEqual(n_ia, 15)
+        self.assertEqual(n_ti, 5)
+        self.assertEqual(n_user, 5)
+
+    def test_central_retrieval_por_palavra_chave(self):
+        from helpdesk.informative_retrieval import buscar_comunicados_relevantes
+        from helpdesk.models import InformativeMessage
+        InformativeMessage.objects.create(
+            text='JoyTec fora do ar — abrir chamado com a discadora.',
+            palavras_chave='joytec, discador, 524',
+            created_by=self.ti,
+            ativo=True,
+        )
+        itens = buscar_comunicados_relevantes(self.ticket, limite=3)
+        self.assertTrue(itens)
+        self.assertIn('JoyTec', itens[0]['texto'])
+
+    def test_presence_heartbeat(self):
+        from helpdesk.models import UserPresence
+        from helpdesk.presence import listar_ti_online_resumo, registrar_heartbeat
+        registrar_heartbeat(self.ti)
+        self.assertTrue(UserPresence.objects.filter(user=self.ti).exists())
+        online = listar_ti_online_resumo()
+        self.assertTrue(any(u['username'] == 'ti_ctx' for u in online))
+
+    def test_chip_tool_sem_autorizacao(self):
+        from integracoes.assistente_runtime import TOOLS_CHIP_SENSIVEIS, _executar_tool, _rodada_ctx
+        token = _rodada_ctx.set({'autoriza_chips': False})
+        try:
+            raw = _executar_tool(self.ticket.pk, 'criar_chip_operacional', {
+                'line_number': '51999999999',
+                'operator_id': 1,
+            })
+            data = __import__('json').loads(raw)
+            self.assertFalse(data.get('ok'))
+            self.assertIn('INTERNA', data.get('error', ''))
+        finally:
+            _rodada_ctx.reset(token)
+        self.assertIn('criar_chip_operacional', TOOLS_CHIP_SENSIVEIS)

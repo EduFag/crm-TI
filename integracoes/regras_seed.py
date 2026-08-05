@@ -91,10 +91,14 @@ REGRAS_SEED: list[dict[str, Any]] = [
         'conteudo': (
             'Formato das mensagens:\n'
             '- Use Markdown leve (**negrito**, listas com - ou 1.).\n'
-            '- Ao solicitante: 2–4 mensagens curtas via send_assistente_message (1–3 frases). '
-            'Nunca um único bloco longo.\n'
+            '- Ao solicitante: mensagens BREVES (1–2 frases). Diagnóstico e próximos passos '
+            'vão no canal interno (interno=true).\n'
             '- CRÍTICO: o campo text não deve ter raciocínio, "Ok, sem chips...", "Vou passar...", '
-            '"1ª mensagem:" — isso não pode aparecer no chamado.'
+            '"1ª mensagem:" — isso não pode aparecer no chamado.\n'
+            '- Não repita o que já disse no histórico recente do chamado.\n'
+            '- NÃO use status PENDING (só TI após Em Atendimento).\n'
+            '- Use definir_tag_chamado com tag curta (máx. 30 chars) como funil.\n'
+            '- Se houver comunicado vigente da Central Informativa no contexto, siga-o.'
         ),
     },
     {
@@ -116,9 +120,9 @@ REGRAS_SEED: list[dict[str, Any]] = [
             'ANTES ou JUNTO das mensagens ao solicitante.\n'
             '- WhatsApp/chip: consulte consultar_chips; status/obs com atualizar_status_chip / '
             'atualizar_observacao_chip; se já tiver 2 em uso, questione. '
-            'NÃO criar, registrar nem entregar chip novo/reserva — isso é humano. '
-            'Banimento permanente / troca: atualize status se couber, mensagem interna '
-            'à TI e escalar_para_ti.\n'
+            'Criar/transferir chip SÓ se a rodada for @assistente em mensagem INTERNA de TI '
+            '(tools criar_chip_operacional / transferir_chip). Caso contrário, peça à TI no interno.\n'
+            '- Banimento permanente: atualize status se couber, mensagem interna à TI e escalar_para_ti.\n'
             '- Patrimônio/e-mail: consultar_equipamento e consultar_email quando relevante.\n'
             '- Discador/JoyTec (inventário local): consultar_acesso_discador (já tem login/ramal?); '
             'consultar_licencas_discador / listar_ramais_discador (FREE). '
@@ -128,6 +132,7 @@ REGRAS_SEED: list[dict[str, Any]] = [
             '- MoneyConsig: use moneyconsig_usuario_consultar, moneyconsig_alerta_ti_listar, '
             'moneyconsig_alerta_ti_destinatarios e moneyconsig_alerta_ti_criar quando couber. '
             'Se a API falhar ou for mudança de UI/permissão humana → escalar_para_ti (TI interna).\n'
+            '- Dúvida ou falta de info: listar_ti_online + pedir_ajuda_ti (interno).\n'
             '- Acesso CRM: pergunte qual sistema; use consultar_usuario para caso individual.\n'
             '- Título/descrição incorretos: recusar_chamado com motivo (não invente o problema).\n'
             '- Hardware, AnyDesk, permissões de rede e mudanças no MoneyConsig (UI/abas/acessos): '
@@ -135,7 +140,7 @@ REGRAS_SEED: list[dict[str, Any]] = [
             'Não oriente a procurar suporte externo para MoneyConsig.\n'
             '- Só use RESOLVED se o problema foi resolvido sem TI (recusa usa recusar_chamado).\n'
             '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
-            '- Não invente procedimentos fora dos chunks e do histórico.'
+            '- Não invente procedimentos fora dos chunks, da Central e do histórico.'
         ),
     },
 ]

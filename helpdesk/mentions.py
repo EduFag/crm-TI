@@ -11,6 +11,9 @@ from helpdesk.ticket_access import usuario_eh_operador_helpdesk
 # Username estilo Instagram/WhatsApp após @
 MENTION_RE = re.compile(r'(?<!\w)@([A-Za-z0-9_.+-]+)')
 
+# Alias virtual do Assistente (não é CustomUser)
+ASSISTENTE_ALIASES = frozenset({'assistente', 'ia', 'assist'})
+
 
 def extrair_usernames_mencionados(texto: str) -> list[str]:
     """Extrai usernames únicos na ordem em que aparecem no texto."""
@@ -26,11 +29,20 @@ def extrair_usernames_mencionados(texto: str) -> list[str]:
     return resultado
 
 
+def texto_menciona_assistente(texto: str) -> bool:
+    """True se o texto contém @assistente (alias virtual)."""
+    for username in extrair_usernames_mencionados(texto or ''):
+        if username.lower() in ASSISTENTE_ALIASES:
+            return True
+    return False
+
+
 def processar_mencoes(ticket, comment, autor) -> list:
     """
     Processa @mentions de um comentário criado por operador TI/admin.
 
     Concede acesso via co_authors, cria TicketMention e retorna usuários mencionados.
+    Ignora o alias virtual @assistente.
     """
     if not autor or not usuario_eh_operador_helpdesk(autor):
         return []
@@ -41,6 +53,8 @@ def processar_mencoes(ticket, comment, autor) -> list:
 
     mencionados = []
     for username in usernames:
+        if username.lower() in ASSISTENTE_ALIASES:
+            continue
         user = CustomUser.objects.filter(username__iexact=username, is_active=True).first()
         if not user or user.pk == autor.pk:
             continue
@@ -50,6 +64,33 @@ def processar_mencoes(ticket, comment, autor) -> list:
             user=user,
             comment=comment,
             defaults={'mentioned_by': autor},
+        )
+        mencionados.append(user)
+    return mencionados
+
+
+def processar_mencoes_assistente(ticket, comment) -> list:
+    """
+    Processa @mentions em comentário do Assistente (author=None).
+    Cria TicketMention para cada TI mencionado (sem exigir autor operador).
+    """
+    usernames = extrair_usernames_mencionados(comment.text or '')
+    if not usernames:
+        return []
+
+    mencionados = []
+    for username in usernames:
+        if username.lower() in ASSISTENTE_ALIASES:
+            continue
+        user = CustomUser.objects.filter(username__iexact=username, is_active=True).first()
+        if not user or not usuario_eh_operador_helpdesk(user):
+            continue
+        ticket.co_authors.add(user)
+        TicketMention.objects.get_or_create(
+            ticket=ticket,
+            user=user,
+            comment=comment,
+            defaults={'mentioned_by': None},
         )
         mencionados.append(user)
     return mencionados
