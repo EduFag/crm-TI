@@ -1095,3 +1095,67 @@ class AssistenteContextualTestCase(TestCase):
         finally:
             _rodada_ctx.reset(token)
         self.assertIn('criar_chip_operacional', TOOLS_CHIP_SENSIVEIS)
+
+    def test_antirrepeticao_mensagem_interna(self):
+        from helpdesk.assistente_services import AssistenteServiceError, send_assistente_message
+        texto = (
+            'Preciso que o comando venha em mensagem INTERNA com @assistente '
+            'para eu criar o chip e transferir para o usuário solicitante.'
+        )
+        send_assistente_message(self.ticket.pk, texto, interno=True)
+        with self.assertRaises(AssistenteServiceError):
+            send_assistente_message(self.ticket.pk, texto, interno=True)
+        # Variação mínima de redação também é bloqueada
+        with self.assertRaises(AssistenteServiceError):
+            send_assistente_message(
+                self.ticket.pk, texto.replace('Preciso que', 'Por favor,'), interno=True,
+            )
+
+    def test_operadora_resolvida_por_nome(self):
+        from chips.models import Operator
+        from helpdesk.assistente_services import (
+            AssistenteServiceError,
+            _resolver_operadora_chip,
+            listar_operadoras_chips,
+        )
+        tim = Operator.objects.create(name='TIM')
+        self.assertEqual(_resolver_operadora_chip(None, 'tim').pk, tim.pk)
+        self.assertEqual(_resolver_operadora_chip(tim.pk, '').pk, tim.pk)
+        self.assertTrue(listar_operadoras_chips()['count'] >= 1)
+        with self.assertRaises(AssistenteServiceError) as ctx:
+            _resolver_operadora_chip(9999, 'Inexistente')
+        # Erro deve listar as opções para a IA não pedir id à TI
+        self.assertIn('TIM', str(ctx.exception))
+
+    def test_autorizacao_chip_persiste_em_sessao(self):
+        from unittest.mock import patch
+
+        from helpdesk.presence import registrar_heartbeat
+        registrar_heartbeat(self.ti)
+        c1 = Comment.objects.create(
+            ticket=self.ticket,
+            author=self.ti,
+            text='@assistente criar chip 51999999999 operadora TIM',
+            is_interno=True,
+        )
+        with patch('integracoes.assistente_runtime._processar_assistente_inner'):
+            from integracoes.assistente_runtime import processar_assistente
+            processar_assistente(self.ticket.pk, comment_id=c1.pk, gatilho='mencao')
+        self.ticket.refresh_from_db()
+        self.assertTrue(self.ticket.assistente_chip_autorizado)
+        self.assertEqual(self.ticket.assistente_chip_auth_por_id, self.ti.pk)
+
+        # Complemento interno sem @assistente mantém a autorização
+        c2 = Comment.objects.create(
+            ticket=self.ticket, author=self.ti, text='usar operadora TIM', is_interno=True,
+        )
+        capturado = {}
+
+        def _fake(ticket_id, **kwargs):
+            from integracoes.assistente_runtime import _rodada_ctx
+            capturado.update(_rodada_ctx.get() or {})
+
+        with patch('integracoes.assistente_runtime._processar_assistente_inner', _fake):
+            from integracoes.assistente_runtime import processar_assistente
+            processar_assistente(self.ticket.pk, comment_id=c2.pk, gatilho='continuacao')
+        self.assertTrue(capturado.get('autoriza_chips'))

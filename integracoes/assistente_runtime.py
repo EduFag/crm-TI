@@ -9,6 +9,7 @@ from contextvars import ContextVar
 from typing import Any
 
 from django.db.models import Q
+from django.utils import timezone
 
 from helpdesk.assistente_services import (
     AssistenteServiceError,
@@ -34,6 +35,7 @@ from helpdesk.assistente_services import (
     listar_anexos_ticket,
     listar_campanhas_discador,
     listar_categorias_especificas,
+    listar_operadoras_chips,
     listar_ramais_discador,
     listar_ti_online,
     moneyconsig_alerta_ti_criar,
@@ -608,13 +610,16 @@ TOOLS_SPEC = [
         'function': {
             'name': 'criar_chip_operacional',
             'description': (
-                'Cria chip e entrega. SÓ funciona se esta rodada veio de @assistente '
-                'em mensagem INTERNA de membro TI. Confirma só no canal interno.'
+                'Cria chip e entrega. Requer autorização de TI (menção interna @assistente; '
+                'a autorização segue valendo nas mensagens internas seguintes). '
+                'Informe operator_nome (ex.: TIM) — resolva antes com listar_operadoras_chips '
+                'e NUNCA peça o id da operadora à TI. Confirma só no canal interno.'
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'line_number': {'type': 'string'},
+                    'operator_nome': {'type': 'string'},
                     'operator_id': {'type': 'integer'},
                     'tipo_titular': {
                         'type': 'string',
@@ -625,8 +630,19 @@ TOOLS_SPEC = [
                     'operador_id': {'type': 'integer'},
                     'observacao': {'type': 'string'},
                 },
-                'required': ['line_number', 'operator_id'],
+                'required': ['line_number'],
             },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'listar_operadoras_chips',
+            'description': (
+                'Lista operadoras do controle de chips (id e nome). '
+                'Use para resolver o nome informado pela TI antes de criar chip.'
+            ),
+            'parameters': {'type': 'object', 'properties': {}, 'required': []},
         },
     },
     {
@@ -634,8 +650,8 @@ TOOLS_SPEC = [
         'function': {
             'name': 'transferir_chip',
             'description': (
-                'Entrega (AVAILABLE) ou transfere (IN_USE) chip. SÓ com @assistente '
-                'em mensagem INTERNA de TI nesta rodada.'
+                'Entrega (AVAILABLE) ou transfere (IN_USE) chip. Requer autorização de TI '
+                '(menção interna @assistente; segue valendo nas mensagens internas seguintes).'
             ),
             'parameters': {
                 'type': 'object',
@@ -1014,11 +1030,16 @@ def _system_prompt() -> str:
         'Lembretes fixos:\n'
         '- Sempre envie ao menos uma mensagem via send_assistente_message nesta interação.\n'
         '- Público = breve (1–2 frases). Detalhes/diagnóstico = interno=true.\n'
-        '- Não repita o que já disse no histórico recente.\n'
+        '- Nunca repita nem reformule mensagem já enviada no histórico recente.\n'
+        '- Nunca peça para reenviar/repetir algo que já está no histórico: use o dado.\n'
+        '- Se um pedido já foi feito, continue de onde parou em vez de recomeçar.\n'
+        '- Pergunte no máximo uma vez por dado faltante, e só o que ainda falta.\n'
         '- NÃO use status PENDING.\n'
         '- Defina/atualize tag curta com definir_tag_chamado quando o tema estiver claro.\n'
         '- Se faltar info: pedir_ajuda_ti (menciona TI online) em vez de inventar.\n'
-        '- Criar/transferir chip só quando a rodada for @assistente interno de TI.\n'
+        '- Chips: a TI autoriza com @assistente interno e a autorização segue valendo '
+        'nas mensagens internas seguintes. Resolva a operadora com '
+        'listar_operadoras_chips; nunca peça o id da operadora à TI.\n'
         '- Discador JoyTec: só inventário local. MoneyConsig: tools moneyconsig_*.\n'
         '- Comunicado vigente da Central prevalece sobre passo a passo genérico.'
     )
@@ -1198,14 +1219,16 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
                 pedir_ajuda_ti(ticket_id, args.get('pergunta') or ''),
                 ensure_ascii=False,
             )
+        if name == 'listar_operadoras_chips':
+            return json.dumps(listar_operadoras_chips(), ensure_ascii=False)
         if name in TOOLS_CHIP_SENSIVEIS:
             ctx = _rodada_ctx.get() or {}
             if not ctx.get('autoriza_chips'):
                 return json.dumps({
                     'ok': False,
                     'error': (
-                        'Criar/transferir chip só é permitido quando um membro TI '
-                        'pede em mensagem INTERNA com @assistente nesta rodada.'
+                        'Criar/transferir chip só é permitido após um membro TI pedir '
+                        'em mensagem INTERNA com @assistente.'
                     ),
                 }, ensure_ascii=False)
             actor = ctx.get('autor_ti')
@@ -1214,7 +1237,8 @@ def _executar_tool(ticket_id: int, name: str, args: dict) -> str:
                     criar_chip_assistente(
                         ticket_id,
                         line_number=args.get('line_number') or '',
-                        operator_id=args.get('operator_id') or 0,
+                        operator_id=args.get('operator_id'),
+                        operator_nome=args.get('operator_nome') or '',
                         tipo_titular=args.get('tipo_titular') or 'texto',
                         nome_livre=args.get('nome_livre') or '',
                         user_id=args.get('user_id'),
@@ -1422,9 +1446,10 @@ def processar_assistente(
     except Ticket.DoesNotExist:
         return
 
-    # Autorização chips: menção interna TI no comentário gatilho
-    autoriza_chips = False
-    autor_ti = None
+    # Autorização de chips: concedida por @assistente interno da TI e mantida
+    # em sessão, para a TI poder complementar dados sem repetir a menção.
+    autoriza_chips = ticket.assistente_chip_autorizado
+    autor_ti = ticket.assistente_chip_auth_por if autoriza_chips else None
     if comment_id:
         from helpdesk.mentions import texto_menciona_assistente
         c_gatilho = (
@@ -1432,18 +1457,31 @@ def processar_assistente(
             .select_related('author')
             .first()
         )
-        if c_gatilho and texto_menciona_assistente(c_gatilho.text or ''):
+        mencionou = bool(c_gatilho and texto_menciona_assistente(c_gatilho.text or ''))
+        if mencionou:
             # Qualquer @assistente reativa o atendimento
             if ticket.assistente_escalado:
                 ticket.assistente_escalado = False
                 ticket.save(update_fields=['assistente_escalado', 'updated_at'])
-            if (
-                c_gatilho.is_interno
-                and c_gatilho.author_id
-                and usuario_eh_operador_helpdesk(c_gatilho.author)
-            ):
-                autoriza_chips = True
-                autor_ti = c_gatilho.author
+        ti_interno = bool(
+            c_gatilho
+            and c_gatilho.is_interno
+            and c_gatilho.author_id
+            and usuario_eh_operador_helpdesk(c_gatilho.author)
+        )
+        if ti_interno and (mencionou or autoriza_chips):
+            # Abre a sessão (menção) ou renova enquanto a TI segue no interno
+            autoriza_chips = True
+            autor_ti = c_gatilho.author
+            ticket.assistente_chip_auth_em = timezone.now()
+            ticket.assistente_chip_auth_por = c_gatilho.author
+            ticket.save(
+                update_fields=[
+                    'assistente_chip_auth_em',
+                    'assistente_chip_auth_por',
+                    'updated_at',
+                ]
+            )
 
     token = _rodada_ctx.set({
         'comment_id': comment_id,
@@ -1476,10 +1514,14 @@ def _processar_assistente_inner(
         return
 
     motivo = assistente_motivo_bloqueio(ticket)
+    chip_sessao = bool((_rodada_ctx.get() or {}).get('autoriza_chips'))
     # Menção @assistente ou orientação interna: permite continuar
     if motivo and gatilho not in (GATILHO_MENCAO, GATILHO_ORIENTACAO):
-        # Se há orientação interna pendente, o gate padrão já libera
-        if not (motivo == 'assistente_escalado' and ticket_tem_orientacao_interna_pendente(ticket)):
+        # Orientação interna pendente ou tarefa de chip em andamento liberam o gate
+        if not (
+            motivo == 'assistente_escalado'
+            and (ticket_tem_orientacao_interna_pendente(ticket) or chip_sessao)
+        ):
             logger.info(
                 'Assistente não atuou no ticket %s: %s',
                 ticket_id,
@@ -1517,6 +1559,14 @@ def _processar_assistente_inner(
 
         orientacao_interna = ticket_tem_orientacao_interna_pendente(ticket)
         pedido = 'Analise o chamado e aja (tools). Contexto:\n\n' + contexto
+        if chip_sessao:
+            pedido += (
+                '\n\nA TI já autorizou operações de chip neste chamado e a autorização '
+                'continua valendo: NÃO peça para reenviar o comando nem exija nova '
+                '@assistente. Use os dados já enviados no histórico interno, complete '
+                'com listar_operadoras_chips / listar_ti_online e execute. '
+                'Só pergunte (interno) o que ainda não foi informado, uma única vez.'
+            )
         if gatilho == GATILHO_MENCAO:
             ctx = _rodada_ctx.get() or {}
             if ctx.get('autoriza_chips') or (
@@ -1617,8 +1667,6 @@ def gerar_chunks_aprendizado(
     data_inicio/data_fim: date ou None (filtra resolved_at, fallback updated_at).
     """
     from datetime import datetime, time
-
-    from django.utils import timezone
 
     from integracoes.llm import chat_text
     from integracoes.models import AssistenteChunk, AssistenteConfig

@@ -187,12 +187,41 @@ class Ticket(models.Model):
         blank=True,
         help_text='Última solicitação de ajuda do Assistente aos técnicos online (anti-spam).',
     )
+    assistente_chip_auth_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Início/renovação da autorização de chips dada por TI via @assistente interno. '
+            'Vale por ASSISTENTE_CHIP_AUTH_MINUTOS e é renovada a cada nota interna da TI.'
+        ),
+    )
+    assistente_chip_auth_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='chip_auth_tickets',
+        help_text='Membro da TI que autorizou operações de chip neste chamado.',
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text='Data e hora de criação.')
     updated_at = models.DateTimeField(auto_now=True, help_text='Data e hora da última atualização.')
 
     # Prazos padrão de arquivamento automático (em horas)
     HORAS_ARQUIVAR_RESOLVIDO = 24
     HORAS_ARQUIVAR_RECUSADO = 24
+
+    # Janela em que a autorização de chips dada pela TI continua valendo
+    ASSISTENTE_CHIP_AUTH_MINUTOS = 120
+
+    @property
+    def assistente_chip_autorizado(self) -> bool:
+        """True se a TI autorizou operações de chip e a janela ainda está aberta."""
+        from datetime import timedelta
+
+        if not self.assistente_chip_auth_em:
+            return False
+        limite = timedelta(minutes=self.ASSISTENTE_CHIP_AUTH_MINUTOS)
+        return (timezone.now() - self.assistente_chip_auth_em) <= limite
 
     @classmethod
     def archive_old_tickets(

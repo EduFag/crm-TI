@@ -6,6 +6,7 @@ import logging
 import mimetypes
 import os
 import re
+from datetime import timedelta
 from typing import Any
 
 from django.db.models import Q
@@ -209,12 +210,37 @@ def _notificar_comentario_assistente(ticket: Ticket, texto: str) -> None:
         pass
 
 
+def _texto_repetido(novo: str, anteriores: list[str], limiar: float = 0.88) -> bool:
+    """True se o texto for igual, contido ou muito parecido com algum anterior."""
+    from difflib import SequenceMatcher
+
+    norm_novo = re.sub(r'\s+', ' ', (novo or '').lower()).strip()
+    if not norm_novo:
+        return False
+    for antigo in anteriores:
+        norm_antigo = re.sub(r'\s+', ' ', (antigo or '').lower()).strip()
+        if not norm_antigo:
+            continue
+        if norm_novo == norm_antigo:
+            return True
+        if len(norm_novo) > 40 and norm_novo in norm_antigo:
+            return True
+        if len(norm_antigo) > 40 and norm_antigo in norm_novo:
+            return True
+        # Variações mínimas de redação também contam como repetição
+        if min(len(norm_novo), len(norm_antigo)) > 60:
+            if SequenceMatcher(None, norm_novo, norm_antigo).ratio() >= limiar:
+                return True
+    return False
+
+
 def send_assistente_message(
     ticket_id: int,
     text: str,
     *,
     interno: bool = False,
     followup_mencao: bool = False,
+    permitir_repeticao: bool = False,
 ) -> dict:
     interno = bool(interno)
     followup_mencao = bool(followup_mencao)
@@ -241,32 +267,24 @@ def send_assistente_message(
     if not ticket:
         raise AssistenteServiceError('Chamado não encontrado.', 404)
 
-    # Anti-repetição: compara com últimas mensagens públicas do Assistente
-    if not interno:
+    # Anti-repetição: vale para os dois canais, comparando dentro do mesmo canal
+    if not permitir_repeticao:
         recentes = list(
             Comment.objects.filter(
                 ticket=ticket,
                 is_active=True,
                 is_assistente=True,
-                is_interno=False,
+                is_interno=interno,
             )
             .order_by('-created_at')
             .values_list('text', flat=True)[:8]
         )
-        norm_novo = re.sub(r'\s+', ' ', texto.lower()).strip()
-        for antigo in recentes:
-            norm_antigo = re.sub(r'\s+', ' ', (antigo or '').lower()).strip()
-            if not norm_antigo:
-                continue
-            if norm_novo == norm_antigo or (
-                len(norm_novo) > 40 and norm_novo in norm_antigo
-            ) or (
-                len(norm_antigo) > 40 and norm_antigo in norm_novo
-            ):
-                raise AssistenteServiceError(
-                    'Mensagem repetida em relação ao histórico recente do Assistente. '
-                    'Reformule ou use canal interno para detalhes.'
-                )
+        if _texto_repetido(texto, recentes):
+            raise AssistenteServiceError(
+                'Mensagem praticamente igual a uma que você já enviou neste chamado. '
+                'Não repita nem peça de novo algo já informado: use o que já está no '
+                'histórico e avance no atendimento (ou envie apenas o que mudou).'
+            )
 
     pedacos = _partir_texto_assistente(texto)
     # Mensagem interna: uma bolha só (orientação à TI)
@@ -398,14 +416,36 @@ def escalar_para_ti(ticket_id: int, motivo: str = '') -> dict:
         'Encaminhei este chamado para a equipe de TI analisar. '
         'Um técnico assumirá o atendimento em breve.'
     )
-    comment = Comment.objects.create(
-        ticket=ticket,
-        author=None,
-        text=texto_publico,
-        is_assistente=True,
-        is_interno=False,
+    # Evita duas bolhas públicas seguidas dizendo a mesma coisa ao solicitante
+    ultima_publica = (
+        Comment.objects.filter(
+            ticket=ticket, is_active=True, is_assistente=True, is_interno=False,
+        )
+        .order_by('-created_at')
+        .first()
     )
-    _notificar_comentario_assistente(ticket, texto_publico)
+    reaproveita = bool(
+        ultima_publica
+        and (timezone.now() - ultima_publica.created_at) < timedelta(minutes=5)
+        and not Comment.objects.filter(
+            ticket=ticket,
+            is_active=True,
+            is_assistente=False,
+            is_interno=False,
+            created_at__gt=ultima_publica.created_at,
+        ).exists()
+    )
+    if reaproveita:
+        comment = ultima_publica
+    else:
+        comment = Comment.objects.create(
+            ticket=ticket,
+            author=None,
+            text=texto_publico,
+            is_assistente=True,
+            is_interno=False,
+        )
+        _notificar_comentario_assistente(ticket, texto_publico)
 
     comment_interno_id = None
     if motivo_limpo:
@@ -1823,11 +1863,49 @@ def _resolver_titular_chip(
     return nome, None, None
 
 
+def listar_operadoras_chips() -> dict:
+    """Operadoras cadastradas no controle de chips (para resolver nome -> id)."""
+    from chips.models import Operator
+
+    itens = [
+        {'id': o.pk, 'nome': o.name, 'status': o.status}
+        for o in Operator.objects.all().order_by('name')
+    ]
+    return {'ok': True, 'count': len(itens), 'results': itens}
+
+
+def _resolver_operadora_chip(operator_id=None, operator_nome: str = ''):
+    """Resolve a operadora por id ou nome; erro traz as opções existentes."""
+    from chips.models import Operator
+
+    operator = None
+    if operator_id:
+        operator = Operator.objects.filter(pk=operator_id).first()
+    if not operator and operator_nome:
+        nome = operator_nome.strip()
+        operator = (
+            Operator.objects.filter(name__iexact=nome).first()
+            or Operator.objects.filter(name__icontains=nome).first()
+        )
+    if operator:
+        return operator
+
+    disponiveis = ', '.join(
+        f'{o.pk}={o.name}' for o in Operator.objects.all().order_by('name')
+    ) or '(nenhuma cadastrada)'
+    raise AssistenteServiceError(
+        f'Operadora não encontrada. Cadastradas: {disponiveis}. '
+        'Use operator_nome com um destes nomes ou o id correspondente.',
+        404,
+    )
+
+
 def criar_chip_assistente(
     ticket_id: int,
     *,
     line_number: str,
-    operator_id: int,
+    operator_id=None,
+    operator_nome: str = '',
     tipo_titular: str = 'texto',
     nome_livre: str = '',
     user_id=None,
@@ -1838,17 +1916,14 @@ def criar_chip_assistente(
     """Cria chip operacional (somente com autorização TI interna)."""
     from django.core.exceptions import ValidationError
 
-    from chips.models import Operator
     from chips.services import criar_chip_operacional
 
     line_number = (line_number or '').strip()
     if not line_number:
         raise AssistenteServiceError('Informe line_number.')
-    if not operator_id:
-        raise AssistenteServiceError('Informe operator_id da operadora.')
-    operator = Operator.objects.filter(pk=operator_id).first()
-    if not operator:
-        raise AssistenteServiceError('Operadora não encontrada.', 404)
+    if not operator_id and not operator_nome:
+        raise AssistenteServiceError('Informe operator_nome (ex.: TIM) ou operator_id.')
+    operator = _resolver_operadora_chip(operator_id, operator_nome)
 
     nome, emp_user, emp_op = _resolver_titular_chip(
         tipo_titular=tipo_titular,
@@ -1871,8 +1946,9 @@ def criar_chip_assistente(
 
     send_assistente_message(
         ticket_id,
-        f'Chip {line_number} criado/entregue para {nome} (pedido TI).',
+        f'Chip {line_number} ({operator.name}) criado/entregue para {nome} (pedido TI).',
         interno=True,
+        permitir_repeticao=True,
     )
     return {'ok': True, 'ticket_id': ticket_id, 'chip': grid}
 
@@ -1934,5 +2010,6 @@ def transferir_chip_assistente(
         ticket_id,
         f'Chip {chip.line_number} {acao} para {nome} (pedido TI).',
         interno=True,
+        permitir_repeticao=True,
     )
     return {'ok': True, 'ticket_id': ticket_id, 'acao': acao, 'chip': grid}
