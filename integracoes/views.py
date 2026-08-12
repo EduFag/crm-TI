@@ -1233,3 +1233,24 @@ def token_revogar(request, pk):
     else:
         messages.info(request, f'Token "{token_obj.nome}" já estava revogado.')
     return redirect('integracoes:tokens_list')
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+def tokens_docs_download(request):
+    """Baixa documentação Markdown passo a passo da API (exemplo Python)."""
+    from django.http import HttpResponse
+
+    from integracoes.api_docs import montar_documentacao_api_python, nome_arquivo_docs
+
+    if not usuario_pode_token_api(request.user):
+        return resposta_sem_permissao_token(request)
+
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    conteudo = montar_documentacao_api_python(
+        base_url=base_url,
+        username=request.user.username,
+    )
+    response = HttpResponse(conteudo, content_type='text/markdown; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{nome_arquivo_docs()}"'
+    return response
+

@@ -34,5 +34,6 @@ urlpatterns = [
     # Tokens de API externa (CRM-TI → sistemas do cliente)
     path('tokens/', views.TokenListView.as_view(), name='tokens_list'),
     path('tokens/gerar/', views.TokenGerarView.as_view(), name='tokens_gerar'),
+    path('tokens/documentacao/', views.tokens_docs_download, name='tokens_docs'),
     path('tokens/<int:pk>/revogar/', views.token_revogar, name='tokens_revogar'),
 ]
