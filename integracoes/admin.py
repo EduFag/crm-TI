@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from integracoes.models import AssistenteInteracao, IntegracaoApi, IntegracaoIA
+from integracoes.models import AssistenteInteracao, IntegracaoApi, IntegracaoIA, TokenApiExterna
 
 
 @admin.register(IntegracaoIA)
@@ -17,6 +17,14 @@ class IntegracaoApiAdmin(admin.ModelAdmin):
     list_filter = ('provider', 'is_active')
     search_fields = ('name',)
     readonly_fields = ('credentials_encrypted', 'token_hint', 'created_at', 'updated_at')
+
+
+@admin.register(TokenApiExterna)
+class TokenApiExternaAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'user', 'prefixo', 'ativo', 'criado_em', 'ultimo_uso')
+    list_filter = ('ativo',)
+    search_fields = ('nome', 'prefixo', 'user__username')
+    readonly_fields = ('token_hash', 'prefixo', 'criado_em', 'ultimo_uso')
 
 
 @admin.register(AssistenteInteracao)

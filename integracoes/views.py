@@ -17,7 +17,8 @@ from integracoes.api_providers import (
     default_base_url_api,
     lista_provedores_api,
 )
-from integracoes.models import IntegracaoApi, IntegracaoIA
+from integracoes.models import IntegracaoApi, IntegracaoIA, TokenApiExterna
+from integracoes.token_api import criar_token, usuario_pode_token_api
 from integracoes.providers import (
     CAMPOS_META,
     base_url_do_provedor,
@@ -1124,3 +1125,111 @@ def ia_aprendizado_chat_limpar(request):
             pk=conversa_id, user=request.user, ativo=True,
         ).update(ativo=False)
     return JsonResponse({'ok': True})
+
+
+# ---------------------------------------------------------------------------
+# Tokens de API externa (integração CRM-TI → sistemas do cliente)
+# ---------------------------------------------------------------------------
+
+
+def resposta_sem_permissao_token(request):
+    from django.http import HttpResponseForbidden, JsonResponse
+    from django.shortcuts import redirect
+
+    if request.headers.get('HX-Request'):
+        return HttpResponseForbidden('Sem permissão para gerar tokens de API.')
+    if request.content_type == 'application/json':
+        return JsonResponse({'error': 'Sem permissão para gerar tokens de API.'}, status=403)
+    return redirect('sem_permissao')
+
+
+class TokenListView(ModuloObrigatorioMixin, ListView):
+    model = TokenApiExterna
+    template_name = 'integracoes/tokens_list.html'
+    context_object_name = 'tokens'
+    modulo_obrigatorio = MODULO_INTEGRACOES
+
+    def get(self, request, *args, **kwargs):
+        if not usuario_pode_token_api(request.user):
+            return resposta_sem_permissao_token(request)
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            TokenApiExterna.objects.filter(user=self.request.user)
+            .order_by('-ativo', '-criado_em')
+        )
+
+
+class TokenGerarView(ModuloObrigatorioMixin, View):
+    """GET: modal formulário · POST: gera token e mostra plaintext uma vez."""
+    modulo_obrigatorio = MODULO_INTEGRACOES
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if not usuario_pode_token_api(request.user):
+            return resposta_sem_permissao_token(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        if not request.headers.get('HX-Request'):
+            return redirect('integracoes:tokens_list')
+        return render(request, 'integracoes/_token_gerar_modal.html', {
+            'form_action': reverse('integracoes:tokens_gerar'),
+        })
+
+    def post(self, request):
+        nome = (request.POST.get('nome') or '').strip()
+        try:
+            token_obj, plaintext = criar_token(request.user, nome)
+        except ValueError as exc:
+            return render(request, 'integracoes/_token_gerar_modal.html', {
+                'form_action': reverse('integracoes:tokens_gerar'),
+                'erro': str(exc),
+                'nome': nome,
+            }, status=422)
+        except PermissionError as exc:
+            return render(request, 'integracoes/_token_gerar_modal.html', {
+                'form_action': reverse('integracoes:tokens_gerar'),
+                'erro': str(exc),
+                'nome': nome,
+            }, status=403)
+
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.CREATED,
+            descricao=f'Token API externa "{token_obj.nome}" gerado.',
+            actor=request.user,
+            obj=token_obj,
+            metadata={'prefixo': token_obj.prefixo, 'pk': token_obj.pk},
+        )
+        return render(request, 'integracoes/_token_gerado_modal.html', {
+            'token_obj': token_obj,
+            'token_plaintext': plaintext,
+        })
+
+
+@requer_modulo(MODULO_INTEGRACOES)
+@require_POST
+def token_revogar(request, pk):
+    """Desativa (revoga) um token do próprio usuário."""
+    if not usuario_pode_token_api(request.user):
+        return resposta_sem_permissao_token(request)
+
+    token_obj = get_object_or_404(TokenApiExterna, pk=pk, user=request.user)
+    if token_obj.ativo:
+        token_obj.ativo = False
+        token_obj.save(update_fields=['ativo'])
+        registrar_acao(
+            modulo=MODULO_CORE,
+            acao=RegistroAcao.AcaoChoices.UPDATED,
+            descricao=f'Token API externa "{token_obj.nome}" revogado.',
+            actor=request.user,
+            obj=token_obj,
+            metadata={'prefixo': token_obj.prefixo, 'pk': token_obj.pk},
+        )
+        messages.success(request, f'Token "{token_obj.nome}" revogado.')
+    else:
+        messages.info(request, f'Token "{token_obj.nome}" já estava revogado.')
+    return redirect('integracoes:tokens_list')

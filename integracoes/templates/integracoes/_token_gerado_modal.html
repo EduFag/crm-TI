@@ -1,0 +1,73 @@
+{# Modal: exibe o token gerado (plaintext) uma única vez #}
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+     onclick="document.getElementById('modal-container').innerHTML = ''; window.location.reload()"></div>
+
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-hidden pointer-events-auto flex flex-col"
+         onclick="event.stopPropagation()">
+
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50 shrink-0">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">Token gerado</h3>
+                <p class="text-xs text-emerald-700 mt-0.5">Copie agora — não será exibido novamente.</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''; window.location.reload()"
+                    class="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <div class="px-6 py-5 space-y-4">
+            <div>
+                <p class="text-sm font-medium text-slate-700 mb-1">Nome</p>
+                <p class="text-sm text-slate-900 font-semibold">{{ token_obj.nome }}</p>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-slate-700 mb-1">Token</p>
+                <div class="flex gap-2 items-stretch">
+                    <code id="token-plaintext-value"
+                          class="flex-1 text-xs font-mono text-slate-800 bg-slate-50 px-3 py-2.5 rounded-lg border border-slate-200 break-all select-all">{{ token_plaintext }}</code>
+                    <button type="button" id="btn-copiar-token"
+                            class="shrink-0 px-3 py-2 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-100">
+                        Copiar
+                    </button>
+                </div>
+            </div>
+            <div class="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+                Use <code class="font-mono">POST /api/v1/auth/</code> com <code class="font-mono">username</code> + <code class="font-mono">token</code>,
+                e nas demais rotas o header <code class="font-mono">Authorization: Bearer &lt;token&gt;</code>.
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
+            <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''; window.location.reload()"
+                    class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
+                Concluir
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var btn = document.getElementById('btn-copiar-token');
+    var el = document.getElementById('token-plaintext-value');
+    if (!btn || !el) return;
+    btn.addEventListener('click', function () {
+        var texto = el.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(texto).then(function () {
+                btn.textContent = 'Copiado';
+                setTimeout(function () { btn.textContent = 'Copiar'; }, 2000);
+            });
+        } else {
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            try { document.execCommand('copy'); btn.textContent = 'Copiado'; } catch (e) {}
+            setTimeout(function () { btn.textContent = 'Copiar'; }, 2000);
+        }
+    });
+})();
+</script>

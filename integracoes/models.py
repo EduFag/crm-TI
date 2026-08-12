@@ -290,3 +290,47 @@ class AssistenteMemoriaConversa(models.Model):
 
     def __str__(self) -> str:
         return f'{self.titulo} (#{self.pk})'
+
+
+class TokenApiExterna(models.Model):
+    """Token de API para integração do CRM-TI com sistemas externos do usuário."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tokens_api_externa',
+        help_text='Usuário dono do token.',
+    )
+    nome = models.CharField(
+        max_length=120,
+        help_text='Rótulo amigável (ex.: sistema do cliente).',
+    )
+    prefixo = models.CharField(
+        max_length=12,
+        help_text='Primeiros caracteres do token para identificação na UI.',
+    )
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        help_text='SHA-256 do token em texto claro.',
+    )
+    ativo = models.BooleanField(default=True, help_text='False = revogado.')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    ultimo_uso = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Última autenticação ou chamada autenticada.',
+    )
+
+    class Meta:
+        ordering = ['-criado_em']
+        verbose_name = 'token API externa'
+        verbose_name_plural = 'tokens API externa'
+
+    def __str__(self) -> str:
+        return f'{self.nome} ({self.prefixo}…) — {self.user}'
+
+    @property
+    def token_mascarado(self) -> str:
+        return f'{self.prefixo}…'

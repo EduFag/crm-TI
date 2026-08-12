@@ -28,6 +28,7 @@ urlpatterns = [
     path('discador/', include('discador.urls')),
     path('integracoes/', include('integracoes.urls')),
     path('api/mcp/', include('mcp_api.urls')),
+    path('api/v1/', include('integracoes.api_urls')),
 ]
 
 from django.conf import settings

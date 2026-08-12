@@ -555,3 +555,69 @@ def atualizar_contrato(
             registered_by=actor if getattr(actor, 'is_authenticated', False) else None,
         )
     return discador
+
+
+class DiscadorApiError(Exception):
+    """Erro de domínio para respostas JSON da API externa."""
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def serializar_ramal_api(ramal: Ramal) -> dict:
+    """Serializa ramal com titular e login para a API externa."""
+    acesso = None
+    try:
+        acesso = ramal.acesso
+    except AcessoDiscador.DoesNotExist:
+        acesso = None
+    return {
+        'id': ramal.pk,
+        'numero': ramal.numero,
+        'status': ramal.status,
+        'status_display': ramal.get_status_display(),
+        'titular': (acesso.nome_exibicao if acesso else None),
+        'login_discador': (acesso.login_discador if acesso else None),
+    }
+
+
+def listar_ramais_api(
+    *,
+    status: str = 'IN_USE',
+    slug: str = SLUG_JOYTEC,
+    limit: int = 200,
+) -> dict:
+    """Lista ramais do discador para API externa (default: em uso)."""
+    slug_limpo = (slug or SLUG_JOYTEC).strip() or SLUG_JOYTEC
+    discador = Discador.objects.filter(slug=slug_limpo, is_active=True).first()
+    if not discador:
+        raise DiscadorApiError(f'Discador "{slug_limpo}" não encontrado.', 404)
+
+    limit = max(1, min(int(limit or 200), 500))
+    qs = (
+        Ramal.objects.filter(discador=discador)
+        .select_related('acesso', 'acesso__titular_user')
+        .order_by('numero')
+    )
+
+    status_limpo = (status or '').strip().upper()
+    if not status_limpo:
+        status_limpo = Ramal.StatusChoices.IN_USE
+    validos = {c.value for c in Ramal.StatusChoices}
+    if status_limpo not in validos:
+        raise DiscadorApiError(
+            f'Status inválido. Use: {", ".join(sorted(validos))}.',
+            400,
+        )
+    qs = qs.filter(status=status_limpo)
+
+    itens = [serializar_ramal_api(r) for r in qs[:limit]]
+    return {
+        'ok': True,
+        'discador': discador.nome,
+        'slug': discador.slug,
+        'status': status_limpo,
+        'count': len(itens),
+        'results': itens,
+    }
