@@ -28,4 +28,8 @@ jobs:
           script: |
             set -e
             cd /home/edufa/crm-TI
-            bash .vps/deploy.sh
+            # SHA vem do Action (não do origin/main stale na VPS)
+            echo "Checkout forçado: ${{ github.sha }}"
+            git fetch --force origin "${{ github.sha }}"
+            git checkout -B main "${{ github.sha }}"
+            SKIP_GIT=1 bash .vps/deploy.sh

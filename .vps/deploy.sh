@@ -48,16 +48,21 @@ cd "${APP_DIR}"
 
 log "Deploy como usuário: $(whoami)"
 
-log "Atualizando código (origin/${BRANCH})..."
-# Atualiza explicitamente refs/remotes/origin/<branch> (só "git fetch origin main"
-# pode deixar origin/main antigo e o reset apontar para o commit errado).
-if ! git fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"; then
-    log "ERRO: git fetch falhou — o usuário $(whoami) precisa de acesso ao GitHub (deploy key ou token)."
-    exit 1
+# SKIP_GIT=1: o workflow já fez checkout do github.sha (evita origin/main stale).
+if [[ "${SKIP_GIT:-0}" == "1" ]]; then
+    log "SKIP_GIT=1 — mantendo código já no HEAD $(git rev-parse --short HEAD)"
+else
+    log "Atualizando código (origin/${BRANCH})..."
+    # Atualiza explicitamente refs/remotes/origin/<branch> (só "git fetch origin main"
+    # pode deixar origin/main antigo e o reset apontar para o commit errado).
+    if ! git fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"; then
+        log "ERRO: git fetch falhou — o usuário $(whoami) precisa de acesso ao GitHub (deploy key ou token)."
+        exit 1
+    fi
+    git checkout "${BRANCH}"
+    # Produção deve espelhar o que acabou de ser buscado — descarta alterações locais
+    git reset --hard "FETCH_HEAD"
 fi
-git checkout "${BRANCH}"
-# Produção deve espelhar o que acabou de ser buscado — descarta alterações locais
-git reset --hard "FETCH_HEAD"
 
 # Fallback de cache-bust (?v=) se o processo não achar .git em runtime
 git rev-parse --short HEAD > helpdesk/.frontend_git_version
