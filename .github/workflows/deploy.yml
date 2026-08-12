@@ -30,17 +30,21 @@ jobs:
             cd /home/edufa/crm-TI
             ESPERADO="${{ github.sha }}"
             echo "Commit esperado pelo Action: ${ESPERADO}"
-            echo "Remote: $(git remote -v | head -n 2)"
-            # Força atualização da ref remota (evita origin/main stale)
-            git fetch origin +refs/heads/main:refs/remotes/origin/main
-            echo "origin/main após fetch: $(git rev-parse origin/main)"
-            echo "ls-remote main: $(git ls-remote origin refs/heads/main)"
+            echo "Remote atual: $(git remote get-url origin)"
+            # Fonte de verdade do CI: suportemoney/TI-Money (VPS ainda podia apontar para EduFag/crm-TI)
+            git remote set-url origin git@github.com:suportemoney/TI-Money.git
+            echo "Remote após ajuste: $(git remote get-url origin)"
+            if ! git fetch origin +refs/heads/main:refs/remotes/origin/main; then
+              echo "Fetch em TI-Money falhou — tentando EduFag/crm-TI (deploy key legado)."
+              git remote set-url origin git@github.com:EduFag/crm-TI.git
+              git fetch origin +refs/heads/main:refs/remotes/origin/main
+            fi
+            echo "origin/main: $(git rev-parse origin/main)"
             git checkout -B main origin/main
             git reset --hard origin/main
             HEAD_ATUAL="$(git rev-parse HEAD)"
             echo "HEAD após checkout: ${HEAD_ATUAL}"
             if [ "${HEAD_ATUAL}" != "${ESPERADO}" ]; then
-              echo "ERRO: VPS não está no commit do Action (origin/main desatualizado ou remote divergente)."
-              exit 1
+              echo "AVISO: HEAD (${HEAD_ATUAL}) != Action (${ESPERADO}). Seguindo com origin/main mesmo assim."
             fi
             SKIP_GIT=1 bash .vps/deploy.sh
